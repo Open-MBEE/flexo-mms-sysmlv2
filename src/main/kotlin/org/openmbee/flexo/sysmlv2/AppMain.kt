@@ -14,14 +14,14 @@ import io.ktor.server.metrics.dropwizard.*
 import java.util.concurrent.TimeUnit
 import io.ktor.server.routing.*
 import org.openmbee.flexo.sysmlv2.apis.BranchApi
-import org.openapitools.server.apis.CommitApi
-import org.openapitools.server.apis.DiffMergeApi
-import org.openapitools.server.apis.ElementApi
-import org.openapitools.server.apis.MetaApi
-import org.openapitools.server.apis.ProjectApi
-import org.openapitools.server.apis.QueryApi
-import org.openapitools.server.apis.RelationshipApi
-import org.openapitools.server.apis.TagApi
+import org.openmbee.flexo.sysmlv2.apis.CommitApi
+import org.openmbee.flexo.sysmlv2.apis.DiffMergeApi
+import org.openmbee.flexo.sysmlv2.apis.ElementApi
+import org.openmbee.flexo.sysmlv2.apis.MetaApi
+import org.openmbee.flexo.sysmlv2.apis.ProjectApi
+import org.openmbee.flexo.sysmlv2.apis.QueryApi
+import org.openmbee.flexo.sysmlv2.apis.RelationshipApi
+import org.openmbee.flexo.sysmlv2.apis.TagApi
 
 
 
@@ -39,8 +39,8 @@ fun Application.main() {
         register(ContentType.Application.Json, GsonConverter())
     }
     install(AutoHeadResponse) // see https://ktor.io/docs/autoheadresponse.html
-    install(Compression, org.openmbee.flexo.sysmlv2.ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html
-    install(HSTS, org.openmbee.flexo.sysmlv2.ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
+    install(Compression, ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html
+    install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
     install(Resources)
     install(Routing) {
         BranchApi()
