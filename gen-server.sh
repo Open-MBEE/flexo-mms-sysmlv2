@@ -6,6 +6,7 @@ OUTPUT_DIR="./gen"
 GENERATOR="kotlin-server"
 
 # check if openapi-generator-cli is installed
+# brew is for mac and the command is called openapi-generator instead of openapi-generator-cli, fix as needed
 if ! command -v openapi-generator-cli &> /dev/null; then
     echo "OpenAPI Generator CLI not found, installing..."
     brew install openapi-generator
@@ -25,7 +26,8 @@ echo "Generating Kotlin stub server from $OPENAPI_PATH..."
 openapi-generator-cli generate \
     -g "$GENERATOR" \
     -i "$OPENAPI_PATH" \
-    -o "$OUTPUT_DIR"
+    -o "$OUTPUT_DIR" \
+    --additional-properties=groupId=org.openmbee.flexo,packageName=org.openmbee.flexo.sysmlv2
 
 # check if the generation was successful
 if [ $? -eq 0 ]; then
