@@ -13,6 +13,7 @@ repositories {
 plugins {
     application
     kotlin("jvm") version "1.9.24"
+    kotlin("plugin.serialization") version "1.9.24"
     id("com.gradleup.shadow") version "8.3.5"
 }
 
@@ -56,7 +57,7 @@ tasks.wrapper {
 }
 
 tasks.shadowJar {
-    archiveBaseName.set("flexo-mms-sysmlv2")
+    archiveBaseName.set("flexo-sysmlv2")
     archiveClassifier.set("")
     archiveVersion.set("")
 }

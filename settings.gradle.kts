@@ -1,1 +1,1 @@
-rootProject.name = "flexo-mms-sysmlv2"
+rootProject.name = "flexo-sysmlv2"
