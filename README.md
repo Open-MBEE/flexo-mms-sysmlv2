@@ -33,8 +33,8 @@ The server builds as a jar with a main entrypoint. To start the service, run `ja
 You may also run in docker:
 
 ```
-docker build -t org.openmbee.flexo.mms.sysmlv2 .
-docker run -p 8080:8080 org.openmbee.flexo.mms.sysmlv2
+docker build -t org.openmbee.flexo.sysmlv2 .
+docker run -p 8080:8080 org.openmbee.flexo.sysmlv2
 ```
 
 ## Features/Implementation Notes
