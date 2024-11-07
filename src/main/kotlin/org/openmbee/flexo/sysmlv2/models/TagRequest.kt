@@ -11,6 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.models
 
+import kotlinx.serialization.Serializable
 import org.openmbee.flexo.sysmlv2.models.Identified
 
 /**
@@ -19,6 +20,7 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  * @param taggedCommit
  * @param atType
  */
+@Serializable
 data class TagRequest(
     val name: kotlin.String,
     val taggedCommit: Identified,

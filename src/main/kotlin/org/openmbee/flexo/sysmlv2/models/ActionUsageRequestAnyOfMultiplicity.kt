@@ -9,14 +9,20 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
 
+import UUIDSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import org.openmbee.flexo.sysmlv2.models.Identified
 
 /**
  *
  * @param atId
  */
+@Serializable
 data class ActionUsageRequestAnyOfMultiplicity(
     val atId: java.util.UUID
 )

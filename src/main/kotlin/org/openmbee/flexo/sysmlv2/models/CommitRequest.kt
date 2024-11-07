@@ -11,6 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.models
 
+import kotlinx.serialization.Serializable
 import org.openmbee.flexo.sysmlv2.models.DataVersionRequest
 
 /**
@@ -19,6 +20,7 @@ import org.openmbee.flexo.sysmlv2.models.DataVersionRequest
  * @param atType
  * @param description
  */
+@Serializable
 data class CommitRequest(
     val change: kotlin.collections.List<DataVersionRequest>,
     val atType: CommitRequest.AtType? = null,

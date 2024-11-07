@@ -11,6 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.models
 
+import kotlinx.serialization.Serializable
 import org.openmbee.flexo.sysmlv2.models.DataIdentityRequest
 import org.openmbee.flexo.sysmlv2.models.DataRequest
 
@@ -20,6 +21,7 @@ import org.openmbee.flexo.sysmlv2.models.DataRequest
  * @param atType
  * @param identity
  */
+@Serializable
 data class DataVersionRequest(
     val payload: DataRequest,
     val atType: DataVersionRequest.AtType? = null,

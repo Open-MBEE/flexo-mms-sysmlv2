@@ -11,6 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.models
 
+import kotlinx.serialization.Serializable
 import org.openmbee.flexo.sysmlv2.models.ConstraintRequest
 
 /**
@@ -19,6 +20,7 @@ import org.openmbee.flexo.sysmlv2.models.ConstraintRequest
  * @param select
  * @param `where`
  */
+@Serializable
 data class QueryRequest(
     val atType: QueryRequest.AtType? = null,
     val select: kotlin.collections.List<kotlin.String>? = null,

@@ -11,10 +11,13 @@
 */
 package org.openmbee.flexo.sysmlv2.models
 
+import kotlinx.serialization.Serializable
+
 
 /**
  *
  */
+@Serializable
 class ActionDefinitionRequestAnyOfIsConjugated(
 
 )

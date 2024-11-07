@@ -11,6 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.models
 
+import kotlinx.serialization.Serializable
 import org.openmbee.flexo.sysmlv2.models.CompositeConstraintRequest
 import org.openmbee.flexo.sysmlv2.models.Constraint
 import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintRequest
@@ -25,6 +26,7 @@ import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintValue
  * @param `value`
  * @param inverse
  */
+@Serializable
 data class ConstraintRequest(
     val atType: ConstraintRequest.AtType,
     val constraint: kotlin.collections.List<Constraint>,

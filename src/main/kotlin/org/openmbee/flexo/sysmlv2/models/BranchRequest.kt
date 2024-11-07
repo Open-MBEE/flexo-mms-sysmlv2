@@ -11,7 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.models.Identified
+import kotlinx.serialization.Serializable
 
 /**
  *
@@ -19,6 +19,7 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  * @param name
  * @param atType
  */
+@Serializable
 data class BranchRequest(
     val head: Identified,
     val name: kotlin.String,

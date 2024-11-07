@@ -9,14 +9,19 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.models.Identified
+import UUIDSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 /**
  *
  * @param atId
  */
+@Serializable
 data class PrimitiveConstraintValue(
     val atId: java.util.UUID
 )

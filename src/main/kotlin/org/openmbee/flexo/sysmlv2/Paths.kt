@@ -9,12 +9,15 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class, URISerializer::class)
+
 package org.openmbee.flexo.sysmlv2
 
+import URISerializer
+import UUIDSerializer
 import io.ktor.resources.*
 import kotlinx.serialization.*
 import org.openmbee.flexo.sysmlv2.models.*
-
 object Paths {
     /**
      * Delete branch by project and ID
