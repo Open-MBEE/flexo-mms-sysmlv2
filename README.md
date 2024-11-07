@@ -28,7 +28,7 @@ This runs all tests and packages the library.
 
 ## Running
 
-The server builds as a jar with a main entrypoint. To start the service, run `java -jar ./build/libs/flexo-mms-sysmlv2.jar`.
+The server builds as a jar with a main entrypoint. To start the service, run `java -jar ./build/libs/flexo-sysmlv2.jar`.
 
 You may also run in docker:
 
