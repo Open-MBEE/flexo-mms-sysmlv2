@@ -15,18 +15,20 @@ import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.request.*
 import io.ktor.server.resources.*
 import io.ktor.server.resources.post
 import io.ktor.server.resources.put
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+
 import org.openmbee.flexo.sysmlv2.Paths
 import org.openmbee.flexo.sysmlv2.models.Project
 import org.openmbee.flexo.sysmlv2.models.ProjectRequest
 
 fun Route.ProjectApi() {
-    val gson = Gson()
-    val empty = mutableMapOf<String, Any?>()
 
     delete<Paths.deleteProjectById> {
         val exampleContentType = "application/json"
@@ -42,7 +44,7 @@ fun Route.ProjectApi() {
         }"""
 
         when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
+            "application/json" -> call.respond(Json.decodeFromString<Project>(exampleContentString))
             "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
             else -> call.respondText(exampleContentString)
         }
@@ -63,7 +65,7 @@ fun Route.ProjectApi() {
         }"""
 
         when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
+            "application/json" -> call.respond(Json.decodeFromString<Project>(exampleContentString))
             "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
             else -> call.respondText(exampleContentString)
         }
@@ -91,9 +93,9 @@ fun Route.ProjectApi() {
           "description" : "description",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         } ]"""
-
+        val projects = Json.decodeFromString<List<Project>>(exampleContentString)
         when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, emptyArray<Project>()::class.java))
+            "application/json" -> call.respond(projects)
             "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
             else -> call.respondText(exampleContentString)
         }
@@ -101,7 +103,7 @@ fun Route.ProjectApi() {
     }
 
     post<ProjectRequest>("/projects") {
-        call.respondText(gson.toJson(it))
+        call.respond(it)
         val exampleContentType = "application/json"
         val exampleContentString = """{
           "@type" : "Project",
@@ -115,14 +117,15 @@ fun Route.ProjectApi() {
         }"""
 
         when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
+            "application/json" -> call.respond(Json.decodeFromString<Project>(exampleContentString))
             "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
             else -> call.respondText(exampleContentString)
         }
 
     }
 
-    put<Paths.putProjectById> {
+    put<ProjectRequest>("/projects/{projectId}") {
+        call.respond(it)
         val exampleContentType = "application/json"
         val exampleContentString = """{
           "@type" : "Project",
@@ -136,7 +139,7 @@ fun Route.ProjectApi() {
         }"""
 
         when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
+            "application/json" -> call.respond(Json.decodeFromString<Project>(exampleContentString))
             "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
             else -> call.respondText(exampleContentString)
         }

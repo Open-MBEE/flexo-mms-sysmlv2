@@ -14,7 +14,7 @@
 package org.openmbee.flexo.sysmlv2.models
 
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -28,7 +28,7 @@ import org.openmbee.flexo.sysmlv2.models.DataVersion
  */
 @Serializable
 data class DataDifference(
-    @SerializedName("@type")
+    @SerialName("@type")
     val atType: DataDifference.AtType,
     val baseData: DataVersion,
     val compareData: DataVersion

@@ -15,7 +15,7 @@ package org.openmbee.flexo.sysmlv2.models
 
 import org.openmbee.flexo.sysmlv2.infrastructure.URISerializer
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -28,9 +28,9 @@ import kotlinx.serialization.UseSerializers
  */
 @Serializable
 data class ExternalDataRequest(
-    @SerializedName("@type")
+    @SerialName("@type")
     val atType: ExternalDataRequest.AtType,
-    @SerializedName("@id")
+    @SerialName("@id")
     val atId: java.util.UUID? = null,
     val resourceIdentifier: java.net.URI? = null
 )

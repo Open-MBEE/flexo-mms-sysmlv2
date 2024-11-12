@@ -13,7 +13,7 @@
 
 package org.openmbee.flexo.sysmlv2.models
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -28,7 +28,7 @@ import kotlinx.serialization.UseSerializers
 @Serializable
 data class ProjectRequest(
     val name: kotlin.String,
-    @SerializedName("@type")
+    @SerialName("@type")
     val atType: ProjectRequest.AtType? = null,
     val defaultBranch: Identified? = null,
     val description: kotlin.String? = null

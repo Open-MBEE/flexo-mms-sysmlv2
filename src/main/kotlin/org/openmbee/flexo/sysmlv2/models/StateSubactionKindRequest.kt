@@ -14,7 +14,7 @@
 package org.openmbee.flexo.sysmlv2.models
 
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 

@@ -14,7 +14,7 @@
 package org.openmbee.flexo.sysmlv2.models
 
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -121,9 +121,9 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  */
 @Serializable
 data class VerificationCaseDefinitionRequest(
-    @SerializedName("@type")
+    @SerialName("@type")
     val atType: VerificationCaseDefinitionRequest.AtType,
-    @SerializedName("@id")
+    @SerialName("@id")
     val atId: java.util.UUID? = null,
     val action: kotlin.collections.List<Identified>? = null,
     val actorParameter: kotlin.collections.List<Identified>? = null,

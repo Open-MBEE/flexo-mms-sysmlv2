@@ -14,7 +14,7 @@
 package org.openmbee.flexo.sysmlv2.models
 
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -371,9 +371,9 @@ import org.openmbee.flexo.sysmlv2.models.VisibilityKindRequest
  */
 @Serializable
 data class ElementRequest(
-    @SerializedName("@type")
+    @SerialName("@type")
     val atType: ElementRequest.AtType,
-    @SerializedName("@id")
+    @SerialName("@id")
     val atId: java.util.UUID? = null,
     val aliasIds: kotlin.collections.List<kotlin.String>? = null,
     val declaredName: kotlin.String? = null,

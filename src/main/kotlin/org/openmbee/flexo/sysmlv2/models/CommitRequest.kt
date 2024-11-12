@@ -14,7 +14,7 @@
 package org.openmbee.flexo.sysmlv2.models
 
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -29,7 +29,7 @@ import org.openmbee.flexo.sysmlv2.models.DataVersionRequest
 @Serializable
 data class CommitRequest(
     val change: kotlin.collections.List<DataVersionRequest>,
-    @SerializedName("@type")
+    @SerialName("@type")
     val atType: CommitRequest.AtType? = null,
     val description: kotlin.String? = null
 )

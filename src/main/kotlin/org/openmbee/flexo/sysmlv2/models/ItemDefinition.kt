@@ -14,7 +14,7 @@
 package org.openmbee.flexo.sysmlv2.models
 
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
@@ -134,9 +134,9 @@ import org.openmbee.flexo.sysmlv2.models.PartDefinition
  */
 @Serializable
 data class ItemDefinition(
-    @SerializedName("@id")
+    @SerialName("@id")
     val atId: java.util.UUID,
-    @SerializedName("@type")
+    @SerialName("@type")
     val atType: ItemDefinition.AtType,
     val aliasIds: kotlin.collections.List<kotlin.String>,
     val declaredName: kotlin.String,
