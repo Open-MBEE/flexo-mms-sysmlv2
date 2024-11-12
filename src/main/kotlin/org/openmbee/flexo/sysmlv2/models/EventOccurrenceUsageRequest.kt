@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.EventOccurrenceUsageRequestAnyOf
 import org.openmbee.flexo.sysmlv2.models.FeatureDirectionKindRequest
@@ -154,8 +161,11 @@ import org.openmbee.flexo.sysmlv2.models.PortionKindRequest
  * @param useCaseDefinition
  * @param useCaseIncluded
  */
+@Serializable
 data class EventOccurrenceUsageRequest(
+    @SerializedName("@type")
     val atType: EventOccurrenceUsageRequest.AtType,
+    @SerializedName("@id")
     val atId: java.util.UUID? = null,
     val aliasIds: kotlin.collections.List<kotlin.String>? = null,
     val chainingFeature: kotlin.collections.List<Identified>? = null,

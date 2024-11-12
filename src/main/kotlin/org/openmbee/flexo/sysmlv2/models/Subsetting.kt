@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.Identified
 import org.openmbee.flexo.sysmlv2.models.Redefinition
@@ -55,8 +62,11 @@ import org.openmbee.flexo.sysmlv2.models.SubsettingAnyOf
  * @param referencedFeature
  * @param referencingFeature
  */
+@Serializable
 data class Subsetting(
+    @SerializedName("@id")
     val atId: java.util.UUID,
+    @SerializedName("@type")
     val atType: Subsetting.AtType,
     val aliasIds: kotlin.collections.List<kotlin.String>,
     val declaredName: kotlin.String,

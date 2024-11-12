@@ -9,9 +9,15 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
 
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+
 import org.openmbee.flexo.sysmlv2.models.DataVersionRequest
 
 /**
@@ -23,6 +29,7 @@ import org.openmbee.flexo.sysmlv2.models.DataVersionRequest
 @Serializable
 data class CommitRequest(
     val change: kotlin.collections.List<DataVersionRequest>,
+    @SerializedName("@type")
     val atType: CommitRequest.AtType? = null,
     val description: kotlin.String? = null
 )

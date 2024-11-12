@@ -22,25 +22,32 @@ import org.openmbee.flexo.sysmlv2.apis.ProjectApi
 import org.openmbee.flexo.sysmlv2.apis.QueryApi
 import org.openmbee.flexo.sysmlv2.apis.RelationshipApi
 import org.openmbee.flexo.sysmlv2.apis.TagApi
-
+import org.openmbee.flexo.sysmlv2.infrastructure.LocalDateTimeAdapter
+import org.openmbee.flexo.sysmlv2.infrastructure.OffsetDateTimeAdapter
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
 
 
 fun Application.main() {
     install(DefaultHeaders)
-    install(DropwizardMetrics) {
+    /*install(DropwizardMetrics) {
         val reporter = Slf4jReporter.forRegistry(registry)
             .outputTo(this@main.log)
             .convertRatesTo(TimeUnit.SECONDS)
             .convertDurationsTo(TimeUnit.MILLISECONDS)
             .build()
         reporter.start(10, TimeUnit.SECONDS)
-    }
+    }*/
     install(ContentNegotiation) {
-        register(ContentType.Application.Json, GsonConverter())
+        gson {
+            registerTypeAdapter(OffsetDateTime::class.java, OffsetDateTimeAdapter)
+            registerTypeAdapter(LocalDateTime::class.java, LocalDateTimeAdapter)
+        }
+        //register(ContentType.Application.Json, GsonConverter())
     }
     install(AutoHeadResponse) // see https://ktor.io/docs/autoheadresponse.html
     install(Compression, ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html
-    install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
+    //install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
     install(Resources)
     install(Routing) {
         BranchApi()

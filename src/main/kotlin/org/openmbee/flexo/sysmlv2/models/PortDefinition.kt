@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.ConjugatedPortDefinition
 import org.openmbee.flexo.sysmlv2.models.Identified
@@ -106,8 +113,11 @@ import org.openmbee.flexo.sysmlv2.models.PortDefinitionAnyOf
  * @param originalPortDefinition
  * @param ownedPortConjugator
  */
+@Serializable
 data class PortDefinition(
+    @SerializedName("@id")
     val atId: java.util.UUID,
+    @SerializedName("@type")
     val atType: PortDefinition.AtType,
     val aliasIds: kotlin.collections.List<kotlin.String>,
     val conjugatedPortDefinition: Identified,

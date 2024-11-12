@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.FeatureDirectionKindRequest
 import org.openmbee.flexo.sysmlv2.models.Identified
@@ -137,8 +144,11 @@ import org.openmbee.flexo.sysmlv2.models.PortionKindRequest
  * @param viewDefinition
  * @param viewRendering
  */
+@Serializable
 data class ViewUsageRequest(
+    @SerializedName("@type")
     val atType: ViewUsageRequest.AtType,
+    @SerializedName("@id")
     val atId: java.util.UUID? = null,
     val aliasIds: kotlin.collections.List<kotlin.String>? = null,
     val chainingFeature: kotlin.collections.List<Identified>? = null,

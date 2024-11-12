@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.AnnotatingElementAnyOf
 import org.openmbee.flexo.sysmlv2.models.Comment
@@ -145,8 +152,11 @@ import org.openmbee.flexo.sysmlv2.models.TextualRepresentation
  * @param language
  * @param representedElement
  */
+@Serializable
 data class AnnotatingElement(
+    @SerializedName("@id")
     val atId: java.util.UUID,
+    @SerializedName("@type")
     val atType: AnnotatingElement.AtType,
     val aliasIds: kotlin.collections.List<kotlin.String>,
     val annotatedElement: kotlin.collections.List<Identified>,

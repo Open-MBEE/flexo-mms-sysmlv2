@@ -9,7 +9,15 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class, OffsetDateTimeSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+import org.openmbee.flexo.sysmlv2.infrastructure.OffsetDateTimeSerializer
 
 import org.openmbee.flexo.sysmlv2.models.Identified
 
@@ -23,8 +31,11 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  * @param owningProject
  * @param referencedCommit
  */
+@Serializable
 data class Branch(
+    @SerializedName("@id")
     val atId: java.util.UUID,
+    @SerializedName("@type")
     val atType: Branch.AtType,
     val created: java.time.OffsetDateTime,
     val head: Identified,

@@ -9,7 +9,15 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class, URISerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.URISerializer
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 
 /**
@@ -18,8 +26,11 @@ package org.openmbee.flexo.sysmlv2.models
  * @param atId
  * @param resourceIdentifier
  */
+@Serializable
 data class ExternalDataRequest(
+    @SerializedName("@type")
     val atType: ExternalDataRequest.AtType,
+    @SerializedName("@id")
     val atId: java.util.UUID? = null,
     val resourceIdentifier: java.net.URI? = null
 )

@@ -15,16 +15,14 @@ import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
-import io.ktor.server.resources.get
+import io.ktor.server.resources.*
 import io.ktor.server.resources.post
 import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.openmbee.flexo.sysmlv2.Paths
+import org.openmbee.flexo.sysmlv2.models.Project
+import org.openmbee.flexo.sysmlv2.models.ProjectRequest
 
 fun Route.ProjectApi() {
     val gson = Gson()
@@ -95,14 +93,15 @@ fun Route.ProjectApi() {
         } ]"""
 
         when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
+            "application/json" -> call.respond(gson.fromJson(exampleContentString, emptyArray<Project>()::class.java))
             "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
             else -> call.respondText(exampleContentString)
         }
 
     }
 
-    post<Paths.postProject> {
+    post<ProjectRequest>("/projects") {
+        call.respondText(gson.toJson(it))
         val exampleContentType = "application/json"
         val exampleContentString = """{
           "@type" : "Project",

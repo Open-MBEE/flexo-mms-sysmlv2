@@ -13,10 +13,10 @@
 
 package org.openmbee.flexo.sysmlv2
 
-import URISerializer
-import UUIDSerializer
 import io.ktor.resources.*
 import kotlinx.serialization.*
+import org.openmbee.flexo.sysmlv2.infrastructure.URISerializer
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import org.openmbee.flexo.sysmlv2.models.*
 object Paths {
     /**

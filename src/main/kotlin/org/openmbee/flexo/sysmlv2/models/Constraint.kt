@@ -9,9 +9,15 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
 
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import com.google.gson.annotations.SerializedName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+
 import org.openmbee.flexo.sysmlv2.models.CompositeConstraint
 import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraint
 import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintValue
@@ -27,6 +33,7 @@ import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintValue
  */
 @Serializable
 data class Constraint(
+    @SerializedName("@type")
     val atType: Constraint.AtType,
     val constraint: kotlin.collections.List<Constraint>,
     val `operator`: Constraint.`Operator`,
