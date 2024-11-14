@@ -11,7 +11,6 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -25,13 +24,14 @@ import io.ktor.server.resources.delete
 import io.ktor.server.resources.head
 import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import org.openmbee.flexo.sysmlv2.models.Branch
+import org.openmbee.flexo.sysmlv2.models.BranchRequest
 
 fun Route.BranchApi() {
-    val gson = Gson()
-    val empty = mutableMapOf<String, Any?>()
 
     delete<Paths.deleteBranchByProjectAndId> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "head" : {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
@@ -47,17 +47,10 @@ fun Route.BranchApi() {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
           }
         }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<Branch>(exampleContentString))
     }
 
     get<Paths.getBranchesByProject> {
-        val exampleContentType = "application/json"
         val exampleContentString = """[ {
           "head" : {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
@@ -88,16 +81,10 @@ fun Route.BranchApi() {
           }
         } ]"""
 
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<List<Branch>>(exampleContentString))
     }
 
     get<Paths.getBranchesByProjectAndId> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "head" : {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
@@ -113,39 +100,11 @@ fun Route.BranchApi() {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
           }
         }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<Branch>(exampleContentString))
     }
 
-    post<Paths.postBranchByProject> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """{
-          "head" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "Branch",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "name" : "name",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "referencedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    post<BranchRequest>("/projects/{projectId}/branches") {
+        call.respond(it)
     }
 
 }

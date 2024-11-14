@@ -11,7 +11,6 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -27,11 +26,8 @@ import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
 
 fun Route.MetaApi() {
-    val gson = Gson()
-    val empty = mutableMapOf<String, Any?>()
 
     get<Paths.getDatatypeById> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "${'$'}schema" : "${'$'}schema",
           "${'$'}defs" : {
@@ -47,29 +43,17 @@ fun Route.MetaApi() {
           "${'$'}id" : "https://openapi-generator.tech"
         }"""
 
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respondText(exampleContentString, ContentType.Application.Json)
     }
 
     get<Paths.getDatatypes> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "${'$'}schema" : "${'$'}schema",
           "${'$'}defs" : {
             "key" : ""
           }
         }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respondText(exampleContentString, ContentType.Application.Json)
     }
 
 }
