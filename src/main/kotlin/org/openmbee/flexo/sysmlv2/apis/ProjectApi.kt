@@ -29,7 +29,8 @@ import org.openmbee.flexo.sysmlv2.models.ProjectRequest
 
 fun Route.ProjectApi() {
 
-    delete<Paths.deleteProjectById> {
+    delete<Paths.deleteProjectById> {  it ->
+        call.application.log.debug("${it.projectId}")
         val exampleContentString = """{
           "@type" : "Project",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -45,6 +46,7 @@ fun Route.ProjectApi() {
     }
 
     get<Paths.getProjectById> {
+        call.application.log.debug("${it.projectId}")
         val exampleContentString = """{
           "@type" : "Project",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -88,6 +90,7 @@ fun Route.ProjectApi() {
     }
 
     put<ProjectRequest>("/projects/{projectId}") {
+        call.application.log.debug("${call.parameters["projectId"]}")
         call.respond(it)
     }
 
