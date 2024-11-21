@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.ActionDefinition
 import org.openmbee.flexo.sysmlv2.models.ConstraintDefinition
@@ -152,8 +159,11 @@ import org.openmbee.flexo.sysmlv2.models.PortDefinition
  * @param isParallel
  * @param state
  */
+@Serializable
 data class OccurrenceDefinition(
+    @SerialName("@id")
     val atId: java.util.UUID,
+    @SerialName("@type")
     val atType: OccurrenceDefinition.AtType,
     val aliasIds: kotlin.collections.List<kotlin.String>,
     val declaredName: kotlin.String,

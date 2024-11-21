@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.AssociationStructureRequestAnyOf
 import org.openmbee.flexo.sysmlv2.models.ConnectionDefinitionRequest
@@ -119,8 +126,11 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  * @param allocation
  * @param interfaceEnd
  */
+@Serializable
 data class AssociationStructureRequest(
+    @SerialName("@type")
     val atType: AssociationStructureRequest.AtType,
+    @SerialName("@id")
     val atId: java.util.UUID? = null,
     val aliasIds: kotlin.collections.List<kotlin.String>? = null,
     val associationEnd: kotlin.collections.List<Identified>? = null,

@@ -11,27 +11,26 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
-import io.ktor.server.resources.get
+import io.ktor.server.request.*
+import io.ktor.server.resources.*
 import io.ktor.server.resources.post
 import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+
+import org.openmbee.flexo.sysmlv2.Paths
+import org.openmbee.flexo.sysmlv2.models.Project
+import org.openmbee.flexo.sysmlv2.models.ProjectRequest
 
 fun Route.ProjectApi() {
-    val gson = Gson()
-    val empty = mutableMapOf<String, Any?>()
 
-    delete<Paths.deleteProjectById> {
-        val exampleContentType = "application/json"
+    delete<Paths.deleteProjectById> {  it ->
+        call.application.log.debug("${it.projectId}")
         val exampleContentString = """{
           "@type" : "Project",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -42,17 +41,12 @@ fun Route.ProjectApi() {
           "description" : "description",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<Project>(exampleContentString))
+        //call.respondText(exampleContentString, ContentType.Application.Json)
     }
 
     get<Paths.getProjectById> {
-        val exampleContentType = "application/json"
+        call.application.log.debug("${it.projectId}")
         val exampleContentString = """{
           "@type" : "Project",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -63,17 +57,11 @@ fun Route.ProjectApi() {
           "description" : "description",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<Project>(exampleContentString))
+        //call.respondText(exampleContentString, ContentType.Application.Json)
     }
 
     get<Paths.getProjects> {
-        val exampleContentType = "application/json"
         val exampleContentString = """[ {
           "@type" : "Project",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -93,55 +81,17 @@ fun Route.ProjectApi() {
           "description" : "description",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         } ]"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<List<Project>>(exampleContentString))
+        //call.respondText(exampleContentString, ContentType.Application.Json)
     }
 
-    post<Paths.postProject> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """{
-          "@type" : "Project",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "defaultBranch" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "name" : "name",
-          "description" : "description",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    post<ProjectRequest>("/projects") {
+        call.respond(it)
     }
 
-    put<Paths.putProjectById> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """{
-          "@type" : "Project",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "defaultBranch" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "name" : "name",
-          "description" : "description",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    put<ProjectRequest>("/projects/{projectId}") {
+        call.application.log.debug("${call.parameters["projectId"]}")
+        call.respond(it)
     }
 
 }

@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.FeatureDirectionKind
 import org.openmbee.flexo.sysmlv2.models.Identified
@@ -101,8 +108,11 @@ import org.openmbee.flexo.sysmlv2.models.LiteralString
  * @param unioningType
  * @param `value`
  */
+@Serializable
 data class LiteralExpression(
+    @SerialName("@id")
     val atId: java.util.UUID,
+    @SerialName("@type")
     val atType: LiteralExpression.AtType,
     val aliasIds: kotlin.collections.List<kotlin.String>,
     val behavior: kotlin.collections.List<Identified>,

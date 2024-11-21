@@ -11,7 +11,6 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -25,13 +24,16 @@ import io.ktor.server.resources.delete
 import io.ktor.server.resources.head
 import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import org.openmbee.flexo.sysmlv2.models.Commit
+import org.openmbee.flexo.sysmlv2.models.DataDifference
+import io.ktor.server.application.log
+import org.openmbee.flexo.sysmlv2.models.Data
 
 fun Route.DiffMergeApi() {
-    val gson = Gson()
-    val empty = mutableMapOf<String, Any?>()
 
     get<Paths.diff> {
-        val exampleContentType = "application/json"
         val exampleContentString = """[ {
           "@type" : "DataDifference",
           "baseData" : {
@@ -210,37 +212,12 @@ fun Route.DiffMergeApi() {
           }
         } ]"""
 
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<List<DataDifference>>(exampleContentString))
     }
 
-    post<Paths.merge> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """{
-          "@type" : "Commit",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "description" : "description",
-          "previousCommit" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    post<List<Data>>("/projects/{projectId}/branches/{targetBranchId}/merge") { it ->
+        call.application.environment.log.info("projectId: ${call.parameters["projectId"]}, targetBranchId: ${call.parameters["targetBranchId"]}")
+        call.respond(it)
     }
 
 }

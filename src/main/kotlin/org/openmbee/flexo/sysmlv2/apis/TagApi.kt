@@ -11,7 +11,6 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -25,13 +24,14 @@ import io.ktor.server.resources.delete
 import io.ktor.server.resources.head
 import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import org.openmbee.flexo.sysmlv2.models.Tag
+import org.openmbee.flexo.sysmlv2.models.TagRequest
 
 fun Route.TagApi() {
-    val gson = Gson()
-    val empty = mutableMapOf<String, Any?>()
 
     delete<Paths.deleteTagByProjectAndId> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "@type" : "Tag",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -48,16 +48,10 @@ fun Route.TagApi() {
           }
         }"""
 
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<Tag>(exampleContentString))
     }
 
     get<Paths.getTagByProjectAndId> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "@type" : "Tag",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -74,16 +68,11 @@ fun Route.TagApi() {
           }
         }"""
 
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
+        call.respond(Json.decodeFromString<Tag>(exampleContentString))
 
     }
 
     get<Paths.getTagsByProject> {
-        val exampleContentType = "application/json"
         val exampleContentString = """[ {
           "@type" : "Tag",
           "created" : "2000-01-23T04:56:07.000+00:00",
@@ -114,38 +103,11 @@ fun Route.TagApi() {
           }
         } ]"""
 
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<List<Tag>>(exampleContentString))
     }
 
-    post<Paths.postTagByProject> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """{
-          "@type" : "Tag",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "taggedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "name" : "name",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "referencedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    post<TagRequest>("/projects/{projectId}/tags") {
+        call.respond(it)
     }
 
 }

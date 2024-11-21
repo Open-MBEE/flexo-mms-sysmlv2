@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.ActionDefinitionRequestAnyOfDeclaredShortName
 import org.openmbee.flexo.sysmlv2.models.ActionDefinitionRequestAnyOfIsConjugated
@@ -42,8 +49,11 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  * @param shortName
  * @param textualRepresentation
  */
+@Serializable
 data class AnnotatingElementAnyOf(
+    @SerialName("@id")
     val atId: java.util.UUID,
+    @SerialName("@type")
     val atType: AnnotatingElementAnyOf.AtType,
     val aliasIds: kotlin.collections.List<kotlin.String>,
     val annotatedElement: kotlin.collections.List<Identified>,

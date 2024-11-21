@@ -9,7 +9,16 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class, URISerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
+
+import org.openmbee.flexo.sysmlv2.infrastructure.URISerializer
 
 import org.openmbee.flexo.sysmlv2.models.ActionDefinitionRequestAnyOfIsConjugated
 import org.openmbee.flexo.sysmlv2.models.ActionUsageRequestAnyOfMultiplicity
@@ -368,8 +377,11 @@ import org.openmbee.flexo.sysmlv2.models.VisibilityKindRequest
  * @param usedCommit
  * @param usedProject
  */
+@Serializable
 data class DataRequest(
+    @SerialName("@type")
     val atType: DataRequest.AtType,
+    @SerialName("@id")
     val atId: java.util.UUID? = null,
     val aliasIds: kotlin.collections.List<kotlin.String>? = null,
     val declaredName: kotlin.String? = null,

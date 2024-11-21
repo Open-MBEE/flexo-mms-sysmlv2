@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.ConstraintRequest
 
@@ -19,7 +26,9 @@ import org.openmbee.flexo.sysmlv2.models.ConstraintRequest
  * @param select
  * @param `where`
  */
+@Serializable
 data class QueryRequest(
+    @SerialName("@type")
     val atType: QueryRequest.AtType? = null,
     val select: kotlin.collections.List<kotlin.String>? = null,
     val `where`: ConstraintRequest? = null

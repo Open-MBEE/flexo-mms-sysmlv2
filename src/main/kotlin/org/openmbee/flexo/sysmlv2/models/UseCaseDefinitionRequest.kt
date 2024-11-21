@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.Identified
 
@@ -112,8 +119,11 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  * @param variant
  * @param variantMembership
  */
+@Serializable
 data class UseCaseDefinitionRequest(
+    @SerialName("@type")
     val atType: UseCaseDefinitionRequest.AtType,
+    @SerialName("@id")
     val atId: java.util.UUID? = null,
     val action: kotlin.collections.List<Identified>? = null,
     val actorParameter: kotlin.collections.List<Identified>? = null,

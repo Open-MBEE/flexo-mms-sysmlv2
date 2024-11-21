@@ -11,7 +11,6 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import com.google.gson.Gson
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -25,13 +24,15 @@ import io.ktor.server.resources.delete
 import io.ktor.server.resources.head
 import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import org.openmbee.flexo.sysmlv2.models.Element
+import org.openmbee.flexo.sysmlv2.models.Query
+import org.openmbee.flexo.sysmlv2.models.QueryRequest
 
 fun Route.QueryApi() {
-    val gson = Gson()
-    val empty = mutableMapOf<String, Any?>()
 
     delete<Paths.deleteQueryByProjectAndId> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "select" : [ "select", "select" ],
           "@type" : "Query",
@@ -45,17 +46,10 @@ fun Route.QueryApi() {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
           }
         }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<Query>(exampleContentString))
     }
 
     get<Paths.getQueriesByProject> {
-        val exampleContentType = "application/json"
         val exampleContentString = """[ {
           "select" : [ "select", "select" ],
           "@type" : "Query",
@@ -81,17 +75,10 @@ fun Route.QueryApi() {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
           }
         } ]"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<List<Query>>(exampleContentString))
     }
 
     get<Paths.getQueryByProjectAndId> {
-        val exampleContentType = "application/json"
         val exampleContentString = """{
           "select" : [ "select", "select" ],
           "@type" : "Query",
@@ -105,17 +92,10 @@ fun Route.QueryApi() {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
           }
         }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<Query>(exampleContentString))
     }
 
     get<Paths.getQueryResultsByProjectIdQuery> {
-        val exampleContentType = "application/json"
         val exampleContentString = """[ {
           "owner" : {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
@@ -185,17 +165,10 @@ fun Route.QueryApi() {
           "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         } ]"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<List<Element>>(exampleContentString))
     }
 
     get<Paths.getQueryResultsByProjectIdQueryId> {
-        val exampleContentType = "application/json"
         val exampleContentString = """[ {
           "owner" : {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
@@ -265,141 +238,18 @@ fun Route.QueryApi() {
           "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         } ]"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+        call.respond(Json.decodeFromString<List<Element>>(exampleContentString))
     }
 
-    post<Paths.getQueryResultsByProjectIdQueryPost> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """[ {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    post<QueryRequest>("/projects/{projectId}/query-results") {
+        call.respond(it)
     }
 
-    post<Paths.postQueryByProject> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """{
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    post<QueryRequest>("/projects/{projectId}/queries") {
+        call.respond(it)
     }
 
-    put<Paths.putQueryByProjectAndId> {
-        val exampleContentType = "application/json"
-        val exampleContentString = """{
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-
-        when (exampleContentType) {
-            "application/json" -> call.respond(gson.fromJson(exampleContentString, empty::class.java))
-            "application/xml" -> call.respondText(exampleContentString, ContentType.Text.Xml)
-            else -> call.respondText(exampleContentString)
-        }
-
+    put<QueryRequest>("/projects/{projectId}/queries/{queryId}") {
+        call.respond(it)
     }
-
 }

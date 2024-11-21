@@ -9,7 +9,14 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
+@file:UseSerializers(UUIDSerializer::class)
+
 package org.openmbee.flexo.sysmlv2.models
+
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.AssertConstraintUsageRequest
 import org.openmbee.flexo.sysmlv2.models.ConstraintUsageRequestAnyOf
@@ -156,8 +163,11 @@ import org.openmbee.flexo.sysmlv2.models.RequirementUsageRequest
  * @param viewpointDefinition
  * @param viewpointStakeholder
  */
+@Serializable
 data class ConstraintUsageRequest(
+    @SerialName("@type")
     val atType: ConstraintUsageRequest.AtType,
+    @SerialName("@id")
     val atId: java.util.UUID? = null,
     val aliasIds: kotlin.collections.List<kotlin.String>? = null,
     val behavior: kotlin.collections.List<Identified>? = null,
