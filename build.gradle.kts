@@ -2,7 +2,7 @@ group = "org.openmbee.flexo.sysmlv2"
 version = "0.0.1-ALPHA"
 
 application {
-    mainClass.set("io.ktor.server.netty.DevelopmentEngine")
+    mainClass.set("io.ktor.server.netty.EngineMain")
 }
 
 repositories {
