@@ -1,7 +1,11 @@
-FROM openjdk:8-jre-alpine
+FROM openjdk:17.0.2-jdk-slim as build
+WORKDIR application
+COPY . .
+RUN ./gradlew installDist
 
-COPY ./build/libs/flexo-sysmlv2.jar /root/flexo-sysmlv2.jar
-
-WORKDIR /root
-
-CMD ["java", "-server", "-Xms4g", "-Xmx4g", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=100", "-XX:+UseStringDeduplication", "-jar", "flexo-sysmlv2.jar"]
+FROM openjdk:17.0.2-jdk-slim
+WORKDIR application
+RUN apt-get update && apt-get install -y procps
+COPY --from=build application/build/install/flexo-sysmlv2/ .
+ENTRYPOINT ["./bin/flexo-sysmlv2"]
+EXPOSE 8080
