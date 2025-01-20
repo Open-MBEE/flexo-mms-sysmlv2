@@ -1,0 +1,586 @@
+/*******************************************************************************
+ * SysML 2 RDF API Implementation
+ * Copyright (c) 2025 Model Driven Solutions, Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of theGNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * @license LGPL-3.0-or-later <http://spdx.org/licenses/LGPL-3.0-or-later>
+ *
+ *******************************************************************************/
+
+ package com.modeldriven.sysmlv2.apiService
+
+/**
+ * Rdf4jService provides an extension to RdfServiceAbstract, using the RDF4J API for managing the graphs.
+ */
+
+import kotlinx.serialization.json.*
+import org.eclipse.rdf4j.model.IRI
+import org.eclipse.rdf4j.model.Literal
+import org.eclipse.rdf4j.model.util.Values.literal
+import org.eclipse.rdf4j.model.Value
+import org.eclipse.rdf4j.query.BindingSet
+import org.eclipse.rdf4j.query.TupleQuery
+import org.eclipse.rdf4j.repository.RepositoryConnection;
+import org.eclipse.rdf4j.repository.Repository;
+import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.eclipse.rdf4j.sail.memory.MemoryStore;
+import java.time.LocalDate
+import java.util.*
+
+/**
+ * RdfServiceRdf4j is a service class that provides an interface for managing and interacting
+ * with RDF data using the RDF4J framework. It extends RDF-related capabilities to perform
+ * CRUD operations on RDF graphs, translate objects to RDF terms, and manage RDF triples using
+ * a specified graph configuration.
+ *
+ * @property rdf4JRepo The repository connection to manage RDF data storage and retrieval.
+ * @property rdf4JCon The connection used to interact with the RDF4J repository.
+ * @property rdfSubject The subject for RDF graph manipulation operations.
+ * @property rdfPredicate The predicate for RDF triple manipulation operations.
+ * @property rdfObject The object for RDF triple manipulation operations.
+ */
+open class RdfServiceRdf4jV1 (modelGraph:GraphConfig, projectGraph:GraphConfig) : RdfService(modelGraph, projectGraph) {
+    // Add export to real DB using DB interface.
+    val rdf4JRepo: Repository = SailRepository(MemoryStore())
+    val rdf4JCon: RepositoryConnection = rdf4JRepo.connection
+
+
+
+    //val apiIndex = Values.iri("https://www.omg.org/spec/SysML/API#index") not currently used, uses IRI instead.
+    init {
+        rdfSubject = this.rdfIRI("rdf:", "subject") //("http://www.w3.org/1999/02/22-rdf-syntax-ns#subject")
+        rdfPredicate = this.rdfIRI("rdf:", "predicate")
+        rdfObject = this.rdfIRI("rdf:", "object")
+        rdfType = this.rdfIRI("rdf:", "type")
+        serviceInit()
+    }
+
+     /**
+     * Deletes a triple from the RDF model based on the specified subject, predicate, and object values.
+     * If the object is not null, it resolves the RDF term associated with the object and removes the
+     * corresponding triple from the model. Additionally, if indexing is enabled, a SPARQL update query
+     * is used for deletion of th eindex.
+     *
+     * @param subject The subject of the triple, represented as an `ObjectCache`. Contains information
+     * about the graph configuration, object type, and RDF properties.
+     * @param predicate The predicate of the triple, specified as a string. Represents the relationship
+     * between the subject and the object.
+     * @param obj The object of the triple, which can be any value (e.g., a string, number, or another object).
+     * If null, no action is performed.
+     * @param indexed A flag indicating whether indexed deletion should be performed. If true, a SPARQL query
+     * will be used to remove the indexed representation of the triple. If false, the triple is removed
+     * directly from the model without indexing.
+     */
+    override fun deleteTriple(gc: GraphConfig, subject: String, predicateSpec: PredicateSpec, obj: Any?, index: Int?) {
+        if (obj != null) {
+
+            val term: Value? = this.getGraphTerm(predicateSpec, obj, gc)
+            if (term != null) {
+                //this.exportStream.println("Add: ${subject.gc.prefix}: ${subject.uri}  ${qualified(predicate, subject.gc)}  $term  Index:$index" )
+                val s = this.getGraphResourceIRI(subject, gc)
+                val p =
+                    predicateSpec.getRdfIRI() as IRI //this.getGraphResourceIRI(predicateSpec.predicate, this.getRdfGraph(predicateSpec.graphKey)!!)
+
+                this.rdfRemove(s, p, term, gc)
+
+                if (index != null) {
+                    val orderUrl = this.getGraphResourceIRI(
+                        "${subject}__${this.simpleTerm(predicateSpec.predicate)}__${
+                            index.toString(16).padStart(6, '0')
+                        }", gc
+                    )
+                    this.rdfRemove(orderUrl, rdfSubject, s, gc)
+                    this.rdfRemove(orderUrl, rdfPredicate, p, gc)
+                    this.rdfRemove(orderUrl, rdfObject, term, gc)
+                    //model.remove(orderUrl,apiIndex, literal(index), ctx) // Currently using URL index
+                }
+            }
+        }
+    }
+
+
+
+    /**
+     * Deletes an object from the RDF model and related references following data integrity rules.
+     * The method constructs and executes a SPARQL query to remove all triples directly or indirectly
+     * associated with the specified subject, including references and relationships.
+     *
+     * @param subject The object to be deleted, represented as an `ObjectCache`. Contains information
+     * about the graph configuration, URI, associated data identity, and RDF properties.
+     */
+    override open fun deleteObject(gc: GraphConfig, subject: String?) {
+        /**
+         * Deleting Data - Commit.change should include a DataVersion
+         * record with DataVersion.payload not provided, thereby
+         * indicating deletion of DataIdentity in the new commit.
+         * DataVersion.identity should be populated with the
+         * DataIdentity that will be deleted in the new commit.
+         * When a DataIdentity is deleted in a commit, all its
+         * versions (DataVersion) are also deleted, and any
+         * references from other DataIdentity are also removed to
+         * maintain data integrity. In addition, for Element Data
+         * (KerML), deletion of an Element must also result in
+         * deletion of incoming Relationships. When Element Data
+         * (KerML) is created or updated, derived properties must
+         * be computed or verified if the API provider claims
+         * Derived Property Conformance. The deleted element -
+         * DataIdentity and its DataVersion records - will be
+         * accessible in previous commits.
+         */
+        val ctxIri = this.getGraphHelper(gc).context.stringValue()
+        val subIri = this.getGraphResourceIRI(subject, gc)?.stringValue()
+        val model = this.getGraphHelper(gc).model
+
+        this.exportStream.println("Delete Object: ${subject} ")
+        // ToDo incoming KerML relationships
+
+        val deleteQuery = """
+DELETE {
+graph <$ctxIri> {
+    <$subIri> ?p ?o . # all triples FROM subejct
+
+        ?i rdf:subject <$subIri> .
+        ?i rdf:predicate ?p .
+        ?i rdf:object ?o .
+
+        ?ref ?anyP2 <$subIri> . # All triples TO object
+
+            ?i2 rdf:subject ?ref .
+            ?i2 rdf:predicate ?anyP2 .
+            ?i2 rdf:object <$subIri>  .
+
+            ?ref ?anyP3 ?any31 . # all triples FROM Relationship
+
+                ?i3 rdf:subject ?ref .
+                ?i3 rdf:predicate ?anyP3 .
+                ?i3 rdf:object ?any31 .
+
+                ?ref4 ?anyP4 ?ref .
+
+                    ?i4 rdf:subject ?ref4.
+                    ?i4 rdf:predicate ?anyP4 .
+                    ?i4 rdf:object ?ref .
+}}WHERE {
+graph <$ctxIri> {
+    <$subIri> ?p ?o . # all triples FROM subejct
+        optional { # Indexing triples of all objects  FROM subject
+        ?i rdf:subject <$subIri> .
+        ?i rdf:predicate ?p .
+        ?i rdf:object ?o .
+        }
+    optional {
+        ?ref ?anyP2 <$subIri> . # All triples TO object
+        optional { # Indexing triples of all triples to object
+            ?i2 rdf:subject ?ref .
+            ?i2 rdf:predicate ?anyP2 .
+            ?i2 rdf:object <$subIri>  .
+        }
+        optional {
+            ?ref <https://www.omg.org/spec/SysML#ownedRelatedElement>+ <$subIri> . # ?ref is a Relationship related to subject
+            ?ref ?anyP3 ?any31 . # all triples FROM Relationship
+            optional { # Indexing triples of all triples From Relationship
+                ?i3 rdf:subject ?ref .
+                ?i3 rdf:predicate ?anyP3 .
+                ?i3 rdf:object ?any31 .
+            }
+            optional { # All triples TO relationship
+                ?ref4 ?anyP4 ?ref .
+                optional { #Indexing of any triples to relationship
+                    ?i4 rdf:subject ?ref4.
+                    ?i4 rdf:predicate ?anyP4 .
+                    ?i4 rdf:object ?ref .
+                }
+            }
+        }
+    }
+}}"""
+        this.sparqlUpdate(deleteQuery, gc)
+    }
+
+
+
+    /**
+     * Converts the provided object and type specifications into a JSON representation.
+     *
+     * @param predicateSpec The `PredicateSpec` instance that contains information about the schema type and value type
+     *                 for the object being converted.
+     * @param objArg The object to be converted into a JSON element. This can be an instance of various data types,
+     *               such as primitive types, strings, or objects implementing specific interfaces.
+     * @param objType An optional string representing the object's type, used for constructing JSON-LD terms
+     *                with `@type` annotations.
+     * @return A `JsonElement` that represents the input object within the context of the given type and schema
+     *         specifications. This may include JSON primitives, objects, or arrays, depending on the input data.
+     */
+    override fun getJsonTerm(predicateSpec: PredicateSpec, obj: Any, objType: String?): JsonElement {
+        var term: JsonElement? = null
+
+        if (obj is JsonPrimitive) return obj
+
+
+        val castType = predicateSpec.valueType
+        val schemaKind = predicateSpec.schemaType
+        val that = this
+
+        if (schemaKind == "primitive" || schemaKind == "array" || schemaKind == "object") {
+
+            when (castType) {
+                "string", "uuid" -> term = JsonPrimitive(obj.toString())
+                "integer" -> term = JsonPrimitive(if (obj is Int) obj else obj.toString().toInt())
+                "boolean" -> term = JsonPrimitive(obj.toString() == "true")
+                "number" -> term = JsonPrimitive(if (obj is Number) obj else obj.toString().toFloatOrNull())
+                "date-time" -> term = JsonPrimitive(obj.toString())
+                "date" -> term = JsonPrimitive(obj.toString())
+                "reference" -> term = buildJsonObject {
+                    put("@id", that.simpleTerm(obj.toString()))
+                    //if (objType!=null)
+                    //    put("@type", JsonPrimitive(objType))//(obj as ObjectCache).uriId) )
+                }
+
+                else -> {
+                    term = JsonPrimitive(obj.toString())
+                    logApiError("Warning: Qualified type not found: $castType for ${obj.toString()}")
+                }
+            }
+
+        }
+
+        if (term == null) {
+            logApiError("Type not found: $castType for ${obj.toString()}")
+            term = JsonPrimitive("ERROR, no binding for: <${obj.toString()}> as a $castType")
+        }
+
+        return term
+    }
+
+    /**
+     * Retrieves a JSON representation of model data based on the given UniqueID
+     *
+     * @param gc The graph configuration containing information about the RDF graph, such as the base URI.
+     * @param uniqueID An optional string identifier used to filter the query; if null or empty, fetches all data.
+     * @return A JsonArray containing the JSON representation of the retrieved data respecting indexing, if any.
+     *
+    override fun getJsonById(gc: GraphConfig, uniqueID: String?): JsonArray {
+        val elements: MutableList<JsonObject> = mutableListOf()
+        val graphSpec = "graph <${gc.baseURI}>"
+        val graphHelper = this.getGraphHelper(gc)//bind( ${this.qualified(s,gc)} as ?s)
+        val uriStr: String? = if (uniqueID == null) null else this.qualified(uniqueID, gc)
+        val queryString = if (uriStr == null || uriStr == "") """SELECT ?s ?p ?o ?st ?ot ?index WHERE { 
+$graphSpec {?s ?p ?o.
+?s rdf:type ?st.
+optional {?o rdf:type ?ot} 
+optional {
+?index rdf:subject ?s.
+?index rdf:predicate ?p .
+?index rdf:object ?o.
+}}}
+order by ?s ?p ?index"""
+        else """SELECT ?s ?p ?o ?st ?ot ?index WHERE { 
+BIND( <${this.getGraphResourceIRI(uriStr, gc)?.stringValue()}> as ?s).            
+$graphSpec {?s ?p ?o.
+?s rdf:type ?st.
+optional {?o rdf:type ?ot} 
+optional {
+?index rdf:subject ?s.
+?index rdf:predicate ?p .
+?index rdf:object ?o.
+}}}
+order by ?s ?p ?index"""
+        //println(queryString)
+
+        var lastS: String? = null
+        var lastP: String? = null
+        var currentProperties: HashMap<String, JsonElement>? = null// = HashMap<String, JsonObject>()
+        var predicateSpec: PredicateSpec? = null
+        var term: JsonElement
+        var termArray: MutableList<JsonElement>? = null
+
+        //println("getJsonById: $queryString")
+        val queryResult = this.queryHelperFactory(queryString)
+        while (queryResult.next()) {
+            val valueOfS = queryResult.getValueString("s")
+            val valueOfP = queryResult.getValueString("p")
+            val valueOfO = queryResult.getValueString("o")
+            val valueOfSt = queryResult.getValueString("st") // Type of ?s
+            val valueOfOt = queryResult.getValueString("ot") // Optional type of ?o
+            val valueOfIndex = queryResult.getValueString("index") // Index URI of S P O
+
+            //println("getById: $valueOfS $valueOfP $valueOfO $valueOfSt $valueOfOt index:$valueOfIndex")
+
+            if (valueOfP != lastP || valueOfS != lastS) {
+                if (termArray != null) {
+                    currentProperties?.put(this.simpleTerm(lastP!!), JsonArray(termArray))
+                }
+                lastP = valueOfP
+                if (valueOfSt != null) {
+
+                    if (valueOfP == "rdf:type" || valueOfP == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+                        predicateSpec = this.rdfTypeSpec
+                    else
+                        predicateSpec =
+                            this.getPredicateSpec(gc, this.simpleTerm(valueOfSt), this.simpleTerm(valueOfP!!))
+                    // NOT FOUND??
+                    if (predicateSpec == null) {
+                        val valueType: String = if (queryResult.isLiteralValue("o")) "string" else "reference"
+                        //logApiError("Warning: Predicate not found: ${valueOfSt.stringValue()} ${valueOfP.stringValue()}")
+                        predicateSpec = this.makeDefaultPredicateSpec(
+                            this.simpleTerm(valueOfSt),
+                            this.simpleTerm(valueOfP),
+                            "primitive",
+                            valueType
+                        )
+                    }
+                }
+                if (predicateSpec != null && predicateSpec?.schemaType == "array") termArray =
+                    arrayListOf() else termArray = null
+            }
+
+            if (valueOfS != lastS) {
+                lastS = valueOfS
+                if (currentProperties != null) elements.add(JsonObject(currentProperties!!))
+                currentProperties = HashMap<String, JsonElement>()
+                currentProperties?.put("@id", JsonPrimitive(this.simpleTerm(valueOfS!!)))
+                if (valueOfSt != null) {
+                    val theType = this.simpleTerm(valueOfSt)
+                    currentProperties?.put("@type", JsonPrimitive(theType))
+                }
+            }
+
+            if (predicateSpec != null) { // Ignore anything without a type spec
+                val simpleO: Any? =
+                    if (predicateSpec?.valueType == "reference") this.simpleTerm(valueOfO!!) else valueOfO
+
+                term = getJsonTerm(
+                    predicateSpec!!,
+                    simpleO!!,
+                    if (valueOfOt != null) this.simpleTerm(valueOfOt) else predicateSpec?.valueType
+                )
+
+                if (valueOfP != "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" && valueOfP != "rdf:type")
+                    if (predicateSpec.schemaType == "array") {
+                        if (valueOfIndex != null) {
+                            termArray?.add(term) // assumes ordered index in query
+                            //termArray?.add((valueOfIndex.stringValue()).toInt(), term)
+                        } else
+                            termArray?.add(term) // Not ordered (currently everything is ordered)
+                    } else {
+                        currentProperties?.put(this.simpleTerm(valueOfP!!), term)
+                    }
+            } else {
+                if (valueOfSt != null) {
+                    logApiError(("Warning: RDF Predicate:${this.simpleTerm(valueOfP!!)}' in '${this.simpleTerm(valueOfSt)}' ignored, not in schema"))
+                }
+            }
+
+        }
+
+        if (termArray != null) {
+            currentProperties?.put(this.simpleTerm(lastP!!), JsonArray(termArray!!))
+        }
+        if (currentProperties != null) elements.add(JsonObject(currentProperties!!))
+        return JsonArray(elements)
+    }*/
+
+    override fun queryHelperFactory(theQuery:String):RdfQueryHelperStub {return RdfQueryHelper(this,theQuery)} // For override
+
+
+    //
+    // Isolated rdf4J dependencies
+    //
+
+
+    /**
+     * Resolves and returns an RDF `IRI` (Internationalized Resource Identifier) based on the provided object
+     * and the graph configuration. The method supports various data types for the input object and handles
+     * scenarios like extracting prefixes, handling cached objects, resolving JSON primitives, and returning
+     * the input if it's already an IRI.
+     *
+     * @param obj The object to be converted into an RDF `IRI`. This parameter can be a `String`, `ObjectCache`, `JsonPrimitive`,
+     *            or an existing `IRI`. If none of these types match, the object is converted to its string representation.
+     * @param gc The graph configuration (`GraphConfig`) that provides context for the operation. This includes
+     *           details like the base URI and graph prefixes used to resolve the `IRI`.
+     * @return An RDF `IRI` that represents the provided object within the context of the graph configuration.
+     */
+    override fun getGraphResourceIRI(obj:String?, gc:GraphConfig): IRI? {
+
+        // Calling iri("rdf:type") did not work, may be a rdf4j bug?
+        var result:IRI? = null
+        if (obj != null) {
+
+            //return this.rdf4JCon.valueFactory.createIRI(obj)
+            var delim = obj.indexOf(':')
+            if (delim >= 0) {
+                // To make rdf values.iri work, had to pull apart prefix and term
+                val basePrefix: String = obj.substring(0, delim)
+                val baseGC = this.graphsByPrefix.get(basePrefix)
+                if (baseGC != null)
+                    result = this.rdf4JCon.valueFactory.createIRI(baseGC.baseURI, obj.substring(delim + 1))
+                else {
+                    logApiError("Prefix not found: $obj")
+                    this.rdf4JCon.valueFactory.createIRI((obj.substring(0, delim)), obj.substring(delim + 1))
+                }
+            } else {
+                delim = obj.lastIndexOf('#')
+                if (delim < 0) delim = obj.lastIndexOf('/')
+                if (delim < 0)
+                    result = this.rdf4JCon.valueFactory.createIRI(gc.baseURI, obj)
+                else
+                    result = this.rdf4JCon.valueFactory.createIRI((obj.substring(0, delim)), obj.substring(delim + 1))
+            }
+        }
+        return result
+
+    }
+
+    override fun rdfIRI(base:String, term:String?) :IRI {
+        return this.rdf4JCon.valueFactory.createIRI(base, term)
+    }
+    override fun rdfIRI(iriStr:String?) :Any {
+        return this.rdf4JCon.valueFactory.createIRI(iriStr)
+    }
+    /**
+     * Generates an RDF term/UIR/Literal, which may be DB specific, based on the provided object, its intended type, and the graph configuration.
+     * and the graph configuration.Handles various data types such as strings, integers, booleans, dates, and references by mapping them
+     * references by mapping them to corresponding RDF literals or resources.
+     *
+     * @param gc The graph configuration, represented as a `GraphConfig` instance. Provides context
+     *           for the RDF graph, including base URI and metamodel specifications.
+     * @param obj The object to be converted into an RDF term. Can be of types such as string, integer,
+     *            boolean, date, or other supported types. If the object is a `JsonPrimitive`, or CachedObject its
+     *            content will be extracted.
+     * @param castType A string representing the desired type of the resultant RDF term. Supported types
+     *                 include "string", "uuid", "integer", "boolean", "number", "date-time", "date", and "reference".
+     *                 If the type is unrecognized, the string representation of the object will be used.
+     * @return The generated RDF `Value`, which can be a literal or an IRI, depending on the input
+     *         object and castType.
+     */
+    override fun getGraphTerm( predicateSpec: PredicateSpec, obj:Any?, gc:GraphConfig):Value? {
+        var term:Value? = null
+        var termStr:String? = this.getValueAsString(predicateSpec, obj)
+        print("<$obj><$termStr>")
+        if (termStr!=null && termStr.startsWith('\"') && termStr.endsWith('\"')) {
+            termStr = termStr.substring(1, termStr.length - 1)
+            print("Stripped: $termStr")
+        }
+        if (termStr!=null)
+            when (predicateSpec.valueType) {
+                "string","uuid","String"    -> term = this.rdf4JCon.valueFactory.createLiteral(termStr)
+                "integer"   -> term = this.rdf4JCon.valueFactory.createLiteral(termStr.toInt())
+                "boolean" -> term = this.rdf4JCon.valueFactory.createLiteral(termStr=="true")
+                "number" -> term = this.rdf4JCon.valueFactory.createLiteral(termStr.toFloat())
+                "date-time" -> term = this.rdf4JCon.valueFactory.createLiteral(LocalDate.parse(termStr))
+                "date" -> term = this.rdf4JCon.valueFactory.createLiteral(LocalDate.parse(termStr))//objLocal as Date)
+                "reference" -> term = this.getGraphResourceIRI(termStr, if (predicateSpec.subjectGraph!=null) this.getRdfGraph(predicateSpec.subjectGraph!!)!! else gc)//predicateSpec.boundGc()!!)
+                else -> {
+                    term = literal(termStr)
+                    logApiError("Qualified type not found: ${predicateSpec.valueType} for ${termStr}")
+                }
+            }
+        return term
+    }
+
+    fun rdfSparqlQueryJson(queryString:String, gc:GraphConfig): JsonArray {
+        val elements :MutableList<JsonObject> = mutableListOf()
+        println("DoQuery query: $queryString")
+        val tupleQuery: TupleQuery = this.rdf4JCon.prepareTupleQuery(queryString)
+        tupleQuery.evaluate().use { result ->
+            for (bindingSet in result) {
+                println("doQuery result: $bindingSet")
+                //elements.add(bindingSet.to)
+            }
+            result.close()
+        }
+        return JsonArray(elements)
+    }
+
+
+    fun beginCommit(trasnsactionId:String?=null) {
+        this.rdf4JCon.begin()
+    }
+    fun endCommit() {
+        this.rdf4JCon.commit()
+    }
+
+    fun serviceInit() {
+        //for ( aNamespace in this.rdf4JCon.getNamespaces()) println("Namespace pre init: ${aNamespace.prefix} ${aNamespace.name}")
+        for (aGraph in this.rdfGraphs.values) {
+            if (!(aGraph.baseURI.endsWith(':'))) // for known prefix namespace
+                rdf4JCon.setNamespace(aGraph.prefix, aGraph.baseURI)
+        }
+        for ( aNamespace in this.rdf4JCon.getNamespaces()) println("Namespace: ${aNamespace.prefix} ${aNamespace.name}")
+    }
+
+    fun serviceClose() {
+        this.rdf4JCon.close()
+    }
+
+    override fun rdfAdd(s:Any?, p:Any?, o:Any?, gc:GraphConfig) {
+        if (s!=null && p!=null && o!=null)
+            this.getGraphHelper(gc).model.add(s as IRI, p as IRI, o as Value, this.getGraphHelper(gc).context)
+        else
+            logApiError("ERROR: rdfAdd: null parameter $s $p $o")
+    }
+    override fun rdfRemove(s:Any?, p:Any?, o:Any?, gc:GraphConfig) {
+        if (s!=null && p!=null && o!=null)
+            this.getGraphHelper(gc).model.remove(s as IRI, p as IRI, o as Value, this.getGraphHelper(gc).context)
+        else
+            logApiError("ERROR: rdfAdd: null parameter $s $p $o")
+    }
+    override fun sparqlUpdate(query:String, gc: GraphConfig) {
+        this.rdf4JCon.prepareUpdate(query).execute()
+    }
+
+    /**
+     * A "mixin class for GraphConfig that propvides DB specific properties and operations for that graph.
+     * In the case of rdf$J, provides the "model" and "context" objects and sets namespaces.
+     */
+    class Rdf4jHelper(gc:GraphConfig, rdfService:RdfServiceRdf4j) {
+        var model = rdfService.rdf4JCon // the model object on which to perform queries and such.
+        val context:IRI = model.valueFactory.createIRI(gc.baseURI, "") // The named graph
+
+    }
+class RdfQueryHelper(rdfService: RdfServiceRdf4j, theQuery:String) : RdfQueryHelperStub(rdfService, theQuery) {
+    val queryResult = rdfService.rdf4JCon.prepareTupleQuery(theQuery).evaluate()
+    var currentBindingSet: BindingSet? = null
+
+    override fun next(): Boolean {currentBindingSet = queryResult.next(); return this.hasNext()}
+    override fun hasNext():Boolean  {
+        val isNext =queryResult.hasNext()
+        if (!isNext) this.close()
+        return isNext
+    }
+    override fun getValueString(key:String):String? {return currentBindingSet?.getValue(key)?.stringValue()}
+    override fun isLiteralValue(key:String):Boolean = currentBindingSet?.getValue(key) is Literal
+    override fun nextBindingJson(): JsonObject {
+        val elements = HashMap<String, JsonPrimitive>() // Can we make this ordered?
+        if (this.next()) {
+            if (currentBindingSet != null) {
+                for (binding in currentBindingSet!!) {
+                    elements[binding.name] = JsonPrimitive(binding.value.stringValue())
+                }
+            }
+        }
+        return JsonObject(elements)
+    }
+    override fun close() {queryResult.close()}
+}
+    /**
+     * Get the DB specific "helper" mixin for a GraphConfig.
+     */
+    fun getGraphHelper(gc:GraphConfig):Rdf4jHelper{
+        if (gc.graphImpl == null) {gc.graphImpl = Rdf4jHelper(gc, this)}
+        return gc.graphImpl as Rdf4jHelper
+    }
+
+}
