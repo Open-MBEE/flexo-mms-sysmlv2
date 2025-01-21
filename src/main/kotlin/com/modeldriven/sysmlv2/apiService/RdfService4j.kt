@@ -123,7 +123,8 @@ open public class RdfServiceRdf4j(modelGraph:GraphConfig, projectGraph:GraphConf
                         elements[binding.name] = JsonPrimitive(binding.value.stringValue())
                     }
                 }
-            }
+            } else
+                this.close()
             return JsonObject(elements)
         }
         override fun close() {queryResult.close()}

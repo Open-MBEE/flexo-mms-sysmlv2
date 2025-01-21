@@ -51,15 +51,17 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
     var rdfTypeSpec = PredicateSpec("type", "primitive", "reference", "rdf", this)
     var defaultedPredicateSpec = PredicateSpec("UNDEFINED", "primitive", "string", "Model", this)
 
-    val rdfSubject = this.rdfIRI("rdf", "subject") //("http://www.w3.org/1999/02/22-rdf-syntax-ns#subject")
-    val rdfPredicate = this.rdfIRI("rdf", "predicate")
-    val rdfObject = this.rdfIRI("rdf", "object")
-    val rdfType = this.rdfIRI("rdf", "type")
+    var rdfSubject: Any // Could be string or DB specific
+    var rdfPredicate: Any
+    var rdfObject : Any
+    var rdfType  : Any
 
     init {
-            // These keys are required for these graphs
-            projectGraph.defaultedKey("Project", this)
-            modelGraph.defaultedKey("Model", this)
+        // These keys are required for these graphs
+        projectGraph.defaultedKey("Project", this)
+        modelGraph.defaultedKey("Model", this)
+        this.addGraph(projectGraph)
+        this.addGraph(modelGraph)
 
         gcMetamodel = this.addGraph("SysML", """https://www.omg.org/spec/SysML/""", "SysML")
         gcRDF = this.addGraph("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
@@ -75,6 +77,10 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
         rdfTypeSpec = PredicateSpec("type", "primitive", "reference", "rdf", this)
         rdfTypeSpec.subjectGraph = "SysML" // Types of elements come from SysML - special case
         defaultedPredicateSpec = PredicateSpec("UNDEFINED", "primitive", "string", "Model", this)
+        rdfSubject = this.rdfIRI("rdf", "subject") //("http://www.w3.org/1999/02/22-rdf-syntax-ns#subject")
+        rdfPredicate = this.rdfIRI("rdf", "predicate")
+        rdfObject = this.rdfIRI("rdf", "object")
+        rdfType = this.rdfIRI("rdf", "type")
     }
 
 
@@ -147,7 +153,7 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
      */
     fun deletePredicateList(gc: GraphConfig, subject: String, predicateSpec: PredicateSpec) {
         val ctxS = this.rdfIRI(gc.baseURI)
-        val sS = this.getGraphResourceIRI(subject, gc)?.toString()
+        val sS = this.getGraphResourceString(subject, gc)
         val pS = predicateSpec.getQualified()
 
         val deleteQuery = if (predicateSpec.schemaType == "array") """
@@ -202,7 +208,7 @@ optional {
 }}}
 order by ?s ?p ?index"""
         else """SELECT ?s ?p ?o ?st ?ot ?index WHERE { 
-BIND( <${this.getGraphResourceIRI(uriStr, gc)?.toString()}> as ?s).            
+BIND( <${this.getGraphResourceString(uriStr, gc)}> as ?s).            
 $graphSpec {?s ?p ?o.
 ?s rdf:type ?st.
 optional {?o rdf:type ?ot} 
@@ -541,6 +547,13 @@ order by ?s ?p ?index"""
         }
     }
 
+    /**
+     * The IRI can be DB specific or a string, this returns it only as a string for use in queries.
+     * The DSB specific will need to override this
+     */
+    open fun getGraphResourceString(obj:Any?, gc: GraphConfig):String?{
+        return this.qualified(obj, gc)
+    }
 
     open fun encodeRdfString(str:String):String {
         return "'''${str.replace("\'", "\\\'")}'''"
@@ -616,7 +629,7 @@ order by ?s ?p ?index"""
          * accessible in previous commits.
          */
         val ctxIri = gc.baseURI
-        val subIri = this.getGraphResourceIRI(subject, gc)?.toString()
+        val subIri = this.getGraphResourceString(subject, gc)
         val graphSpec:String = /*if (gc.baseURI.endsWith(':')) "" else*/ "GRAPH <${gc.baseURI}> {"
         val graphEndSpec = /*if (gc.baseURI.endsWith(':')) "" else*/ "}"
 
@@ -693,7 +706,7 @@ $graphEndSpec}"""
     open fun deleteObjectContents(gc: GraphConfig, subject: String?) {
 
         val ctxIri = gc.baseURI
-        val subIri = this.getGraphResourceIRI(subject, gc)?.toString()
+        val subIri = this.getGraphResourceString(subject, gc)
         val graphSpec:String = /*if (gc.baseURI.endsWith(':')) "" else*/ "GRAPH <${gc.baseURI}> {"
         val graphEndSpec = /*if (gc.baseURI.endsWith(':')) "" else*/ "}"
 

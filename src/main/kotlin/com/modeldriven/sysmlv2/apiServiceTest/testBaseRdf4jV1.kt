@@ -4,7 +4,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import com.modeldriven.sysmlv2.apiService.ApiCrudService
 import com.modeldriven.sysmlv2.apiService.GraphConfig
-import com.modeldriven.sysmlv2.apiService.RdfServiceRdf4j
+import com.modeldriven.sysmlv2.apiService.RdfServiceRdf4jV1
+import java.io.PrintStream
 
 
 fun testBase(){
@@ -87,9 +88,11 @@ fun testBase(){
 
 
     println("Test simple commit")
-    val modelGraph = GraphConfig("urn", "urn:sysmlv2:", "Model")
+    val modelGraph = GraphConfig("Model", "urn:sysmlv2:", "Model")
     val projectGraph = GraphConfig("Project","https://systemsmodeling.com/SysMlProject/")
-    val rdfService = RdfServiceRdf4j( modelGraph, projectGraph)
+    val rdfService = RdfServiceRdf4jV1( modelGraph, projectGraph)
+    rdfService.exportStream = PrintStream("/temp/logs/testBaseRdf4jV1.txt")
+    val rdfConnection = rdfService.getDBConnection()
 
     val apiService = ApiCrudService(rdfService)
     val jsonChange = Json.parseToJsonElement(changeText).jsonArray
@@ -97,7 +100,7 @@ fun testBase(){
 
     //    fun createCommit(change: JsonArray, branch: JsonObject?, previousCommits: JsonArray?, project: JsonObject)
     apiService.changeService(jsonChange)
-    printGraph(rdfService.rdf4JCon)
+    printGraph(rdfConnection)
 
     println("\nNow get it all back as JSON - modelgraph")
     var modelObjects  = apiService.getElements(null)
@@ -107,3 +110,8 @@ fun testBase(){
 
 }
 
+fun main() {
+
+    testBase()
+
+}

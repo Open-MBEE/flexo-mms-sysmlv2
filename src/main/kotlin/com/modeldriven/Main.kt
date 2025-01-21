@@ -5,9 +5,9 @@ import com.modeldriven.sysmlv2.apiServiceTest.testOpenAPI
 
 fun main() {
     println("API to RDF Tests")
-    //testBase()
+    testBase()
     test1()
     TestModelCommit().test()
 
-    //testOpenAPI()
+    testOpenAPI()
 }

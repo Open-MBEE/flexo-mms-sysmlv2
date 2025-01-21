@@ -10,3 +10,6 @@ fun testOpenAPI(){
     val spec = schemaSpecFactory("SysML", rdfService)
     assert( spec.containers.contains("PartDefinition"))
 }
+fun main() {
+testOpenAPI()
+}

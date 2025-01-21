@@ -72,3 +72,8 @@ public class TestModelCommit {
         println("\nModel Test Done")
     }
 }
+fun main() {
+
+    TestModelCommit().test()
+
+}
