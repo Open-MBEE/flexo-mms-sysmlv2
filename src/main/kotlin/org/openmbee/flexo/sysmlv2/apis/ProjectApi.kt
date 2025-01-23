@@ -37,7 +37,7 @@ import java.util.*
 //      "description" : "description",
 //      "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
 //    }"""
-fun FlexoResponseHandler.projectFromResponse(
+fun FlexoModelHandlerWithFocalNode.projectFromResponse(
     outgoing: Map<Property, Set<RDFNode>> = primary,
     projectUuid: UUID = UUID.fromString(outgoing[MMS.id]?.literal()),
     branchUuid: UUID = UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
@@ -142,7 +142,7 @@ fun Route.ProjectApi() {
 
         // submit PUT request to create new repo
         val flexoResponse = flexoRequestPut {
-            orgPath("/repos/${projectId}")
+            orgPath("/repos/$projectId")
 
             // build query parameters; set default branch ID
             addQueryParams(

@@ -14,21 +14,46 @@ package org.openmbee.flexo.sysmlv2.apis
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.resources.*
 import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
-import io.ktor.server.resources.get
-import io.ktor.server.resources.post
-import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
+import io.ktor.util.pipeline.*
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
+import org.apache.jena.graph.Node
+import org.apache.jena.graph.NodeFactory
+import org.apache.jena.rdf.model.Property
+import org.apache.jena.rdf.model.RDFNode
+import org.apache.jena.vocabulary.DCTerms
+import org.apache.jena.vocabulary.RDF
+import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
 import org.openmbee.flexo.sysmlv2.models.DataVersion
+import org.openmbee.flexo.sysmlv2.models.Identified
+import java.time.OffsetDateTime
+import java.util.*
+
+class InvalidSysmlSerializationError(message: String): Error(message)
+
+fun FlexoModelHandler.commitFromModel(
+    commitIri: String,
+    properties: Map<Property, Set<RDFNode>?>,
+    projectUuid: UUID,
+): Commit {
+    // generate commit object
+    return Commit(
+        atId = UUID.fromString(commitIri.suffix),
+        atType = Commit.AtType.Commit,
+        created = OffsetDateTime.parse(properties[MMS.submitted]!!.literal()!!),
+        description = properties[DCTerms.description]?.literal()?: "",
+        owningProject = Identified(atId = projectUuid),
+        previousCommit = properties[MMS.parent]?.map {
+            Identified(atId = UUID.fromString(it.asResource().uri.suffix))
+        }?: emptyList()
+    )
+}
 
 fun Route.CommitApi() {
     get<Paths.getChangeByProjectCommitId> {
@@ -167,58 +192,204 @@ fun Route.CommitApi() {
         call.respond(Json.decodeFromString<List<DataVersion>>(exampleContentString))
     }
 
-    get<Paths.getCommitByProjectAndId> {
-        val exampleContentString = """{
-          "@type" : "Commit",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "description" : "description",
-          "previousCommit" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
+    get<Paths.getCommitByProjectAndId> { getCommits ->
+        // submit GET request to retrieve project metadata
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${getCommits.projectId}/query")
 
-       call.respond(Json.decodeFromString<Commit>(exampleContentString))
+            sparqlQuery {
+                """
+                    prefix mms: <${MMS.uri}>
+
+                    select ?commit_p ?commit_o {
+                        ?commit a mms:Commit ;
+                            mms:id ${NodeFactory.createLiteral(getCommits.commitId.toString()).stringify()} ;
+                            ?commit_p ?commit_o .
+                    }
+                """.trimIndent()
+            }
+        }
+
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+//        flexoResponse.mapResults {
+//            it["commit_p"]
+//        }
+
+        // parse the response model, convert it to JSON, and reply to client
+        call.respond(flexoResponse.parseModel {
+            // each commit node
+            for(commit in indexInv(MMS.Commit.uri)[RDF.type]?: emptySet()) {
+                // reference the commit's IRI
+                val commitIri = commit.asResource().uri;
+
+                // generate commit object
+                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
+            }
+        })
     }
 
-    get<Paths.getCommitsByProject> {
-        val exampleContentString = """[ {
-          "@type" : "Commit",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "description" : "description",
-          "previousCommit" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }, {
-          "@type" : "Commit",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "description" : "description",
-          "previousCommit" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        } ]"""
-        call.respond(Json.decodeFromString<List<Commit>>(exampleContentString))
+    get<Paths.getCommitsByProject> { getCommits ->
+        // submit GET request to retrieve project metadata
+        val flexoResponse = flexoRequestGet {
+            orgPath("/repos/${getCommits.projectId}")
+        }
+
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+        // parse the response model, convert it to JSON, and reply to client
+        call.respond(flexoResponse.parseModel {
+            // each commit node
+            for(commit in indexInv(MMS.Commit.uri)[RDF.type]?: emptySet()) {
+                // reference the commit's IRI
+                val commitIri = commit.asResource().uri;
+
+                // generate commit object
+                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
+            }
+        })
     }
 
-    post<CommitRequest>("/projects/{projectId}/commits") {
-        call.respond(it)
+    post<CommitRequest>("/projects/{projectId}/commits") { commit ->
+        val projectId = "${call.parameters["projectId"]}"
+
+        val inserts = mutableListOf<String>()
+        val deletes = mutableListOf<String>()
+
+        // each change (DataVersionRequest)
+        for((index, change) in commit.change.withIndex()) {
+            val (payload, atType, identity) = change
+
+//            // assert @type
+//            assert(atType == DataVersionRequest.AtType.DataVersion) { ".change[$index][\"@type\"] value of \"$atType\" is not supported" }
+
+            // subject node, target element
+            var elementNode: Node = NodeFactory.createVariable("element_${index}")
+
+            // transform payload into property pairs
+            val properties = mutableListOf<Pair<Property, Set<Node>>>().apply {
+                if(payload == null) return@apply
+
+                // encode each key/value
+                Json.encodeToJsonElement(payload).jsonObject.forEach { (key, value) ->
+                    // depending on the key
+                    when(key) {
+                        // reserved @id
+                        "@id" -> {
+                            elementNode = SYSMLV2.element(payload.atId.toString()).asNode()
+                        }
+
+                        // reserved @type
+                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(payload.atType.value).asNode()))
+
+                        // everything else
+                        else -> {
+                            // depending on JSON type of value
+                            when(value) {
+                                // boolean, number, string
+                                is JsonPrimitive -> {
+                                    add(SYSMLV2.prop(key) to setOf(NodeFactory.createLiteral(value.content)))
+                                }
+                                // array
+                                is JsonArray -> {
+                                    // store entire array as serialized JSON
+                                    add(SYSMLV2.annotation_json(key) to setOf(NodeFactory.createLiteral(Json.encodeToString(value))))
+
+                                    // non-empty list and first element is an object
+                                    if (value.isNotEmpty() && value[0] is JsonObject) {
+                                        // create additional triples to link the elements
+                                        add(SYSMLV2.relation(key) to value.jsonArray.map {
+                                            SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+                                        }.toSet())
+                                    }
+                                }
+                                // object
+                                is JsonObject -> {
+                                    throw Error("Unexpected JSON object at .${key} == ${Json.encodeToString(value)}")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // generate the RDF data for SPARQL INSERT clause
+                inserts.add("""
+                    ${elementNode.stringify()} ${joinToString(" ;\n\t") { pair ->
+                        pair.first.stringify()+" "+pair.second.joinToString(", ") { it.stringify() }
+                    }} .
+                """.trimIndent())
+            }
+
+            // references an existing element
+            if(identity != null) {
+                // generate the RDF data for SPARQL DELETE clause
+                deletes.add("""
+                    ${elementNode.stringify()} ${
+                        // delete all outgoing properties
+                        if(payload == null) "?p_$index ?o_$index"
+                        
+                        // delete the properties being replaced
+                        else properties.joinToString(" ;\n\t") { pair ->
+                            pair.first.stringify()+" ?o_$index"
+                        }
+                    } .
+                """.trimIndent())
+            }
+        }
+
+        // first, lock the given commit
+        val flexoResponseLock = flexoRequestPost {
+            orgPath("/repos/$projectId/locks")
+
+            turtle {
+                """
+                    <> mms:commit mor-commit:${commit.previousCommit} .
+                """.trimIndent()
+            }
+        }
+
+        // forward failures to client
+        if(flexoResponseLock.isFailure()) {
+            return@post forward(flexoResponseLock)
+        }
+
+        // extract lock ID from response model
+        val lockId = flexoResponseLock.parseLdp {
+            primary[MMS.id].literal()!!
+        }
+
+        // submit POST request to commit model
+        val flexoResponseUpdate = flexoRequestPost {
+            orgPath("/repos/$projectId/locks/$lockId/update")
+
+            // construct body payload
+            sparqlUpdate {
+                """
+                    insert {
+                        ${inserts.joinToString("\n")}
+                    }
+                    delete {
+                        ${deletes.joinToString("\n")}
+                    }
+                """.trimIndent()
+            }
+        }
+
+        // forward failures to client
+        if(flexoResponseUpdate.isFailure()) {
+            return@post forward(flexoResponseUpdate)
+        }
+
+        // parse the response model, convert it to JSON, and reply to client
+        call.respond(flexoResponseUpdate.parseLdp {
+            commitFromModel(self!!, primary, UUID.fromString(projectId))
+        })
     }
 
 }

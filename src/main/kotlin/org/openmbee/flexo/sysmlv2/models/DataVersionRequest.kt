@@ -28,7 +28,7 @@ import org.openmbee.flexo.sysmlv2.models.DataRequest
  */
 @Serializable
 data class DataVersionRequest(
-    val payload: DataRequest,
+    val payload: DataRequest?,
     @SerialName("@type")
     val atType: DataVersionRequest.AtType? = null,
     val identity: DataIdentityRequest? = null

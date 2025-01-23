@@ -162,3 +162,29 @@ object MMS_DATATYPE {
     val sparqlGz = BaseDatatype("${BASE}sparqlGz")
 }
 
+object SYSMLV2 {
+    val BASE = "urn:sysmlv2:"
+
+    val ELEMENT = "${BASE}element:"
+    val PROPERTY = "${BASE}property:"
+    val RELATION = "${BASE}relation:"
+    val ANNOTATION = "${BASE}annotation:"
+
+    val ANNOTATION_JSON = "${ANNOTATION}json"
+
+    fun element(uuid: String): Resource {
+        return ResourceFactory.createResource("$ELEMENT:$uuid")
+    }
+
+    fun prop(id: String): Property {
+        return ResourceFactory.createProperty(BASE, id)
+    }
+
+    fun annotation_json(key: String): Property {
+        return ResourceFactory.createProperty("$ANNOTATION_JSON:$key")
+    }
+
+    fun relation(key: String): Property {
+        return ResourceFactory.createProperty("$RELATION:$key")
+    }
+}

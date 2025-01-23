@@ -31,7 +31,8 @@ data class CommitRequest(
     val change: kotlin.collections.List<DataVersionRequest>,
     @SerialName("@type")
     val atType: CommitRequest.AtType? = null,
-    val description: kotlin.String? = null
+    val description: kotlin.String? = null,
+    val previousCommit: Identified? = null
 )
 {
     /**

@@ -11,138 +11,374 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
+import io.ktor.server.resources.*
 import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
-import io.ktor.server.resources.get
-import io.ktor.server.resources.post
-import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.*
+import org.apache.jena.rdf.model.Property
+import org.apache.jena.rdf.model.RDFNode
+import org.apache.jena.vocabulary.RDF
+import org.apache.jena.vocabulary.XSD
+import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Element
 import org.openmbee.flexo.sysmlv2.models.ProjectUsage
 
+const val REIFIED_OUT_IRI = "urn:flexo-mms:reified-out"
+const val REIFIED_INV_IRI = "urn:flexo-mms:reified-inv"
+
+fun modelElementConstructQuery(elementTarget: String="?__element"): String {
+    return """
+        construct {
+            $elementTarget a ?element_type ; 
+                ?element_p ?element_o .
+            
+            ?ownedElement a ?ownedElementType .
+            
+            <$REIFIED_OUT_IRI> ?owningRelation ?owningElement .
+            
+            <$REIFIED_OUT_IRI> ?reified_out_p ?reified_out_o .
+                
+            <$REIFIED_INV_IRI> ?reified_inv_p ?reified_inv_s .
+         
+            [] flexo:subject $elementTarget ;
+                flexo:predicate ?ownedRelation ;
+                flexo:order ?order ;
+                rdf:member ?member ;
+                .
+        }
+        where {
+            {
+                $elementTarget a ?element_type ;
+                    ?element_p ?element_o .
+                    
+                filter not exists {
+                    ?element_o a rdf:Collection .
+                }
+            }  
+            union {
+                $elementTarget ?ownedRelation 
+                ?element_o rdf:rest*/rdf:first ?ownedElement .
+                
+                ?ownedElement a ?ownedElementType .
+                
+                $elementTarget ?ownedRelation [
+                    flexo:order ?order ;
+                    rdf:member ?member ;
+                ] .
+            }
+            
+            [] a rdf:Collection ;
+                flexo:subject $elementTarget ;
+                flexo:predicate ?ownedRelation ;
+                rdf:first <urn:61eff> ;
+                rdf:rest rdf:nil .
+                
+            []
+                flexo:order ?order ;
+                rdf:member ?members ;
+                .
+            
+            optional {
+                ?owningElement ?owningRelation ?owningList .
+                
+                ?owningList rdf:rest*/rdf:first $elementTarget .
+
+                flexo:order "[\"a\", \"b\", \"c\"]"
+                    rdf:member $elementTarget, ?b, ?c ;
+                    .
+                
+                ?owningElement ?owningRelation ($elementTarget, ?b, ?c) .
+                
+                ?reified_out
+                    rdf:subject $elementTarget ;
+                    rdf:predicate ?reified_out_p ;
+                    rdf:object ?reified_out_o ;
+                    .
+            }
+            
+            optional {
+                ?reified_inv
+                    rdf:subject ?reified_inv_s ;
+                    rdf:predicate ?reified_inv_p ;
+                    rdf:object $elementTarget ;
+                    .
+            }
+        }
+    """
+}
+
+class InvalidTripleError(
+    message: String,
+    subjectIri: String,
+    predicate: Property,
+    value: RDFNode
+): Error("$message at <$subjectIri> <${predicate.uri}> ${value.stringify()}")
+
+
+fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject {
+    // direct outgoing properties of element
+    val out = indexOut(elementIri)
+
+    // extract type
+    val type = out[RDF.type].resource()?.uri?.suffix
+
+    return buildJsonObject {
+        put("@type", type)
+        put("@id", elementIri.suffix)
+
+        val relationOrders = mutableMapOf<String, List<String>>()
+        val relations = mutableMapOf<String, Set<RDFNode>>()
+
+        // outgoing properties
+        out.map { (predicate, values) ->
+            // extract the suffix name part
+            val propertyKey = predicate.uri.suffix
+
+            // relations
+            if(predicate.uri.startsWith(SYSMLV2.RELATION)) {
+                // skip
+//                relations.put(propertyKey, values)
+            }
+            // properties & annotations
+            else {
+                // expect exactly 1 object
+                if(values.size != 1) {
+                    // TODO: better error handling
+                    throw Error("Expected exactly 1 object with property ...")
+                }
+
+                // transform each object
+                val obj = values.elementAt(0)
+
+                // properties
+                if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
+                    // object is a Literal
+                    if (obj.isLiteral) {
+                        val lit = obj.asLiteral()
+
+                        // depending on its datatype
+                        when (lit.datatype) {
+                            XSD.xboolean -> put(propertyKey, lit.boolean)
+                            XSD.integer -> put(propertyKey, lit.int)
+                            XSD.decimal, XSD.xdouble -> put(propertyKey, lit.float)
+                            else -> put(propertyKey, lit.string)
+                        }
+                    }
+                    // object is a Resource
+                    else {
+                        val objUri = obj.asResource().uri
+
+                        put(propertyKey, buildJsonObject {
+                            put("@id", objUri.suffix)
+                        })
+                    }
+                }
+                // annotations
+                else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION)) {
+                    // object is not a Literal
+                    if (obj.isLiteral) {
+                        throw InvalidTripleError("Expected annotation property to point to an RDF literal", elementIri, predicate, obj)
+                    }
+
+                    // cast to literal
+                    val lit = obj.asLiteral()
+
+                    // expect valid JSON
+                    val json =  try {
+                        Json.parseToJsonElement(lit.string)
+                    } catch (parse: Error) {
+                        throw InvalidTripleError("Expected annotation property to encode a JSON element", elementIri, predicate, obj)
+                    }
+
+                    // annotating the order of elements
+                    if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
+                        // assert JSON element is an array of strings
+                        val jsonArray = json.jsonArray.also { list ->
+                            if(!list.all { it.jsonPrimitive.isString }) {
+                                throw InvalidTripleError("Not all elements in the array are strings", elementIri, predicate, obj)
+                            }
+                        }
+
+                        // add to object
+                        put(propertyKey, jsonArray)
+                    }
+                    // unrecognized annotation
+                    else {
+                        throw InvalidTripleError("Unrecognized annotation property", elementIri, predicate, obj)
+                    }
+                }
+                // something else
+                else {
+                    throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
+                }
+            }
+        }
+    }
+}
+
+
+
+//val exampleContentString = """{
+//  "owner" : {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  },
+//  "textualRepresentation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "ownedAnnotation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "ownedElement" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "aliasIds" : [ "aliasIds", "aliasIds" ],
+//  "@type" : "Element",
+//  "ownedRelationship" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "documentation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "isImpliedIncluded" : true,
+//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
+//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//}"""
+//
+//val exampleContentString = """[ {
+//  "owner" : {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  },
+//  "textualRepresentation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "ownedAnnotation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "ownedElement" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "aliasIds" : [ "aliasIds", "aliasIds" ],
+//  "@type" : "Element",
+//  "ownedRelationship" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "documentation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "isImpliedIncluded" : true,
+//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
+//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//}, {
+//  "owner" : {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  },
+//  "textualRepresentation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "ownedAnnotation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "ownedElement" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "aliasIds" : [ "aliasIds", "aliasIds" ],
+//  "@type" : "Element",
+//  "ownedRelationship" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "documentation" : [ {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  }, {
+//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//  } ],
+//  "isImpliedIncluded" : true,
+//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
+//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
+//} ]"""
+
 fun Route.ElementApi() {
-    get<Paths.getElementByProjectCommitId> {
-        val exampleContentString = """{
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }"""
-        call.respond(Json.decodeFromString<Element>(exampleContentString))
+    // get an element
+    get<Paths.getElementByProjectCommitId> { getElement ->
+        val elementIri = sysmlv2ElementIri(getElement.elementId)
+
+        // submit POST request to query model
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${getElement.projectId}/commits/${getElement.commitId}/query")
+
+            sparqlQuery {
+                modelElementConstructQuery(elementIri)
+            }
+        }
+
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+        // parse the response model, extract the target element to JSON, and reply to client
+        call.respond(flexoResponse.parseModel {
+            // extract the target model element to JSON
+            extractModelElementToJson(elementIri)
+        })
     }
 
-    get<Paths.getElementsByProjectCommit> {
-        val exampleContentString = """[ {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-        call.respond(Json.decodeFromString<List<Element>>(exampleContentString))
+    // get multiple elements
+    get<Paths.getElementsByProjectCommit> { getElements ->
+        // submit POST request to query model
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${getElements.projectId}/commits/${getElements.commitId}/query")
+
+            sparqlQuery {
+                modelElementConstructQuery()
+            }
+        }
+
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+        // parse the response model, extract the elements to JSON, and reply to client
+        call.respond(flexoResponse.parseModel {
+            // every subject node in response
+            for(subject in model.listSubjects()) {
+                extractModelElementToJson(subject.uri)
+            }
+        })
     }
 
     get<Paths.getProjectUsageByProjectCommitElement> {
+
         val exampleContentString = """{
           "@type" : "ProjectUsage",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
