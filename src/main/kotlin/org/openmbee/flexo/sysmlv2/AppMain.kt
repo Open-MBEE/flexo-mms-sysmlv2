@@ -48,7 +48,7 @@ fun Application.main() {
     }
     install(AutoHeadResponse) // see https://ktor.io/docs/autoheadresponse.html
     install(Compression, ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html
-    install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
+    //install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
     install(Resources)
     install(Routing) {
         BranchApi()

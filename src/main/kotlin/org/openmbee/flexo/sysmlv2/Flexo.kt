@@ -118,7 +118,7 @@ class FlexoRequestBuilder {
     }
 
     fun orgPath(path: String) {
-        this.path = "/orgs/sysml2/$path"
+        this.path = "/orgs/sysml2$path"
     }
 
     fun addQueryParams(vararg params: Pair<String, String>) {
@@ -146,7 +146,7 @@ class FlexoRequestBuilder {
     fun build(): HttpRequestBuilder {
         return request {
             url {
-                protocol = URLProtocol.HTTPS
+                protocol = URLProtocol.HTTP
                 host = "localhost"
                 port = 8080
                 path(path)
@@ -155,12 +155,10 @@ class FlexoRequestBuilder {
                     parameters.append(it.key, it.value)
                 }
             }
-
-            headersOf(*this@FlexoRequestBuilder.headers.toTypedArray())
-
-            contentType(ContentType("text", "turtle"))
-
-            setBody(body)
+            this@FlexoRequestBuilder.headers.forEach { (key, value) ->
+                header(key, value.joinToString())
+            }
+            setBody(this@FlexoRequestBuilder.body)
         }
     }
 }
@@ -197,6 +195,7 @@ class FlexoResponse(
         }
 
         // create response around parsed model and subject from Location header
+        // TODO location is only present if request was a post
         val handler = FlexoModelHandlerWithFocalNode(model, response.headers["Location"])
 
         return setup(handler)
@@ -223,13 +222,13 @@ class FlexoResponse(
             parse(model)
         }
 
-
+        val handler = FlexoModelHandler(model, DEFAULT_PREFIX_MAPPING)
         return setup(handler)
     }
 
 }
 
-suspend fun flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun flexoRequest(method: HttpMethod, auth: String, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     val client = HttpClient()
 
     val builder = FlexoRequestBuilder()
@@ -237,22 +236,24 @@ suspend fun flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Un
     setup(builder)
 
     val request = builder.build()
+    request.header(HttpHeaders.Authorization, auth)
+    request.method = method
 
     val response = client.request(request)
 
     return FlexoResponse(response)
 }
 
-suspend fun flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    return flexoRequest(HttpMethod.Get, setup)
+suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+    return flexoRequest(HttpMethod.Get, call.request.headers["Authorization"]!!, setup)
 }
 
-suspend fun flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    return flexoRequest(HttpMethod.Put, setup)
+suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+    return flexoRequest(HttpMethod.Put, call.request.headers["Authorization"]!!, setup)
 }
 
-suspend fun flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    return flexoRequest(HttpMethod.Post, setup)
+suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+    return flexoRequest(HttpMethod.Post, call.request.headers["Authorization"]!!, setup)
 }
 
 open class FlexoModelHandler(val model: Model, val prefixes: PrefixMappingImpl) {
