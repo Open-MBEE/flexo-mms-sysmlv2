@@ -9,9 +9,10 @@ import io.ktor.http.content.*
 import io.ktor.server.config.*
 import io.ktor.server.testing.*
 import io.ktor.utils.io.*
-//import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeAll
 import java.util.*
@@ -44,7 +45,7 @@ class ApplicationTest {
 
     companion object {
         var token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJsZGFwL3VzZXIvdXNlcjAxIiwiZ3JvdXBzIjpbXSwiZXhwIjoxNzM3NzkxMDA3fQ.45Rs1WQOnlea6wXJ9v9uIVl1o3x1TfchIicDYSMFgRw"
-        /*
+
         @JvmStatic
         @BeforeAll
         fun setup() = runTest {
@@ -55,12 +56,12 @@ class ApplicationTest {
                     headers {
                         append(
                             HttpHeaders.Authorization,
-                            "Basic ${Base64.getEncoder().encodeToString("user01:password01".toByteArray())}"
+                            "Basic ${Base64.getEncoder().encodeToString("user01:password1".toByteArray())}"
                         )
                     }
                 }
 
-            token = Json.parseToJsonElement(tokenResponse.bodyAsText()).jsonObject["token"].toString()
+            token = Json.parseToJsonElement(tokenResponse.bodyAsText()).jsonObject["token"]!!.jsonPrimitive.content
             //pre create default sysml2 org that flexo requests use
 
             client.put("http://localhost:8080/orgs/sysml2") {
@@ -75,7 +76,7 @@ class ApplicationTest {
                     )
                 }
 
-        }*/
+        }
     }
 }
 
