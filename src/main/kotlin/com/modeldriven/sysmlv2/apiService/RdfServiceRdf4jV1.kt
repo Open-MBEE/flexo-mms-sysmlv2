@@ -26,22 +26,17 @@
  * This uses fine grain edfAdd/rdfRemove instead on only using sparql update.
  */
 
-import com.modeldriven.sysmlv2.apiService.RdfServiceRdf4j.Rdf4jHelper
-import com.modeldriven.sysmlv2.apiService.RdfServiceRdf4j.RdfQueryResultRdf4j
+import com.modeldriven.sysmlv2.apiService.RdfServiceRdf4j.SparQLQueryResult4J
 import kotlinx.serialization.json.*
 import org.eclipse.rdf4j.model.IRI
-import org.eclipse.rdf4j.model.Literal
 import org.eclipse.rdf4j.model.util.Values.literal
 import org.eclipse.rdf4j.model.Value
-import org.eclipse.rdf4j.query.BindingSet
-import org.eclipse.rdf4j.query.TupleQuery
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.util.*
 
 /**
  * RdfServiceRdf4j is a service class that provides an interface for managing and interacting
@@ -307,9 +302,9 @@ open class RdfServiceRdf4jV1 (modelGraph:GraphConfig, projectGraph:GraphConfig) 
     /**
      * Override of SparqlQuery returns the DB specific QueryHelper initilized with the Query.
      */
-    override fun sparqlQuery(theQuery:String):RdfQueryResultStub {
+    override fun sparqlQuery(theQuery:String):QueryResultInterface {
         val queryResult = this.rdf4JCon?.prepareTupleQuery(theQuery)?.evaluate()
-        return if (queryResult==null) RdfQueryResultStub("Error: NO RESULT") else RdfQueryResultRdf4j(queryResult)
+        return if (queryResult==null) SparQLResultJson(JsonObject(mapOf())) else SparQLQueryResult4J(queryResult)
     }
     /**
      * A "mixin class for GraphConfig that propvides DB specific properties and operations for that graph.

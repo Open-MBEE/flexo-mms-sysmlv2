@@ -37,34 +37,6 @@ fun test1(){
     var modelObjects  = apiService.getElements(null)
     printObjects(modelObjects)
 
-    val ctxS = "urn:sysmlv2:"
-    val sS = "urn:sysmlv2:payload_system_element_id"
-    val pS = "SysML:connectionEnd"
-    val testQuery = """
-        PREFIX Project: <https://systemsmodeling.com/SysMlProject/>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX SysML: <https://www.omg.org/spec/SysML/>
-PREFIX Model: <urn:sysmlv2:>
-PREFIX XSD: <http://www.w3.org/2001/XMLSchema#>
-PREFIX API: <https://www.omg.org/spec/SysML/API#>
-    SELECT ?p ?o ?i
-    WHERE {
-GRAPH <urn:sysmlv2:> { 
-Model:payload_system_element_id ?p ?o . 
-optional { 
-    ?i rdf:subject Model:payload_system_element_id .
-
-    ?i rdf:predicate ?p .
-    ?i rdf:object ?o .
-}
-}}"""
-    println("Test query like delete")
-    val queryResult = rdfService.sparqlQuery(testQuery)
-    while (queryResult.hasNext()) {println(queryResult.nextBindingJson())}
-
-    println("\nNow get it just payload_system_element_id back as JSON - modelgraph")
-    printObjects(modelObjects)
-
     //assert( modelObjects.toString() == "[{\"@type\":\"PartDefinition\",\"name\":\"Spacecraft System\",\"@id\":\"payload_system_element_id\"}]")
 
 

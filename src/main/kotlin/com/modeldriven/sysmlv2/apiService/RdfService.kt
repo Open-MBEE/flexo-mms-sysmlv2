@@ -8,13 +8,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArrayBuilder
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.eclipse.rdf4j.model.IRI
-import org.eclipse.rdf4j.model.Literal
-import org.eclipse.rdf4j.query.BindingSet
-import org.eclipse.rdf4j.query.QueryResult
-import org.eclipse.rdf4j.query.TupleQueryResult
 
 
 import java.util.*
@@ -185,7 +181,28 @@ DELETE WHERE {
         this.sparqlUpdate(deleteQuery, gc)
     }
 
+    /**
+     * Utility function to produce the query string for getting elements my ID
+     */
+    open fun getByIdQuery(gc: GraphConfig, uniqueID: String? ) : String {
+        val graphSpec = if (gc.graphName == null) "" else "graph <${gc.graphName}> {"
+        val graphEnd = if (gc.graphName == null) "" else "}"
+        val uriStr: String? = if (uniqueID == null) null else this.qualifiedNoPrefix(uniqueID, gc)
+        val queryString = if (uriStr == null || uriStr == "") """SELECT ?s ?p ?o ?st ?ot WHERE { 
+$graphSpec ?s ?p ?o.
+optional {?s rdf:type ?st.}
+optional {?o rdf:type ?ot}  $graphEnd 
+}
+order by ?s ?p """
+        else """SELECT ?s ?p ?o ?st ?ot WHERE { 
+BIND ($uriStr as ?s)            
+$graphSpec?s ?p ?o.
+?s rdf:type ?st.
+optional {?o rdf:type ?ot} $graphEnd }
+order by ?s ?p """
 
+        return queryString
+    }
 
     /**
      * Retrieves a JSON representation of model data based on the given, optional, UniqueID. If no
@@ -197,25 +214,7 @@ DELETE WHERE {
      * @return A JsonArray containing the JSON representation of the retrieved data respecting indexing, if any.
      */
     open fun getJsonById(gc: GraphConfig, uniqueID: String?): JsonArray {
-
-        val graphSpec = if (gc.graphName == null) "" else "graph <${gc.graphName}> {"
-        val graphEnd = if (gc.graphName == null) "" else "}"
-        val uriStr: String? = if (uniqueID == null) null else this.qualified(uniqueID, gc)
-        val queryString = if (uriStr == null || uriStr == "") """SELECT ?s ?p ?o ?st ?ot WHERE { 
-$graphSpec ?s ?p ?o.
-optional {?s rdf:type ?st.}
-optional {?o rdf:type ?ot}  $graphEnd 
-}
-order by ?s ?p """
-        else """SELECT ?s ?p ?o ?st ?ot WHERE { 
-BIND( <${this.getGraphResourceString(uriStr, gc)}> as ?s).            
-$graphSpec ?s ?p ?o.
-?s rdf:type ?st.
-optional {?o rdf:type ?ot} $graphEnd }
-order by ?s ?p """
-
-        //println("getJsonById: $queryString")
-        val queryResult = this.sparqlQuery(queryString)
+        val queryResult = this.sparqlQuery(this.getByIdQuery(gc, uniqueID))
         return this.processQueryResultsJson(queryResult, gc)
     }
 
@@ -232,7 +231,7 @@ order by ?s ?p """
      * @param gc Graph config of the grh to query
      * @return JsonArray of JsonObjects returned by the query
      */
-    fun processQueryResultsJson(queryResult: RdfQueryResultStub, gc: GraphConfig=this.gcModel ): JsonArray {
+    fun processQueryResultsJson(queryResult: QueryResultInterface, gc: GraphConfig=this.gcModel ): JsonArray {
         // Process queryResult
         val elements: MutableList<JsonObject> = mutableListOf()
         var currentProperties: HashMap<String, JsonElement>? = null// = HashMap<String, JsonObject>()
@@ -583,10 +582,17 @@ order by ?s ?p """
             if (predicateSpec.schemaType=="array") {
                 var index = 0
                 if (obj is JsonArray) {
-                    this.rdfAdd(rdfIRI(qualified(subject,gc)), this.rdfIRI("${gcMetamodel?.prefix}:annotation:json:${predicateSpec.predicate}"), this.getGraphTerm(defaultStringSpec,"${uglyJsonEncoder.encodeToString(obj)}",gc), gc)
-                    for (element in obj) {
-                        this.addTriple(gc, subject, predicateSpec, element, index++) // Index currently ignored
-                    }
+                    /*if (obj.isNotEmpty()){ */ // Should we propagate empty lists? May have to augment ParseSchema
+                        this.rdfAdd(
+                            rdfIRI(qualified(subject, gc)),
+                            this.rdfIRI("${gcMetamodel?.prefix}:annotation:json:${predicateSpec.predicate}"),
+                            this.getGraphTerm(defaultStringSpec, "${uglyJsonEncoder.encodeToString(obj)}", gc),
+                            gc
+                        )
+                        for (element in obj) {
+                            this.addTriple(gc, subject, predicateSpec, element, index++) // Index currently ignored
+                        }
+
                 } else {
                     logApiError("Error: Array value for ${predicateSpec.predicate} is not a list: $obj")
                 }
@@ -707,9 +713,17 @@ order by ?s ?p """
     }
     /**
      * Perform a query and return a query helper. Override in DB specific RdfService.
+     * Intended to be specialized by subclass.
      */
-    open fun sparqlQuery(theQuery:String):RdfQueryResultStub {return RdfQueryResultStub("ABSTRACT")}
-    open class RdfQueryResultStub(val queryResult:Any) {
+    open fun sparqlQuery(theQuery:String):QueryResultInterface {return SparQLResultJson(JsonObject(mapOf()))}
+
+    /**
+     * Interface representing a stub for RDF query results. This interface provides methods for
+     * iterating over query results, accessing specific result values, and determining the types
+     * of these values. Intended to be sbclassed for the structure of query results. The SparQL
+     * protocol JSON version is: SparQLResulJson
+     */
+    interface QueryResultInterface {
         /**
          * proceed to next row of query, return true if there are more
          */
@@ -750,27 +764,25 @@ order by ?s ?p """
      *
      * @queryResult SparQL JSON Results Object perSparQL Protocol Spec
      */
-    class SparQLResulJson(queryResult: Any) : RdfQueryResultStub(queryResult) {
-        val jsonResultsObject = queryResult as JsonObject
-        val queryResultTyped = ((jsonResultsObject.get("results")?.jsonObject)?.get("bindings") ?: JsonArray(listOf())) as JsonArray
+    class SparQLResultJson(queryResultsSparQlObject:JsonObject) : QueryResultInterface {
+        val queryResultArray = ((queryResultsSparQlObject.get("results")?.jsonObject)?.get("bindings") ?: JsonArray(listOf())).jsonArray
 
         var currentBindingSet: JsonObject? = null
         var index = 0
-        val indexEnd = queryResultTyped.size - 1
 
         override fun next(): Boolean {
-            if (index>=indexEnd) return false
+            if (index>=queryResultArray.size) return false
+            currentBindingSet = queryResultArray.elementAt(index).jsonObject;
             index += 1
-            currentBindingSet = queryResultTyped.elementAt(index).jsonObject; return true
+            return true
         }
         override fun hasNext():Boolean  {
-            val has = index<indexEnd
-            if (!has) close()
+            val has = index<queryResultArray.size
+            if (!has) close() // May not be required here but just in case
             return has
         }
         override fun getValueString(key:String):String? {
-            return currentBindingSet?.getValue(key)?.jsonObject?.getValue("value")
-            .toString()
+            return currentBindingSet?.getValue(key)?.jsonObject?.getValue("value").toString()
         }
 
         override fun isLiteralValue(key:String):Boolean = (currentBindingSet?.getValue(key)?.jsonObject?.getValue("type")).toString() == "literal"

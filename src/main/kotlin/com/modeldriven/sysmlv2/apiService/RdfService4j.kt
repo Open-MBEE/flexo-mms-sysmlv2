@@ -78,9 +78,10 @@ open public class RdfServiceRdf4j(modelGraph:GraphConfig, projectGraph:GraphConf
     /**
      * Override of SparqlQuery returns the DB specific QueryHelper initilized with the Query.
      */
-    override fun sparqlQuery(theQuery:String):RdfQueryResultStub {
+    override fun sparqlQuery(theQuery:String):QueryResultInterface {
+        println("Executing query: \n$theQuery")
         val queryResult = this.rdf4JCon.prepareTupleQuery(theQuery).evaluate()
-        return RdfQueryResultRdf4j(queryResult)
+        return SparQLQueryResult4J(queryResult)
     }
     /**
      * A "mixin class for GraphConfig that propvides DB specific properties and operations for that graph.
@@ -93,25 +94,22 @@ open public class RdfServiceRdf4j(modelGraph:GraphConfig, projectGraph:GraphConf
     }
 
     /**
-     * The `RdfQueryHelper` class is a concrete implementation for executing and managing RDF queries using the
-     * Rdf4j framework. It extends the `RdfQueryHelperStub` base class, providing actual functionality to execute
-     * SPARQL queries, traverse results, and retrieve query bindings in various formats.
+     * The `RdfQueryHelper` class is a concrete implementation for  managing RDF querie results using the
+     * Rdf4j framework. It implements the `QueryResultInterface` , providing actual functionality to
+     * traverse results, and retrieve query bindings in various formats.
      *
      * This class encapsulates the behavior related to processing query results, ensuring proper handling and
      * closing of resources.
      *
-     * @constructor Creates an instance of `RdfQueryHelper` with the specified RDF service and query string.
-     * @param rdfService The `RdfServiceRdf4j` instance used for executing the query.
-     * @param theQuery The SPARQL query string to execute through the RDF service.
+     * @param queryResultsTyped Results from a RDF4J query.
      */
-    class RdfQueryResultRdf4j(queryResult: Any) : RdfQueryResultStub(queryResult) {
-        val queryResultTyped = queryResult as TupleQueryResult
+    class SparQLQueryResult4J(val queryResult: TupleQueryResult) : QueryResultInterface {
 
         var currentBindingSet: BindingSet? = null
 
-        override fun next(): Boolean {currentBindingSet = queryResultTyped.next(); return this.hasNext()}
+        override fun next(): Boolean {currentBindingSet = queryResult.next(); return this.hasNext()}
         override fun hasNext():Boolean  {
-            val isNext =queryResultTyped.hasNext()
+            val isNext =queryResult.hasNext()
             if (!isNext) this.close()
             return isNext
         }
@@ -129,6 +127,6 @@ open public class RdfServiceRdf4j(modelGraph:GraphConfig, projectGraph:GraphConf
                 this.close()
             return JsonObject(elements)
         }
-        override fun close() {queryResultTyped.close()}
+        override fun close() {queryResult.close()}
     }
  }
