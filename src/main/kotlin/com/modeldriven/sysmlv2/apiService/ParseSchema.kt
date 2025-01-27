@@ -51,6 +51,13 @@ public class PredicateSpec(val predicate:String, val schemaType:String, var valu
     private var rdfResource:Any? = null
     var subjectGraph:String? = null
 
+    fun getAnnotationPredicate():String? {
+        if (schemaType=="array")
+            return "<${gc?.baseURI}annotation:json:${this.predicate}>"
+        else
+            return null
+    }
+
     fun getQualified():String? {
         if (qualifiedStr==null) {
             if (predicate.contains(':'))

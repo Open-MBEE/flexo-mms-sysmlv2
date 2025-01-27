@@ -6,7 +6,15 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArrayBuilder
+import kotlinx.serialization.json.jsonObject
 import org.eclipse.rdf4j.model.IRI
+import org.eclipse.rdf4j.model.Literal
+import org.eclipse.rdf4j.query.BindingSet
+import org.eclipse.rdf4j.query.QueryResult
+import org.eclipse.rdf4j.query.TupleQueryResult
 
 
 import java.util.*
@@ -51,10 +59,12 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
     var rdfTypeSpec = PredicateSpec("type", "primitive", "reference", "rdf", this)
     var defaultedPredicateSpec = PredicateSpec("UNDEFINED", "primitive", "string", "Model", this)
 
+
     var rdfSubject: Any // Could be string or DB specific
     var rdfPredicate: Any
     var rdfObject : Any
     var rdfType  : Any
+    val uglyJsonEncoder = Json { prettyPrint = false }
 
     init {
         // These keys are required for these graphs
@@ -67,12 +77,10 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
         gcRDF = this.addGraph("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
         //this.addGraph("RDFS", "http://www.w3.org/2000/01/rdf-schema#",)
         //this.addGraph("OWL", "http://www.w3.org/2002/07/owl#")
-        this.addGraph("API", """https://www.omg.org/spec/SysML/API#""") // Defined for API in RDF, not for SysML
+        //this.addGraph("API", """https://www.omg.org/spec/SysML/API#""") // Defined for API in RDF, not for SysML
         this.addGraph("XSD", "http://www.w3.org/2001/XMLSchema#")
 
         gcUnkown = this.rdfGraphs["UNKOWN"]
-        //gcModel = this.rdfGraphs["Model"] // Init in subclass
-        //gcProject = this.rdfGraphs["Project"]
         defaultStringSpec = PredicateSpec("UNDEFINED", "primitive", "string", "SysML", this)
         rdfTypeSpec = PredicateSpec("type", "primitive", "reference", "rdf", this)
         rdfTypeSpec.subjectGraph = "SysML" // Types of elements come from SysML - special case
@@ -98,7 +106,8 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
 
                 this.rdfAdd(s, p, term, gc)
 
-                if (index != null) {
+                /** ToDo: Consider editing list?
+                 * if (index != null) {
                     val orderUrl = this.getGraphResourceIRI(
                         "${subject}__${this.simpleTerm(predicateSpec.predicate)}__${
                             index.toString(16).padStart(6, '0')
@@ -108,7 +117,7 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
                     this.rdfAdd(orderUrl, rdfPredicate, p, gc)
                     this.rdfAdd(orderUrl, rdfObject, term, gc)
                     //model.add(orderUrl,apiIndex, literal(index), ctx) // Currently using URL index
-                }
+                }**/
             }
         }
     }
@@ -125,7 +134,7 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
 
                 this.rdfRemove(s, p, term, gc)
 
-                if (index != null) {
+                /**if (index != null) {
                     val orderUrl = this.getGraphResourceIRI(
                         "${subject}__${this.simpleTerm(predicateSpec.predicate)}__${
                             index.toString(16).padStart(6, '0')
@@ -135,7 +144,7 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
                     this.rdfRemove(orderUrl, rdfPredicate, p, gc)
                     this.rdfRemove(orderUrl, rdfObject, term, gc)
                     //model.remove(orderUrl,apiIndex, literal(index), ctx) // Currently using URL index
-                }
+                }**/
             }
         }
     }
@@ -155,30 +164,24 @@ open public class RdfService(modelGraph:GraphConfig, projectGraph:GraphConfig ) 
         val ctxS = this.rdfIRI(gc.baseURI)
         val sS = this.getGraphResourceString(subject, gc)
         val pS = predicateSpec.getQualified()
+        val annotation = "${gcMetamodel?.prefix}:annotation:json:${predicateSpec.predicate}"
 
         val deleteQuery = if (predicateSpec.schemaType == "array") """
 DELETE {
-graph <$ctxS> {
 <$sS> <$pS> ?o .
-
-?i rdf:subject <$sS> .
-?i rdf:predicate <$pS> .
-?i rdf:object ?o
-}}
+<$sS> <$annotation> ?a
+}
 WHERE {
-graph <$ctxS> {
 <$sS> <$pS> ?o .
 optional{
-?i rdf:subject <$sS> .
-?i rdf:predicate <$pS> .
-?i rdf:object ?o
-}}
-    }""" else """
-graph <$ctxS> {
-    <$sS> <$pS> ?o .
+<$sS> <$annotation> ?a
+}
+}""" else """
+DELETE WHERE {
+<$sS> <$pS> ?o .
 }
     """
-        println(deleteQuery)
+        //println(deleteQuery)
         this.sparqlUpdate(deleteQuery, gc)
     }
 
@@ -194,122 +197,104 @@ graph <$ctxS> {
      * @return A JsonArray containing the JSON representation of the retrieved data respecting indexing, if any.
      */
     open fun getJsonById(gc: GraphConfig, uniqueID: String?): JsonArray {
-        val elements: MutableList<JsonObject> = mutableListOf()
-        val graphSpec = /*if (gc.baseURI.endsWith(':')) "" else*/ "graph <${gc.baseURI}>"
-        val uriStr: String? = if (uniqueID == null) null else this.qualified(uniqueID, gc)
-        val queryString = if (uriStr == null || uriStr == "") """SELECT ?s ?p ?o ?st ?ot ?index WHERE { 
-$graphSpec {?s ?p ?o.
-?s rdf:type ?st.
-optional {?o rdf:type ?ot} 
-optional {
-?index rdf:subject ?s.
-?index rdf:predicate ?p .
-?index rdf:object ?o.
-}}}
-order by ?s ?p ?index"""
-        else """SELECT ?s ?p ?o ?st ?ot ?index WHERE { 
-BIND( <${this.getGraphResourceString(uriStr, gc)}> as ?s).            
-$graphSpec {?s ?p ?o.
-?s rdf:type ?st.
-optional {?o rdf:type ?ot} 
-optional {
-?index rdf:subject ?s.
-?index rdf:predicate ?p .
-?index rdf:object ?o.
-}}}
-order by ?s ?p ?index"""
-        //println(queryString)
 
-        var lastS: String? = null
-        var lastP: String? = null
-        var currentProperties: HashMap<String, JsonElement>? = null// = HashMap<String, JsonObject>()
-        var predicateSpec: PredicateSpec? = null
-        var term: JsonElement
-        var termArray: MutableList<JsonElement>? = null
+        val graphSpec = if (gc.graphName == null) "" else "graph <${gc.graphName}> {"
+        val graphEnd = if (gc.graphName == null) "" else "}"
+        val uriStr: String? = if (uniqueID == null) null else this.qualified(uniqueID, gc)
+        val queryString = if (uriStr == null || uriStr == "") """SELECT ?s ?p ?o ?st ?ot WHERE { 
+$graphSpec ?s ?p ?o.
+optional {?s rdf:type ?st.}
+optional {?o rdf:type ?ot}  $graphEnd 
+}
+order by ?s ?p """
+        else """SELECT ?s ?p ?o ?st ?ot WHERE { 
+BIND( <${this.getGraphResourceString(uriStr, gc)}> as ?s).            
+$graphSpec ?s ?p ?o.
+?s rdf:type ?st.
+optional {?o rdf:type ?ot} $graphEnd }
+order by ?s ?p """
 
         //println("getJsonById: $queryString")
         val queryResult = this.sparqlQuery(queryString)
+        return this.processQueryResultsJson(queryResult, gc)
+    }
+
+    /**
+     * Process the result of a query to create Json object representations in SysML API form
+     * Query must be of the form: SELECT ?s ?p ?o ?st ?ot
+     *  - ?s Subject
+     *  - ?p Predicate
+     *  - ?o Object
+     *  - ?st SubjectType
+     *  - ?ot Object Type (Optional)
+     *
+     * @param queryResult RdfQueryHelper providing the result of the query
+     * @param gc Graph config of the grh to query
+     * @return JsonArray of JsonObjects returned by the query
+     */
+    fun processQueryResultsJson(queryResult: RdfQueryResultStub, gc: GraphConfig=this.gcModel ): JsonArray {
+        // Process queryResult
+        val elements: MutableList<JsonObject> = mutableListOf()
+        var currentProperties: HashMap<String, JsonElement>? = null// = HashMap<String, JsonObject>()
+        var predicateSpec: PredicateSpec? = null
+        var term: JsonElement
+        var lastS: String? = null
         while (queryResult.next()) {
-            val valueOfS = queryResult.getValueString("s")
-            val valueOfP = queryResult.getValueString("p")
-            val valueOfO = queryResult.getValueString("o")
-            val valueOfSt = queryResult.getValueString("st") // Type of ?s
+            val valueOfS: String = queryResult.getValueString("s")!!
+            val valueOfP: String = queryResult.getValueString("p")!!
+            val valueOfO = queryResult.getValueString("o")!!
+            val valueOfSt = queryResult.getValueString("st")!! // Type of ?s
             val valueOfOt = queryResult.getValueString("ot") // Optional type of ?o
-            val valueOfIndex = queryResult.getValueString("index") // Index URI of S P O
+            //println("getJsonById: S:$valueOfS P:$valueOfP O:$valueOfO ST:$valueOfSt OT:$valueOfOt ")
 
-            //println("getById: $valueOfS $valueOfP $valueOfO $valueOfSt $valueOfOt index:$valueOfIndex")
 
-            if (valueOfP != lastP || valueOfS != lastS) {
-                if (termArray != null) {
-                    currentProperties?.put(this.simpleTerm(lastP!!), JsonArray(termArray))
-                }
-                lastP = valueOfP
-                if (valueOfSt != null) {
+            if (valueOfP == "rdf:type" || valueOfP == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+                predicateSpec = this.rdfTypeSpec
+            else
+                predicateSpec =
+                    this.getPredicateSpec(gc, this.simpleTerm(valueOfSt), this.simpleTerm(valueOfP))
 
-                    if (valueOfP == "rdf:type" || valueOfP == "http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
-                        predicateSpec = this.rdfTypeSpec
-                    else
-                        predicateSpec =
-                            this.getPredicateSpec(gc, this.simpleTerm(valueOfSt), this.simpleTerm(valueOfP!!))
-                    // NOT FOUND??
-                    if (predicateSpec == null) {
-                        val valueType: String = if (queryResult.isLiteralValue("o")) "string" else "reference"
-                        //logApiError("Warning: Predicate not found: ${valueOfSt.stringValue()} ${valueOfP.stringValue()}")
-                        predicateSpec = this.makeDefaultPredicateSpec(
-                            this.simpleTerm(valueOfSt),
-                            this.simpleTerm(valueOfP),
-                            "primitive",
-                            valueType
-                        )
-                    }
-                }
-                if (predicateSpec != null && predicateSpec?.schemaType == "array") termArray =
-                    arrayListOf() else termArray = null
+            if (predicateSpec == null) { /// Unkown predicate - what to do?
+                val valueType: String = if (queryResult.isLiteralValue("o")) "string" else "reference"
+                //logApiError("Warning: Predicate not found: ${valueOfSt.stringValue()} ${valueOfP.stringValue()}")
+                predicateSpec = this.makeDefaultPredicateSpec(
+                    this.simpleTerm(valueOfSt),
+                    this.simpleTerm(valueOfP),
+                    "primitive",
+                    valueType
+                )
             }
-
             if (valueOfS != lastS) {
-                lastS = valueOfS
-                if (currentProperties != null) elements.add(JsonObject(currentProperties!!))
-                currentProperties = HashMap<String, JsonElement>()
-                currentProperties?.put("@id", JsonPrimitive(this.simpleTerm(valueOfS!!)))
-                if (valueOfSt != null) {
-                    val theType = this.simpleTerm(valueOfSt)
-                    currentProperties?.put("@type", JsonPrimitive(theType))
+                if (currentProperties != null) {
+                    elements.add(JsonObject(currentProperties))
                 }
+                currentProperties = HashMap<String, JsonElement>()
+                lastS = valueOfS
+                //println("getById: $valueOfS $valueOfP $valueOfO $valueOfSt $valueOfOt ")
+                currentProperties.put("@id", JsonPrimitive(this.simpleTerm(valueOfS)))
+                currentProperties.put("@type", JsonPrimitive(this.simpleTerm(valueOfSt)))
             }
 
-            if (predicateSpec != null) { // Ignore anything without a type spec
+            if (predicateSpec.schemaType == "array") {
+                if (valueOfP.contains("annotation:json:")) {
+                    // we put the ordered list in json as the value
+                    currentProperties?.put(this.simpleTerm(valueOfP), JsonPrimitive(valueOfO))
+                } /* else we ignore the detail triples **/
+            } else if (predicateSpec!=this.rdfTypeSpec){ // Non array value
                 val simpleO: Any? =
-                    if (predicateSpec?.valueType == "reference") this.simpleTerm(valueOfO!!) else valueOfO
+                    if (predicateSpec.valueType == "reference") this.simpleTerm(valueOfO) else valueOfO
 
                 term = getJsonTerm(
-                    predicateSpec!!,
+                    predicateSpec,
                     simpleO!!,
-                    if (valueOfOt != null) this.simpleTerm(valueOfOt) else predicateSpec?.valueType
+                    if (valueOfOt != null) this.simpleTerm(valueOfOt) else predicateSpec.valueType
                 )
-
-                if (valueOfP != "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" && valueOfP != "rdf:type")
-                    if (predicateSpec.schemaType == "array") {
-                        if (valueOfIndex != null) {
-                            termArray?.add(term) // assumes ordered index in query
-                            //termArray?.add((valueOfIndex.stringValue()).toInt(), term)
-                        } else
-                            termArray?.add(term) // Not ordered (currently everything is ordered)
-                    } else {
-                        currentProperties?.put(this.simpleTerm(valueOfP!!), term)
-                    }
-            } else {
-                if (valueOfSt != null) {
-                    logApiError(("Warning: RDF Predicate:${this.simpleTerm(valueOfP!!)}' in '${this.simpleTerm(valueOfSt)}' ignored, not in schema"))
-                }
+                currentProperties!!.put(this.simpleTerm(valueOfP), term)
             }
-
         }
+        if (currentProperties != null)
+            elements.add(JsonObject(currentProperties))
 
-        if (termArray != null) {
-            currentProperties?.put(this.simpleTerm(lastP!!), JsonArray(termArray!!))
-        }
-        if (currentProperties != null) elements.add(JsonObject(currentProperties!!))
         return JsonArray(elements)
     }
 
@@ -333,7 +318,7 @@ order by ?s ?p ?index"""
     open fun getJsonTerm(predicateSpec: PredicateSpec, obj: Any, objType: String?): JsonElement {
         var term: JsonElement? = null
 
-        if (obj is JsonPrimitive) return obj
+        if (obj is JsonElement) return obj
 
 
         val castType = predicateSpec.valueType
@@ -427,7 +412,7 @@ order by ?s ?p ?index"""
      * Create & Register a graph for use by this RdfService.
      */
     open fun addGraph(prefix:String, baseURI:String, keyArg:String?=null):GraphConfig {
-        val gc = GraphConfig(prefix, baseURI, keyArg, this)
+        val gc = GraphConfig(prefix, baseURI, keyArg, rdfService=this)
         this.rdfGraphs[gc.key] = gc
         this.graphsByPrefix[gc.prefix] = gc
         return gc
@@ -481,6 +466,39 @@ order by ?s ?p ?index"""
                     } else {
                         //logApiError("Prefix not found for: $resource")
                         return "urn:$resource" // default for unknown
+                    }
+                }
+            } else return resource.toString()
+        }
+
+        return null
+    }
+
+    /**
+     * Resolves the fully qualified name or URI for a given resource based on the provided GraphConfig and optional metadata flag.
+     *
+     * @param resource The resource to be qualified. Can be of type ObjectCache, JsonPrimitive, or any primitive.
+     * @param gc The GraphConfig object providing prefix or metamodel specifications for qualification. Can be null.
+     * @param isMeta A boolean flag indicating if the qualified name should use the metamodel prefix. Defaults to false.
+     * @return The qualified name or URI as a String, or null if the resource is null.
+     */
+    open fun qualifiedNoPrefix(resourceArg:Any?, gc: GraphConfig?, isMeta:Boolean=false):String? {
+        if (resourceArg!=null) {
+            var resource = resourceArg
+            if (resource is JsonPrimitive)
+                resource = resource.content
+            if (resource is String) {
+                val index = resource.indexOf(':')
+                if (index>0) {
+                    val prefix = resource.substring(0, index)
+                    val suffix = resource.substring(index+1)
+                    return "<${this.rdfGraphs[prefix]}$suffix>"
+                } else {
+                    if (gc!=null) {
+                        return if (isMeta) "<${this.rdfGraphs[gc.metamodelSpec?.graphKey]?.baseURI}$resource>" else "<${gc.baseURI}$resource>"
+                    } else {
+                        //logApiError("Prefix not found for: $resource")
+                        return "<urn:$resource>" // default for unknown
                     }
                 }
             } else return resource.toString()
@@ -564,8 +582,11 @@ order by ?s ?p ?index"""
 
             if (predicateSpec.schemaType=="array") {
                 var index = 0
-                if (obj is JsonArray) for (element in obj) {
-                    this.addTriple(gc, subject, predicateSpec, element, index++)
+                if (obj is JsonArray) {
+                    this.rdfAdd(rdfIRI(qualified(subject,gc)), this.rdfIRI("${gcMetamodel?.prefix}:annotation:json:${predicateSpec.predicate}"), this.getGraphTerm(defaultStringSpec,"${uglyJsonEncoder.encodeToString(obj)}",gc), gc)
+                    for (element in obj) {
+                        this.addTriple(gc, subject, predicateSpec, element, index++) // Index currently ignored
+                    }
                 } else {
                     logApiError("Error: Array value for ${predicateSpec.predicate} is not a list: $obj")
                 }
@@ -610,90 +631,8 @@ order by ?s ?p ?index"""
      * about the graph configuration, URI, associated data identity, and RDF properties.
      */
     open fun deleteObject(gc: GraphConfig, subject: String?) {
-        /**
-         * Deleting Data - Commit.change should include a DataVersion
-         * record with DataVersion.payload not provided, thereby
-         * indicating deletion of DataIdentity in the new commit.
-         * DataVersion.identity should be populated with the
-         * DataIdentity that will be deleted in the new commit.
-         * When a DataIdentity is deleted in a commit, all its
-         * versions (DataVersion) are also deleted, and any
-         * references from other DataIdentity are also removed to
-         * maintain data integrity. In addition, for Element Data
-         * (KerML), deletion of an Element must also result in
-         * deletion of incoming Relationships. When Element Data
-         * (KerML) is created or updated, derived properties must
-         * be computed or verified if the API provider claims
-         * Derived Property Conformance. The deleted element -
-         * DataIdentity and its DataVersion records - will be
-         * accessible in previous commits.
-         */
-        val ctxIri = gc.baseURI
-        val subIri = this.getGraphResourceString(subject, gc)
-        val graphSpec:String = /*if (gc.baseURI.endsWith(':')) "" else*/ "GRAPH <${gc.baseURI}> {"
-        val graphEndSpec = /*if (gc.baseURI.endsWith(':')) "" else*/ "}"
-
-        val deleteQuery = """
-DELETE {
-$graphSpec 
-    $subIri ?p ?o . # all triples FROM subejct
-
-        ?i rdf:subject $subIri .
-        ?i rdf:predicate ?p .
-        ?i rdf:object ?o .
-
-        ?ref ?anyP2 $subIri . # All triples TO object
-
-            ?i2 rdf:subject ?ref .
-            ?i2 rdf:predicate ?anyP2 .
-            ?i2 rdf:object $subIri  .
-
-            ?ref ?anyP3 ?any31 . # all triples FROM Relationship
-
-                ?i3 rdf:subject ?ref .
-                ?i3 rdf:predicate ?anyP3 .
-                ?i3 rdf:object ?any31 .
-
-                ?ref4 ?anyP4 ?ref .
-
-                    ?i4 rdf:subject ?ref4.
-                    ?i4 rdf:predicate ?anyP4 .
-                    ?i4 rdf:object ?ref .
-$graphEndSpec}WHERE {
-$graphSpec 
-    $subIri ?p ?o . # all triples FROM subejct
-        optional { # Indexing triples of all objects  FROM subject
-        ?i rdf:subject $subIri .
-        ?i rdf:predicate ?p .
-        ?i rdf:object ?o .
-        }
-    optional {
-        ?ref ?anyP2 $subIri . # All triples TO object
-        optional { # Indexing triples of all triples to object
-            ?i2 rdf:subject ?ref .
-            ?i2 rdf:predicate ?anyP2 .
-            ?i2 rdf:object $subIri  .
-        }
-        optional {
-            ?ref <https://www.omg.org/spec/SysML#ownedRelatedElement>+ $subIri . # ?ref is a Relationship related to subject
-            ?ref ?anyP3 ?any31 . # all triples FROM Relationship
-            optional { # Indexing triples of all triples From Relationship
-                ?i3 rdf:subject ?ref .
-                ?i3 rdf:predicate ?anyP3 .
-                ?i3 rdf:object ?any31 .
-            }
-            optional { # All triples TO relationship
-                ?ref4 ?anyP4 ?ref .
-                optional { #Indexing of any triples to relationship
-                    ?i4 rdf:subject ?ref4.
-                    ?i4 rdf:predicate ?anyP4 .
-                    ?i4 rdf:object ?ref .
-                }
-            }
-        }
-    }
-$graphEndSpec}"""
-        this.sparqlUpdate(deleteQuery, gc)
+        requireNotNull(subject)
+        gc.updater.deleteObject(this.qualifiedNoPrefix(subject,gc)!!)
     }
     /**
      * Deletes an object from the RDF model without deleting references
@@ -704,30 +643,8 @@ $graphEndSpec}"""
      * about the graph configuration, URI, associated data identity, and RDF properties.
      */
     open fun deleteObjectContents(gc: GraphConfig, subject: String?) {
-
-        val ctxIri = gc.baseURI
-        val subIri = this.getGraphResourceString(subject, gc)
-        val graphSpec:String = /*if (gc.baseURI.endsWith(':')) "" else*/ "GRAPH <${gc.baseURI}> {"
-        val graphEndSpec = /*if (gc.baseURI.endsWith(':')) "" else*/ "}"
-
-
-        val deleteQuery = """
-DELETE {
-$graphSpec 
-$subIri ?p ?o . 
-    ?i rdf:subject $subIri .
-    ?i rdf:predicate ?p .
-    ?i rdf:object ?o .
-$graphEndSpec}WHERE {
-$graphSpec 
-$subIri ?p ?o . 
-optional { 
-    ?i rdf:subject $subIri .
-    ?i rdf:predicate ?p .
-    ?i rdf:object ?o .
-}
-$graphEndSpec}"""
-        this.sparqlUpdate(deleteQuery, gc)
+        requireNotNull(subject)
+        gc.updater.deleteObject(this.qualifiedNoPrefix(subject,gc)!!)
     }
 
     /**
@@ -791,17 +708,8 @@ $graphEndSpec}"""
     /**
      * Perform a query and return a query helper. Override in DB specific RdfService.
      */
-    open fun sparqlQuery(theQuery:String):RdfQueryHelperStub {return RdfQueryHelperStub(this,theQuery)}
-    /**
-     * A stub implementation for RDF query handling. This class serves as a placeholder or mock
-     * for testing or development purposes without relying on an actual RDF service implementation.
-     * QueryHelpers execute a query and provide methods for acessing the results in a technology
-     * independent way.
-     *
-     * @param rdfService The RDF service instance used for query operations.
-     * @param theQuery The RDF query string to be executed or processed.
-     */
-    open class RdfQueryHelperStub(val rdfService: RdfService, val theQuery:String) {
+    open fun sparqlQuery(theQuery:String):RdfQueryResultStub {return RdfQueryResultStub("ABSTRACT")}
+    open class RdfQueryResultStub(val queryResult:Any) {
         /**
          * proceed to next row of query, return true if there are more
          */
@@ -831,6 +739,54 @@ $graphEndSpec}"""
          * Close the query
          */
         open fun close() {}
+    }
+    /**
+     * The `SparQLResulJson` class is a concrete implementation for executing and managing SparQL queries using the
+     * SparQL JSON Protocol. It extends the `RdfQueryResultStub` base class, providing actual functionality
+     * traverse results, and retrieve query bindings in various formats.
+     *
+     * This class encapsulates the behavior related to processing query results, ensuring proper handling and
+     * closing of resources.
+     *
+     * @queryResult SparQL JSON Results Object perSparQL Protocol Spec
+     */
+    class SparQLResulJson(queryResult: Any) : RdfQueryResultStub(queryResult) {
+        val jsonResultsObject = queryResult as JsonObject
+        val queryResultTyped = ((jsonResultsObject.get("results")?.jsonObject)?.get("bindings") ?: JsonArray(listOf())) as JsonArray
+
+        var currentBindingSet: JsonObject? = null
+        var index = 0
+        val indexEnd = queryResultTyped.size - 1
+
+        override fun next(): Boolean {
+            if (index>=indexEnd) return false
+            index += 1
+            currentBindingSet = queryResultTyped.elementAt(index).jsonObject; return true
+        }
+        override fun hasNext():Boolean  {
+            val has = index<indexEnd
+            if (!has) close()
+            return has
+        }
+        override fun getValueString(key:String):String? {
+            return currentBindingSet?.getValue(key)?.jsonObject?.getValue("value")
+            .toString()
+        }
+
+        override fun isLiteralValue(key:String):Boolean = (currentBindingSet?.getValue(key)?.jsonObject?.getValue("type")).toString() == "literal"
+        override fun nextBindingJson(): JsonObject {
+            val elements = HashMap<String, JsonPrimitive>()
+            if (this.next()) {
+                if (currentBindingSet != null) {
+                    for (binding in currentBindingSet!!) {
+                        elements[binding.key] = (currentBindingSet?.getValue(binding.key)?.jsonObject?.getValue("value")?.jsonPrimitive) ?: JsonPrimitive("null")
+                    }
+                }
+            } else
+                this.close()
+            return JsonObject(elements)
+        }
+        override fun close() {} // Nothing to close here
     }
     /**
      * Starts a transaction in a DB specific way, if the DB handles transactions.

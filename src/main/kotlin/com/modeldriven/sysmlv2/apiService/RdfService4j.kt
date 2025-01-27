@@ -26,6 +26,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.eclipse.rdf4j.model.IRI
 import org.eclipse.rdf4j.model.Literal
 import org.eclipse.rdf4j.query.BindingSet
+import org.eclipse.rdf4j.query.TupleQueryResult
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.Repository;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
@@ -77,7 +78,10 @@ open public class RdfServiceRdf4j(modelGraph:GraphConfig, projectGraph:GraphConf
     /**
      * Override of SparqlQuery returns the DB specific QueryHelper initilized with the Query.
      */
-    override fun sparqlQuery(theQuery:String):RdfQueryHelperStub {return RdfQueryHelper(this,theQuery)}
+    override fun sparqlQuery(theQuery:String):RdfQueryResultStub {
+        val queryResult = this.rdf4JCon.prepareTupleQuery(theQuery).evaluate()
+        return RdfQueryResultRdf4j(queryResult)
+    }
     /**
      * A "mixin class for GraphConfig that propvides DB specific properties and operations for that graph.
      * In the case of rdf$J, provides the "model" and "context" objects and sets namespaces.
@@ -100,16 +104,14 @@ open public class RdfServiceRdf4j(modelGraph:GraphConfig, projectGraph:GraphConf
      * @param rdfService The `RdfServiceRdf4j` instance used for executing the query.
      * @param theQuery The SPARQL query string to execute through the RDF service.
      */
-    class RdfQueryHelper(rdfService: RdfServiceRdf4j, theQuery:String) : RdfQueryHelperStub(rdfService, theQuery) {
-        val queryResult = rdfService.rdf4JCon.prepareTupleQuery(theQuery).evaluate()
-        var currentBindingSet: BindingSet? = null
-        init {
-            //println("Executing query: \n$theQuery")
-        }
+    class RdfQueryResultRdf4j(queryResult: Any) : RdfQueryResultStub(queryResult) {
+        val queryResultTyped = queryResult as TupleQueryResult
 
-        override fun next(): Boolean {currentBindingSet = queryResult.next(); return this.hasNext()}
+        var currentBindingSet: BindingSet? = null
+
+        override fun next(): Boolean {currentBindingSet = queryResultTyped.next(); return this.hasNext()}
         override fun hasNext():Boolean  {
-            val isNext =queryResult.hasNext()
+            val isNext =queryResultTyped.hasNext()
             if (!isNext) this.close()
             return isNext
         }
@@ -127,6 +129,6 @@ open public class RdfServiceRdf4j(modelGraph:GraphConfig, projectGraph:GraphConf
                 this.close()
             return JsonObject(elements)
         }
-        override fun close() {queryResult.close()}
+        override fun close() {queryResultTyped.close()}
     }
-}
+ }

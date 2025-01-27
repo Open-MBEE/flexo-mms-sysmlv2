@@ -42,13 +42,15 @@ package com.modeldriven.sysmlv2.apiService
  * @property prefix The prefix used to identify the graph.
  * @property baseURI The base URI of the graph.
  * @property keyArg A unique key to identify the graph within the RdfService, which defaults to `prefix` if not provided.
+ * @property graphName name of a named graph, may be the same as baseURI, null means do not insert a named graph
  * @property rdfService RdfService bound to implementing this graph, it may be late bound
  * @property updater Updater object used to update this graph
  */
-public open class GraphConfig (val prefix:String, val baseURI:String, keyArg:String?=null,
-                               var rdfService: RdfService?=null, var updater:RdfUpdater=RdfUpdater(baseURI, rdfService)) {
+public open class GraphConfig (val prefix:String, val baseURI:String, keyArg:String?=null, var graphName:String?=null,
+                               var rdfService: RdfService?=null, updaterArg:RdfUpdater?=null) {
     // Subclass this with links to real graph using graphImpl
-    var key:String = "ERROR" // Key oof graph, Should be set by init
+    var updater:RdfUpdater = updaterArg ?: RdfUpdater(this,rdfService)
+    var key:String = "ERROR" // Key of graph, Should be set by init
     var metamodelSpec:SchemaSpec? = null // Metamodel OPEN-API based) that defines the PredicateSpecs for this graph
     var deleteToEdit:Boolean = true // Do not query for existing state, pre-delete only
     open var graphImpl:Any? = null // place for RDF library specifics
@@ -58,7 +60,7 @@ public open class GraphConfig (val prefix:String, val baseURI:String, keyArg:Str
 
     fun defaultedKey(keyArg:String?, rdfService: RdfService?=null) {
         this.key = keyArg ?: this.prefix
-        this.updater = RdfUpdater(this.baseURI, rdfService)
+        this.updater = RdfUpdater(this, rdfService)
         if (this.metamodelSpec==null && rdfService!=null) {
 
             // Define default metamodel for graph types, binds context for class names

@@ -51,6 +51,9 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
 
+    val jenaVersion = "4.10.0"
+    implementation("org.apache.jena:jena-arq:${jenaVersion}")
+
 // Added by Cory
 // For RDF4J Test
     implementation("org.eclipse.rdf4j:rdf4j-storage:5.1.0")

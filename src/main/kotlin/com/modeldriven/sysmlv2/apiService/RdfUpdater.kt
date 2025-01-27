@@ -8,29 +8,60 @@ package com.modeldriven.sysmlv2.apiService
  * @property graphName The name of the RDF graph that will be updated.
  * @property rdfService Service providing the interface to RDF
  */
-class RdfUpdater(val graphName:String, val rdfService: RdfService?    ) {
-    private var newTriples = ArrayList<String>()
-    private var removedTriples = ArrayList<String>()
+class RdfUpdater(val gc:GraphConfig, val rdfService: RdfService?    ) {
+    val graphStart:String = if (gc.graphName==null) "{" else "{GRAPH <${gc.graphName}> {"
+    val graphEnd:String = if (gc.graphName==null) "}" else "}}"
+    private val newHeader = "INSERT DATA $graphStart\n"
+    private val removeHeader = "DELETE DATA $graphStart\n"
+    private var newTriples:String = newHeader
+    private var removedTriples:String = removeHeader
     private var updates = ArrayList<String>()
-    private val graphSpec:String = "GRAPH <${graphName}> "
+
+
+    private var lastAddS:String? = null
+    private var continueAddS = false
+    private var lastRemoveS:String? = null
+    private var continueRemoveS = false
+    private var header = ""
 
     fun addTriple(s:String, p:String, o:String) {
-        this.newTriples.add("$s $p $o .")
+        if (lastAddS==s) {
+            this.newTriples += " ;\n  $p $o"
+        } else {
+            if (continueAddS) {this.newTriples += " .\n" }
+            this.newTriples += "$s $p $o"
+            lastAddS = s
+            continueAddS = true
+        }
     }
     fun removeTriple(s:String, p:String, o:String) {
-        this.removedTriples.add("$s $p $o .")
+        if (lastRemoveS==s) {
+            this.removedTriples += " ;\n  $p $o"
+        } else {
+            if (continueRemoveS) {this.newTriples += " .\n" }
+            this.removedTriples += "$s $p $o"
+            lastRemoveS = s
+            continueRemoveS = true
+        }
+    }
+
+    /**
+     * Delete all triples for a subject without SysML side effects
+     */
+    fun deleteObject(s:String) {
+        this.updates.add("""DELETE WHERE ${graphStart}$s ?p ?o$graphEnd""")
     }
     fun addSparqlUpdate(sparqlUpdate:String?) {
         if (sparqlUpdate!=null && sparqlUpdate.isNotEmpty()) {
-            this.applyAddRemoveUpdate() // This will make the updates ordered, if that is needed.
+            //this.applyAddRemoveUpdate() // This will make the updates ordered, if that is needed.
             this.updates.add(sparqlUpdate)
         }
     }
     fun getHeader():String {
-        var header = ""
-        if (rdfService!=null) for (gc in rdfService.rdfGraphs.values) {
-            //if (!(gc.baseURI.endsWith(":"))) // urn: is not a prefix
+        if (header.isEmpty()) {
+            if (rdfService != null) for (gc in rdfService.rdfGraphs.values) {
                 header += "PREFIX ${gc.prefix}: <${gc.baseURI}>\n"
+            }
         }
         return header
     }
@@ -52,6 +83,20 @@ class RdfUpdater(val graphName:String, val rdfService: RdfService?    ) {
         update += "\n"
         return update
     }
+
+    /**
+     * Retrieves the current list of updates and clears the internal state.
+     * This method applies any pending add or remove updates before returning
+     * the current list of updates and resetting the internal state for future operations.
+     *
+     * @return A list of strings representing the updates.
+     */
+    fun getUpdateList():List<String> {
+        applyAddRemoveUpdate()
+        val currentUpdates = this.updates
+        this.clear()
+        return currentUpdates
+    }
     fun getCombinedUpdate():String {
         val update =  this.getIntermediateUpdate()
         this.clear()
@@ -62,30 +107,27 @@ class RdfUpdater(val graphName:String, val rdfService: RdfService?    ) {
     }
 
     fun applyAddRemoveUpdate(){
-        var update:String = ""
-        if (removedTriples.isNotEmpty()) {
-            update += "DELETE DATA { $graphSpec {\n"
-            for (triple in removedTriples) {
-                update += "  ${triple}\n"
-            }
-            update += "}}"
+        if (continueAddS) {
+            this.newTriples += " .\n$graphEnd \n"
+            this.addSparqlUpdate(this.newTriples)
+            this.continueAddS = false
+            this.newTriples = newHeader
         }
-        if (newTriples.isNotEmpty()) {
-            if (update.isNotEmpty()) update += ";"
-            update += "INSERT DATA { $graphSpec { \n"
-            for (triple in newTriples) {
-                update += "  ${triple}\n"
-            }
-            update += "}}"
+        if (continueRemoveS) {
+            this.removedTriples += " .\n$graphEnd \n"
+            this.addSparqlUpdate(this.removedTriples)
+            this.continueRemoveS = false
+            this.removedTriples = removeHeader
         }
 
-        this.newTriples = ArrayList<String>()
-        this.removedTriples = ArrayList<String>()
-        this.addSparqlUpdate(update)
     }
     fun clear() {
-        this.newTriples = ArrayList<String>()
-        this.removedTriples = ArrayList<String>()
         this.updates = ArrayList<String>()
+        this.lastAddS = null
+        this.newTriples = newHeader
+        this.removedTriples = removeHeader
+        this.continueAddS = false
+        this.continueRemoveS = false
+        this.header = ""
     }
 }

@@ -27,6 +27,7 @@
  */
 
 import com.modeldriven.sysmlv2.apiService.RdfServiceRdf4j.Rdf4jHelper
+import com.modeldriven.sysmlv2.apiService.RdfServiceRdf4j.RdfQueryResultRdf4j
 import kotlinx.serialization.json.*
 import org.eclipse.rdf4j.model.IRI
 import org.eclipse.rdf4j.model.Literal
@@ -306,7 +307,10 @@ open class RdfServiceRdf4jV1 (modelGraph:GraphConfig, projectGraph:GraphConfig) 
     /**
      * Override of SparqlQuery returns the DB specific QueryHelper initilized with the Query.
      */
-    override fun sparqlQuery(theQuery:String):RdfQueryHelperStub {return RdfQueryHelper(this,theQuery)}
+    override fun sparqlQuery(theQuery:String):RdfQueryResultStub {
+        val queryResult = this.rdf4JCon?.prepareTupleQuery(theQuery)?.evaluate()
+        return if (queryResult==null) RdfQueryResultStub("Error: NO RESULT") else RdfQueryResultRdf4j(queryResult)
+    }
     /**
      * A "mixin class for GraphConfig that propvides DB specific properties and operations for that graph.
      * In the case of rdf$J, provides the "model" and "context" objects and sets namespaces.
@@ -317,45 +321,4 @@ open class RdfServiceRdf4jV1 (modelGraph:GraphConfig, projectGraph:GraphConfig) 
 
     }
 
-    /**
-     * The `RdfQueryHelper` class is a concrete implementation for executing and managing RDF queries using the
-     * Rdf4j framework. It extends the `RdfQueryHelperStub` base class, providing actual functionality to execute
-     * SPARQL queries, traverse results, and retrieve query bindings in various formats.
-     *
-     * This class encapsulates the behavior related to processing query results, ensuring proper handling and
-     * closing of resources.
-     *
-     * @constructor Creates an instance of `RdfQueryHelper` with the specified RDF service and query string.
-     * @param rdfService The `RdfServiceRdf4j` instance used for executing the query.
-     * @param theQuery The SPARQL query string to execute through the RDF service.
-     */
-    class RdfQueryHelper(rdfService: RdfServiceRdf4jV1, theQuery:String) : RdfQueryHelperStub(rdfService, theQuery) {
-        val queryResult = rdfService.rdf4JCon!!.prepareTupleQuery(theQuery).evaluate()
-        var currentBindingSet: BindingSet? = null
-        init {
-            //println("Executing query: \n$theQuery")
-        }
-
-        override fun next(): Boolean {currentBindingSet = queryResult.next(); return this.hasNext()}
-        override fun hasNext():Boolean  {
-            val isNext =queryResult.hasNext()
-            if (!isNext) this.close()
-            return isNext
-        }
-        override fun getValueString(key:String):String? {return currentBindingSet?.getValue(key)?.stringValue()}
-        override fun isLiteralValue(key:String):Boolean = currentBindingSet?.getValue(key) is Literal
-        override fun nextBindingJson(): JsonObject {
-            val elements = HashMap<String, JsonPrimitive>() // Can we make this ordered?
-            if (this.next()) {
-                if (currentBindingSet != null) {
-                    for (binding in currentBindingSet!!) {
-                        elements[binding.name] = JsonPrimitive(binding.value.stringValue())
-                    }
-                }
-            } else
-                this.close()
-            return JsonObject(elements)
-        }
-        override fun close() {queryResult.close()}
-    }
 }
