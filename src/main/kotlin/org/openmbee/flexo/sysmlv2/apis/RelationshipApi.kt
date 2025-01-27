@@ -26,7 +26,7 @@ import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
-import org.openmbee.flexo.sysmlv2.models.Relationship
+import kotlinx.serialization.json.JsonObject
 
 fun Route.RelationshipApi() {
 
@@ -140,7 +140,7 @@ fun Route.RelationshipApi() {
             "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
           } ]
         } ]"""
-        call.respond(Json.decodeFromString<List<Relationship>>(exampleContentString))
+        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
     }
 
 }

@@ -29,7 +29,7 @@ import kotlinx.serialization.decodeFromString
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.DataDifference
 import io.ktor.server.application.log
-import org.openmbee.flexo.sysmlv2.models.Data
+import kotlinx.serialization.json.JsonObject
 
 fun Route.DiffMergeApi() {
 
@@ -215,7 +215,7 @@ fun Route.DiffMergeApi() {
         call.respond(Json.decodeFromString<List<DataDifference>>(exampleContentString))
     }
 
-    post<List<Data>>("/projects/{projectId}/branches/{targetBranchId}/merge") { it ->
+    post<List<JsonObject>>("/projects/{projectId}/branches/{targetBranchId}/merge") { it ->
         call.application.environment.log.info("projectId: ${call.parameters["projectId"]}, targetBranchId: ${call.parameters["targetBranchId"]}")
         call.respond(it)
     }

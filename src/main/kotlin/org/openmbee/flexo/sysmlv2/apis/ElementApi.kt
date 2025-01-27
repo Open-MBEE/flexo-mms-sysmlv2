@@ -22,7 +22,6 @@ import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.vocabulary.RDF
 import org.apache.jena.vocabulary.XSD
 import org.openmbee.flexo.sysmlv2.*
-import org.openmbee.flexo.sysmlv2.models.Element
 import org.openmbee.flexo.sysmlv2.models.ProjectUsage
 
 const val REIFIED_OUT_IRI = "urn:flexo-mms:reified-out"
@@ -463,7 +462,7 @@ fun Route.ElementApi() {
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         } ]"""
 
-        call.respond(Json.decodeFromString<List<Element>>(exampleContentString))
+        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
     }
 
 }

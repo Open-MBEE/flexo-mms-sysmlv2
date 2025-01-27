@@ -15,6 +15,7 @@ package org.openmbee.flexo.sysmlv2
 
 import io.ktor.resources.*
 import kotlinx.serialization.*
+import kotlinx.serialization.json.JsonObject
 import org.openmbee.flexo.sysmlv2.infrastructure.URISerializer
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import org.openmbee.flexo.sysmlv2.models.*
@@ -124,7 +125,7 @@ object Paths {
      * @param pageSize Page size (optional)
      * @param &#x60;data&#x60;  (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/branches/{targetBranchId}/merge") class merge(val projectId: java.util.UUID, val sourceCommitId: kotlin.collections.List<java.util.UUID>, val targetBranchId: java.util.UUID, val description: kotlin.String? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null, val `data`: kotlin.collections.List<Data>? = null)
+    @Serializable @Resource("/projects/{projectId}/branches/{targetBranchId}/merge") class merge(val projectId: java.util.UUID, val sourceCommitId: kotlin.collections.List<java.util.UUID>, val targetBranchId: java.util.UUID, val description: kotlin.String? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null, val `data`: kotlin.collections.List<JsonObject>? = null)
 
     /**
      * Get element by project, commit and ID
