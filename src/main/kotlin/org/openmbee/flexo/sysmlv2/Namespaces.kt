@@ -169,7 +169,6 @@ object SYSMLV2 {
     val PROPERTY = "${BASE}property:"
     val RELATION = "${BASE}relation:"
     val ANNOTATION = "${BASE}annotation:"
-
     val ANNOTATION_JSON = "${ANNOTATION}json"
 
     fun element(uuid: String): Resource {

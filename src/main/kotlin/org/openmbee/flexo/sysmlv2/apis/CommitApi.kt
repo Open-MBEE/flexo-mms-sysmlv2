@@ -11,13 +11,10 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -261,6 +258,7 @@ fun Route.CommitApi() {
 
         val inserts = mutableListOf<String>()
         val deletes = mutableListOf<String>()
+        val wheres = mutableListOf<String>()
 
         // each change (DataVersionRequest)
         for((index, change) in commit.change.withIndex()) {
@@ -339,6 +337,29 @@ fun Route.CommitApi() {
                             pair.first.stringify()+" ?o_$index"
                         }
                     } .
+                    
+                    ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
+                        ?incoming_order_p ?incoming_order_o .
+                """.trimIndent())
+
+                // generate the WHERE clause
+                wheres.add("""
+                    ${elementNode.stringify()} ?p_$index ?o_$index .
+                    
+                    optional {
+                        ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
+                            ?incoming_order_p ?incoming_order_o .
+                        
+                        filter(
+                            str(?incoming_order_p) = concat(
+                                "${SYSMLV2.ANNOTATION_JSON}:",
+                                strAfter(
+                                    str(?incoming_relation_p),
+                                    "${SYSMLV2.PROPERTY}:"
+                                )
+                            )
+                        )
+                    }
                 """.trimIndent())
             }
         }
@@ -349,7 +370,7 @@ fun Route.CommitApi() {
 
             turtle {
                 """
-                    <> mms:commit mor-commit:${commit.previousCommit} .
+                    <> mms:commit mor-commit:${"" /*commit.previousCommit*/} .
                 """.trimIndent()
             }
         }
@@ -376,6 +397,9 @@ fun Route.CommitApi() {
                     }
                     delete {
                         ${deletes.joinToString("\n")}
+                    }
+                    where {
+                        ${wheres.joinToString("\n")}
                     }
                 """.trimIndent()
             }

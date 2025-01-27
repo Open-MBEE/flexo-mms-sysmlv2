@@ -85,7 +85,6 @@ fun RDFNode.stringify(): String {
 //}
 
 
-
 class TurtleBuilder: RdfBuilder() {
     fun thisSubject(vararg pairs: Pair<Property, RDFNode?>): String {
         return "<> "+pairs.joinToString(" ; ") { (predicate, value) -> value?.let {
@@ -177,31 +176,11 @@ class FlexoResponse(
     }
 
     suspend fun <TReturn> parseLdp(setup: FlexoModelHandlerWithFocalNode.()->TReturn): TReturn {
-        // parse Content-Type from response header
-        val contentType = ContentType.parse(response.headers["Content-Type"]?: "text/turtle")
-
-        // convert Content-Type to Jena RDF language
-        val language = RDFLanguages.contentTypeToLang(contentType.withoutParameters().toString())
-
-        // create memory model
-        val model = ModelCom(GraphMemFactory.createGraphMem())
-
-        // parse input document into model
-        RDFParser.create().apply {
-            prefixes(PrefixMapAdapter(DEFAULT_PREFIX_MAPPING))
-            lang(language)
-    //        errorHandler(ErrorHandlerFactory.errorHandlerWarn)
-    //        if(baseIri != null) base(baseIri)
-            source(IOUtils.toInputStream(response.bodyAsText(), StandardCharsets.UTF_8))
-            parse(model)
-        }
-
-        // create response around parsed model and subject from Location header
-        val handler = FlexoModelHandlerWithFocalNode(model, response.headers["Location"])
-
-        return setup(handler)
+        return setup(parseModel {
+            // create response around parsed model and subject from Location header
+            FlexoModelHandlerWithFocalNode(model, response.headers["Location"])
+        })
     }
-
 
     suspend fun <TReturn> parseModel(setup: FlexoModelHandler.()->TReturn): TReturn {
         // parse Content-Type from response header
@@ -223,6 +202,7 @@ class FlexoResponse(
             parse(model)
         }
 
+        val handler = FlexoModelHandler(model, DEFAULT_PREFIX_MAPPING)
 
         return setup(handler)
     }
@@ -233,6 +213,8 @@ suspend fun flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Un
     val client = HttpClient()
 
     val builder = FlexoRequestBuilder()
+
+//    builder.addHeaders("Authorization" to "Bearer ")
 
     setup(builder)
 
