@@ -329,6 +329,11 @@ fun Route.CommitApi() {
                                             SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
                                         }.toSet())
                                     }
+                                    if (value.isNotEmpty() && value[0] is JsonPrimitive) {
+                                        add(SYSMLV2.prop(key) to value.jsonArray.map {
+                                            NodeFactory.createLiteral(it.jsonPrimitive.content)
+                                        }.toSet())
+                                    }
                                 }
                                 // object - this means a reference
                                 is JsonObject -> {
