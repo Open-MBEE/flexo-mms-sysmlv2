@@ -17,8 +17,8 @@ import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
+import kotlinx.serialization.json.JsonObject
 
-import org.openmbee.flexo.sysmlv2.models.Data
 import org.openmbee.flexo.sysmlv2.models.DataIdentity
 
 /**
@@ -35,7 +35,7 @@ data class DataVersion(
     @SerialName("@type")
     val atType: DataVersion.AtType,
     val identity: DataIdentity,
-    val payload: Data
+    val payload: JsonObject
 )
 {
     /**

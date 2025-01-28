@@ -6,7 +6,7 @@ import org.apache.jena.rdf.model.Resource
 import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.shared.impl.PrefixMappingImpl
 
-val ROOT_CONTEXT = "https://url/to/flexo"
+val ROOT_CONTEXT = "http://layer1-service"
 
 val DEFAULT_PREFIX_MAPPING = PrefixMappingImpl();
 class Static {

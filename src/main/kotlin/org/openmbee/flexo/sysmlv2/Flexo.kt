@@ -117,7 +117,7 @@ class FlexoRequestBuilder {
     }
 
     fun orgPath(path: String) {
-        this.path = "/orgs/sysml2/$path"
+        this.path = "/orgs/sysml2$path"
     }
 
     fun addQueryParams(vararg params: Pair<String, String>) {
@@ -145,7 +145,7 @@ class FlexoRequestBuilder {
     fun build(): HttpRequestBuilder {
         return request {
             url {
-                protocol = URLProtocol.HTTPS
+                protocol = URLProtocol.HTTP
                 host = "localhost"
                 port = 8080
                 path(path)
@@ -156,10 +156,12 @@ class FlexoRequestBuilder {
             }
 
             headersOf(*this@FlexoRequestBuilder.headers.toTypedArray())
-
-            contentType(ContentType("text", "turtle"))
+            //this@FlexoRequestBuilder.headers.forEach { (key, value) ->
+            //    header(key, value.joinToString())
+            //}
 
             setBody(body)
+            //setBody(this@FlexoRequestBuilder.body)
         }
     }
 }

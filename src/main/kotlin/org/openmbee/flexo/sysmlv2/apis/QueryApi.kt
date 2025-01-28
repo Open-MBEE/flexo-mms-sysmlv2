@@ -26,7 +26,7 @@ import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
-import org.openmbee.flexo.sysmlv2.models.Element
+import kotlinx.serialization.json.JsonObject
 import org.openmbee.flexo.sysmlv2.models.Query
 import org.openmbee.flexo.sysmlv2.models.QueryRequest
 
@@ -165,7 +165,7 @@ fun Route.QueryApi() {
           "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         } ]"""
-        call.respond(Json.decodeFromString<List<Element>>(exampleContentString))
+        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
     }
 
     get<Paths.getQueryResultsByProjectIdQueryId> {
@@ -238,7 +238,7 @@ fun Route.QueryApi() {
           "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
           "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
         } ]"""
-        call.respond(Json.decodeFromString<List<Element>>(exampleContentString))
+        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
     }
 
     post<QueryRequest>("/projects/{projectId}/query-results") {

@@ -275,16 +275,17 @@ fun Route.CommitApi() {
                 if(payload == null) return@apply
 
                 // encode each key/value
-                Json.encodeToJsonElement(payload).jsonObject.forEach { (key, value) ->
+                payload.forEach { (key, value) ->
                     // depending on the key
                     when(key) {
                         // reserved @id
                         "@id" -> {
-                            elementNode = SYSMLV2.element(payload.atId.toString()).asNode()
+                            //TODO this can be null
+                            elementNode = SYSMLV2.element(payload["@id"]!!.jsonPrimitive.content).asNode()
                         }
 
                         // reserved @type
-                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(payload.atType.value).asNode()))
+                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(payload["@type"]!!.jsonPrimitive.content).asNode()))
 
                         // everything else
                         else -> {
@@ -308,6 +309,7 @@ fun Route.CommitApi() {
                                     }
                                 }
                                 // object
+                                // TODO this should be an element reference (Identified)
                                 is JsonObject -> {
                                     throw Error("Unexpected JSON object at .${key} == ${Json.encodeToString(value)}")
                                 }

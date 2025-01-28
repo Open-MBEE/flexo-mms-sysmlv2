@@ -45,11 +45,17 @@ dependencies {
     implementation("io.ktor:ktor-server-resources:$ktorVersion")
 //    implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
 
     implementation("ch.qos.logback:logback-classic:1.2.9")
     implementation("io.dropwizard.metrics:metrics-core:4.1.18")
 
-    testImplementation("junit:junit:4.13.2")
+    val junitVersion = "5.10.1"
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
+    testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.24")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.24")
+    testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 
 
     val jenaVersion = "4.10.0"
@@ -72,5 +78,10 @@ java {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+tasks {
+    test {
+        useJUnitPlatform()
     }
 }
