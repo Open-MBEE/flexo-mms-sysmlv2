@@ -22,8 +22,14 @@ class ApplicationTest {
 
     @Test
     fun testStore() = testApplication {
+        environment {
+            config = ApplicationConfig("application.test.conf")
+        }
+
+        val partsTreePayload = javaClass.classLoader.getResource("PartsTreeRedefinition.json")?.readText()
+
         //assume the docker compose for layer1 is up locally
-        //set the token string from login at the companion object below, sysml2 org should have been created on flexo
+        //set the token string from login at the companion object below, sysmlv2 org should have been created on flexo
         //this is calling to this sysmlv2 service's api project put
         /*
         val res = client.put("/projects/92de867a-4eb5-4e9d-83d2-acf0a8166564") {
@@ -32,7 +38,11 @@ class ApplicationTest {
                 append(HttpHeaders.ContentType, "application/json")
             }
             setBody("""
-                {"description": "test", "name": "test"}
+                {
+                    "@type": "Project",
+                    "name": "test",
+                    "description": "test"
+                }
             """.trimIndent())
         }
         println(res.status)
@@ -122,33 +132,35 @@ class ApplicationTest {
                     }
                 }
 
-            token = Json.parseToJsonElement(tokenResponse.bodyAsText()).jsonObject["token"]!!.jsonPrimitive.content
-            //pre create default sysml2 org that flexo requests use
+            val body = tokenResponse.bodyAsText()
+            val status = tokenResponse.status
+            require(status.isSuccess()) { "Unsuccessful response $status: $body" }
 
-            client.put("http://localhost:8080/orgs/sysml2") {
+            token = Json.parseToJsonElement(tokenResponse.bodyAsText()).jsonObject["token"]!!.jsonPrimitive.content
+            //pre create default sysmlv2 org that flexo requests use
+
+            client.put("http://localhost:8080/orgs/sysmlv2") {
                     headers {
                         append(HttpHeaders.Authorization, "Bearer $token")
                         append(HttpHeaders.ContentType, "text/turtle")
                     }
                     setBody(
                         """
-                    <> dct:title "sysml2"@en .
+                    <> dct:title "sysmlv2"@en .
                 """.trimIndent()
                     )
                 }
 
-            client.put("http://localhost:8080/orgs/sysml2/repos/92de867a-4eb5-4e9d-83d2-acf0a8166564") {
+            client.put("http://localhost:8080/orgs/sysmlv2/repos/92de867a-4eb5-4e9d-83d2-acf0a8166564") {
                 headers {
                     append(HttpHeaders.Authorization, "Bearer $token")
                     append(HttpHeaders.ContentType, "text/turtle")
                 }
-                setBody(
-                    """
+                setBody("""
                     <> dct:title "testproject"@en .
-                """.trimIndent()
-                )
+                """)
             }
-            client.put("http://localhost:8080/orgs/sysml2/repos/92de867a-4eb5-4e9d-83d2-acf0a8166564/branches/master/graph") {
+            client.put("http://localhost:8080/orgs/sysmlv2/repos/92de867a-4eb5-4e9d-83d2-acf0a8166564/branches/master/graph") {
                 headers {
                     append(HttpHeaders.Authorization, "Bearer $token")
                     append(HttpHeaders.ContentType, "text/turtle")

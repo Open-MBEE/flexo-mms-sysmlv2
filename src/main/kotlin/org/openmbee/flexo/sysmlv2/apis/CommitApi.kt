@@ -11,16 +11,14 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import org.apache.jena.datatypes.xsd.XSDDatatype
 import org.apache.jena.graph.Node
 import org.apache.jena.graph.NodeFactory
 import org.apache.jena.rdf.model.Property
@@ -260,54 +258,37 @@ fun Route.CommitApi() {
         val projectId = "${call.parameters["projectId"]}"
 
         val inserts = mutableListOf<String>()
-        val deletes = mutableListOf<String>()
-        val wheres = mutableListOf<String>()
+//        val wheres = mutableListOf<String>()
+        val values = mutableListOf<String>()
 
         // each change (DataVersionRequest)
         for((index, change) in commit.change.withIndex()) {
             val (payload, atType, identity) = change
 
-            // handle combinations of potential identity id and payload id in DataVersionRequest
-            // 1. identityId is present and payloadId is present: if they match, good, if not, bad
-            // 2. identityId is present and payloadId is not present and payload is not null
-            //     - use identityId
-            // 3. both identityId and payloadId are not present, but payload is not null
-            //     - generate a new uuid
-            // 4. identityId is not present and payloadId is present
-            //     - use payloadId
-            val identityId = identity?.atId?.toString()
-            var payloadId = payload?.getOrDefault("@id", null)?.jsonPrimitive?.content
-            if (identityId != null && payloadId != null && identityId != payloadId) {
-                //bad, log error?
-                continue
-            }
-            if (identityId == null && payloadId == null && payload != null) {
-                payloadId = UUID.randomUUID().toString() // generate an id
-            }
+//            // assert @type
+//            assert(atType == DataVersionRequest.AtType.DataVersion) { ".change[$index][\"@type\"] value of \"$atType\" is not supported" }
+
             // subject node, target element
-            var elementNode: Node = SYSMLV2.element(identityId ?: payloadId!!).asNode()
+            var elementNode: Node = NodeFactory.createVariable("element_${index}")
+
             // transform payload into property pairs
-            mutableListOf<Pair<Property, Set<Node>>>().apply {
-                // delete all outgoing properties, this happens for all elements whether being deleted or replaced or new
-                // where clause have optional since we don't know if element exists or not
-                deletes.add("""
-                    ${elementNode.stringify()} ?p_$index ?o_$index .
-                """.trimIndent())
-                wheres.add("""
-                    optional {
-                        ${elementNode.stringify()} ?p_$index ?o_$index .
-                    }
-                """.trimIndent())
-                if (payload == null) { //if payload is null, this is a delete, done
-                    return@apply
-                }
+            val properties = mutableListOf<Pair<Property, Set<Node>>>().apply {
+                if(payload == null) return@apply
 
                 // encode each key/value
                 payload.forEach { (key, value) ->
+                    // skip null values (although technically not allowed)
+                    if(value == null) return@apply
+
                     // depending on the key
                     when(key) {
+                        // reserved @id
+                        "@id" -> {
+                            elementNode = SYSMLV2.element(value.jsonPrimitive.content).asNode()
+                        }
+
                         // reserved @type
-                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(payload["@type"]!!.jsonPrimitive.content).asNode()))
+                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(value.jsonPrimitive.content).asNode()))
 
                         // everything else
                         else -> {
@@ -315,7 +296,17 @@ fun Route.CommitApi() {
                             when(value) {
                                 // boolean, number, string
                                 is JsonPrimitive -> {
-                                    add(SYSMLV2.prop(key) to setOf(NodeFactory.createLiteral(value.content)))
+                                    val datatype = if(value.jsonPrimitive.isString) {
+                                        XSDDatatype.XSDstring
+                                    }
+                                    else if(value.jsonPrimitive.booleanOrNull != null) {
+                                        XSDDatatype.XSDboolean
+                                    }
+                                    else {
+                                        XSDDatatype.XSDdecimal
+                                    }
+
+                                    add(SYSMLV2.prop(key) to setOf(NodeFactory.createLiteral(value.content, datatype)))
                                 }
                                 // array
                                 is JsonArray -> {
@@ -325,19 +316,29 @@ fun Route.CommitApi() {
                                     // non-empty list and first element is an object
                                     if (value.isNotEmpty() && value[0] is JsonObject) {
                                         // create additional triples to link the elements
-                                        add(SYSMLV2.prop(key) to value.jsonArray.map {
+                                        add(SYSMLV2.relation(key) to value.jsonArray.map {
                                             SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
                                         }.toSet())
                                     }
-                                    if (value.isNotEmpty() && value[0] is JsonPrimitive) {
-                                        add(SYSMLV2.prop(key) to value.jsonArray.map {
-                                            NodeFactory.createLiteral(it.jsonPrimitive.content)
-                                        }.toSet())
-                                    }
                                 }
-                                // object - this means a reference
+                                // object
                                 is JsonObject -> {
-                                    add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(value["@id"]!!.jsonPrimitive.content).asNode()))
+                                    val valueObj = value.jsonObject
+
+                                    // @id reference
+                                    if(valueObj.containsKey("@id")) {
+                                        if(valueObj.keys.size > 1) {
+                                            throw Error("Unexpected extra keys at .${key}")
+                                        }
+
+                                        //
+                                        add(SYSMLV2.relation(key) to setOf(SYSMLV2.element(valueObj["@id"]!!.jsonPrimitive.content).asNode()))
+                                    }
+                                    else {
+//                                        value.jsonObject.forEach { subkey, subvalue ->
+//                                        }
+                                        throw Error("Unexpected JSON object at .${key} == ${Json.encodeToString(value)}")
+                                    }
                                 }
                             }
                         }
@@ -349,53 +350,116 @@ fun Route.CommitApi() {
                     ${elementNode.stringify()} ${joinToString(" ;\n\t") { pair ->
                         pair.first.stringify()+" "+pair.second.joinToString(", ") { it.stringify() }
                     }} .
-                """.trimIndent())
+                """)
+            }
+
+            // references an existing element
+            if(identity != null) {
+//                // generate the RDF data for SPARQL DELETE clause
+//                deletes.add("""
+//                    ${elementNode.stringify()} ${
+//                        // delete all outgoing properties
+//                        if(payload == null) "?p_$index ?o_$index"
+//
+//                        // delete the properties being replaced
+//                        else properties.joinToString(" ;\n\t") { pair ->
+//                            pair.first.stringify()+" ?o_$index"
+//                        }
+//                    } .
+//
+//                    ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
+//                        ?incoming_order_p ?incoming_order_o .
+//                """.trimIndent())
+
+                // add to values block
+                values.add(elementNode.stringify())
+
+//                // generate the WHERE clause
+//                wheres.add("""
+//                    ${elementNode.stringify()} ?p_$index ?o_$index .
+//
+//                    optional {
+//                        ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
+//                            ?incoming_order_p ?incoming_order_o .
+//
+//                        filter(
+//                            str(?incoming_order_p) = concat(
+//                                "${SYSMLV2.ANNOTATION_JSON}:",
+//                                strAfter(
+//                                    str(?incoming_relation_p),
+//                                    "${SYSMLV2.PROPERTY}:"
+//                                )
+//                            )
+//                        )
+//                    }
+//                """.trimIndent())
             }
         }
-/*    //no need to do any locks since we're always commiting to head of branch
-        // first, lock the given commit
-        val flexoResponseLock = flexoRequestPost {
-            orgPath("/repos/$projectId/locks")
 
-            turtle {
+//        // first, lock the given commit
+//        val flexoResponseLock = flexoRequestPost {
+//            orgPath("/repos/$projectId/locks")
+//
+//            turtle {
+//                """
+//                    <> mms:commit mor-commit:${"" /*commit.previousCommit*/} .
+//                """.trimIndent()
+//            }
+//        }
+//
+//        // forward failures to client
+//        if(flexoResponseLock.isFailure()) {
+//            return@post forward(flexoResponseLock)
+//        }
+//
+//        // extract lock ID from response model
+//        val lockId = flexoResponseLock.parseLdp {
+//            primary[MMS.id].literal()!!
+//        }
+
+        val lockId = "none"
+
+        // submit POST request to commit model
+        val flexoResponseUpdate = flexoRequestPost {
+            orgPath("/repos/$projectId/locks/$lockId/update")
+
+            // construct body payload
+            sparqlUpdate {
                 """
-                    <> mms:commit mor-commit:${commit.previousCommit} .
-                """.trimIndent()
-            }
-        }
+                    delete {
+                        ?element_n ?element_p ?element_o .
 
-        // forward failures to client
-        if(flexoResponseLock.isFailure()) {
-            return@post forward(flexoResponseLock)
-        }
-
-        // extract lock ID from response model
-        val lockId = flexoResponseLock.parseLdp {
-            primary[MMS.id].literal()!!
-        }
-*/
-        val body = """
-                   delete {
-                        ${deletes.joinToString("\n")}
+                        ?incoming ?incoming_p ?element_n ;
+                                ?incoming_order_p ?incoming_order_o .
                     }
                     insert {
                         ${inserts.joinToString("\n")}
                     }
                     where {
-                        ${wheres.joinToString("\n")}
                         optional {
-                            <urn:this> <urn:always> <urn:matches> .
+                            ?element_n ?element_p ?element_o .
+                        }
+                        
+                        optional {
+                            ?incoming ?incoming_p ?element_n ;
+                                ?incoming_order_p ?incoming_order_o .
+                            
+                            filter(
+                                str(?incoming_order_p) = concat(
+                                    "urn:sysmlv2:annotation:json:",
+                                    strAfter(
+                                        str(?incoming_relation_p),
+                                        "urn:sysmlv2:property:"
+                                    )
+                                )
+                            )
+                        }
+                        
+                        values ?element_n {
+                            ${values.joinToString("\n        ")}
                         }
                     }
-                    
                 """.trimIndent()
-        // submit POST request to commit model
-        val flexoResponseUpdate = flexoRequestPost {
-            orgPath("/repos/$projectId/branches/master/update")
-
-            // construct body payload
-            sparqlUpdate {
-                body
             }
         }
 
@@ -406,7 +470,7 @@ fun Route.CommitApi() {
 
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponseUpdate.parseLdp {
-            commitFromModel(self!!, primary, UUID.fromString(projectId))
+            commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
         })
     }
 

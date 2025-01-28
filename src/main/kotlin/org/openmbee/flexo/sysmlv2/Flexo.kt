@@ -10,23 +10,19 @@ import io.ktor.server.config.*
 import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import org.apache.commons.io.IOUtils
+import org.apache.jena.datatypes.xsd.XSDDatatype
 import org.apache.jena.graph.GraphMemFactory
 import org.apache.jena.graph.Node
-import org.apache.jena.rdf.model.Literal
-import org.apache.jena.rdf.model.Model
-import org.apache.jena.rdf.model.Property
-import org.apache.jena.rdf.model.RDFNode
-import org.apache.jena.rdf.model.ResourceFactory
+import org.apache.jena.rdf.model.*
 import org.apache.jena.rdf.model.impl.ModelCom
 import org.apache.jena.riot.RDFLanguages
 import org.apache.jena.riot.RDFParser
 import org.apache.jena.riot.system.PrefixMapAdapter
 import org.apache.jena.shared.impl.PrefixMappingImpl
 import java.nio.charset.StandardCharsets
-import java.util.*
+
 
 open class RdfBuilder {
-
     var String.en: Literal
         get() = ResourceFactory.createLangLiteral(this, "en")
         set(v) {}
@@ -39,12 +35,20 @@ fun Node.stringify(): String {
         isLiteral -> {
             val lexical = "\""+literalLexicalForm
                 .replace("\\", "\\\\")
-                .replace("\"", "\\\"")+"\""
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")+"\""
 
             when {
                 literalLanguage.isNotEmpty() -> "$lexical@${literalLanguage}"
                 literalDatatypeURI.isNullOrEmpty() -> lexical
-                else -> "$lexical^^<${literalDatatypeURI}>"
+                else -> {
+                    when(literalDatatype) {
+                        XSDDatatype.XSDboolean -> literalLexicalForm
+                        XSDDatatype.XSDdecimal -> literalLexicalForm
+                        XSDDatatype.XSDstring -> lexical
+                        else -> "$lexical^^<${literalDatatypeURI}>"
+                    }
+                }
             }
         }
         isURI -> "<"+uri.replace("([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()) {
@@ -82,46 +86,39 @@ fun RDFNode.stringify(): String {
     }
 }
 
-//fun RdfBuilder.literal(contents: String, langTag: String) {
-//    return "${}"
-//}
-
-
-
 class TurtleBuilder: RdfBuilder() {
     fun thisSubject(vararg pairs: Pair<Property, RDFNode?>): String {
         return "<> "+pairs.joinToString(" ; ") { (predicate, value) -> value?.let {
             "<${predicate.uri}> ${value.stringify()}"
         }?: ""}+" .\n"
     }
-
 }
 
-class SparqlQueryBuilder {
+class SparqlQueryBuilder {}
 
-}
+class SparqlUpdateBuilder {}
 
-class SparqlUpdateBuilder {
+class FlexoRequestBuilder(
+    private val method: HttpMethod,
+    private val config: FlexoConfig = GlobalFlexoConfig
+) {
+    private var flexoProtocol = config.protocol
+    private var flexoHost = config.host
+    private var flexoPort = config.port
 
-}
-
-fun PipelineContext<*, ApplicationCall>.sysmlv2ElementIri(uuid: UUID): String {
-    return "<urn:sysmlv2:${uuid}>"
-}
-
-class FlexoRequestBuilder(config: FlexoConfig) {
     private var headers = mutableListOf<Pair<String, List<String>>>()
     private var path: String = ""
     private var queryParams = mutableMapOf<String, String>()
     private var body: String = ""
-    private var flexohost = config.host
-    private var flexoport = config.port
+
+    var timeout = config.defaultTimeout
+
     fun addHeaders(vararg headers: Pair<String, String>) {
         this.headers.addAll(headers.map { it.first to listOf(it.second) })
     }
 
-    fun orgPath(path: String) {
-        this.path = "/orgs/sysml2$path"
+    fun orgPath(path: String, org: String=config.org) {
+        this.path = "/orgs/$org$path"
     }
 
     fun addQueryParams(vararg params: Pair<String, String>) {
@@ -148,20 +145,29 @@ class FlexoRequestBuilder(config: FlexoConfig) {
 
     fun build(): HttpRequestBuilder {
         return request {
+            method = this@FlexoRequestBuilder.method
+
             url {
-                protocol = URLProtocol.HTTP
-                host = flexohost
-                port = flexoport
+                protocol = flexoProtocol
+                host = flexoHost
+                port = flexoPort
+
                 path(path)
 
                 queryParams.forEach {
                     parameters.append(it.key, it.value)
                 }
             }
+
             this@FlexoRequestBuilder.headers.forEach { (key, value) ->
                 header(key, value.joinToString())
             }
+
             setBody(this@FlexoRequestBuilder.body)
+
+            timeout {
+                requestTimeoutMillis = this@FlexoRequestBuilder.timeout
+            }
         }
     }
 }
@@ -178,30 +184,10 @@ class FlexoResponse(
     }
 
     suspend fun <TReturn> parseLdp(setup: FlexoModelHandlerWithFocalNode.()->TReturn): TReturn {
-        // parse Content-Type from response header
-        val contentType = ContentType.parse(response.headers["Content-Type"]?: "text/turtle")
-
-        // convert Content-Type to Jena RDF language
-        val language = RDFLanguages.contentTypeToLang(contentType.withoutParameters().toString())
-
-        // create memory model
-        val model = ModelCom(GraphMemFactory.createGraphMem())
-
-        // parse input document into model
-        RDFParser.create().apply {
-            prefixes(PrefixMapAdapter(DEFAULT_PREFIX_MAPPING))
-            lang(language)
-    //        errorHandler(ErrorHandlerFactory.errorHandlerWarn)
-    //        if(baseIri != null) base(baseIri)
-            source(IOUtils.toInputStream(response.bodyAsText(), StandardCharsets.UTF_8))
-            parse(model)
-        }
-
-        // create response around parsed model and subject from Location header
-        // TODO location is only present if request was a post
-        val handler = FlexoModelHandlerWithFocalNode(model, response.headers["Location"])
-
-        return setup(handler)
+        return setup(parseModel {
+            // create response around parsed model and subject from Location header
+            FlexoModelHandlerWithFocalNode(model, response.headers["Location"])
+        })
     }
 
 
@@ -226,41 +212,45 @@ class FlexoResponse(
         }
 
         val handler = FlexoModelHandler(model, DEFAULT_PREFIX_MAPPING)
+
         return setup(handler)
     }
-
 }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+    // prepare client
     val client = HttpClient() {
         install(HttpTimeout)
     }
-    val flexoconfig = getFlexoConfigValues(call.application.environment.config)
-    val builder = FlexoRequestBuilder(flexoconfig)
 
+    // create request builder
+    val builder = FlexoRequestBuilder(method)
+
+    // forward auth header from client
+    builder.addHeaders(HttpHeaders.Authorization to (call.request.headers["Authorization"]?: ""))
+
+    // apply caller setup
     setup(builder)
 
+    // build request
     val request = builder.build()
-    request.header(HttpHeaders.Authorization, call.request.headers["Authorization"]!!)
-    request.method = method
-    request.timeout {
-        requestTimeoutMillis = 600000
-    }
 
+    // submit request
     val response = client.request(request)
 
+    // wrap response
     return FlexoResponse(response)
 }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Get, setup)
 }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Put, setup)
 }
 
-suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Post, setup)
 }
 
@@ -294,13 +284,12 @@ open class FlexoModelHandler(val model: Model, val prefixes: PrefixMappingImpl) 
 
 class FlexoModelHandlerWithFocalNode(
     model: Model,
-    val self: String?,
+    val focalIri: String?,
     prefixes: PrefixMappingImpl= DEFAULT_PREFIX_MAPPING
 ): FlexoModelHandler(model, prefixes) {
-    val primary = indexOut(self)
-    val inverse = indexInv(self)
+    val focalOutgoing = indexOut(focalIri)
+    val focalIncoming = indexInv(focalIri)
 }
-
 
 suspend fun PipelineContext<*, ApplicationCall>.forward(flexoResponse: FlexoResponse) {
     val response = flexoResponse.response
@@ -311,14 +300,4 @@ suspend fun PipelineContext<*, ApplicationCall>.forward(flexoResponse: FlexoResp
             name to headers.getAll(name).orEmpty()
         }.toTypedArray())
     }
-}
-
-data class FlexoConfig(
-    val host: String,
-    val port: Int
-)
-fun getFlexoConfigValues(config: ApplicationConfig): FlexoConfig {
-    val host = config.propertyOrNull("flexo.host")?.getString() ?: "localhost"
-    val port = config.propertyOrNull("flexo.port")?.getString()?.toInt() ?: 8080
-    return FlexoConfig(host, port)
 }
