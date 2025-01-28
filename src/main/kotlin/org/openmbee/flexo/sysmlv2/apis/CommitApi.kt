@@ -266,6 +266,15 @@ fun Route.CommitApi() {
         // each change (DataVersionRequest)
         for((index, change) in commit.change.withIndex()) {
             val (payload, atType, identity) = change
+
+            // handle combinations of potential identity id and payload id in DataVersionRequest
+            // 1. identityId is present and payloadId is present: if they match, good, if not, bad
+            // 2. identityId is present and payloadId is not present and payload is not null
+            //     - use identityId
+            // 3. both identityId and payloadId are not present, but payload is not null
+            //     - generate a new uuid
+            // 4. identityId is not present and payloadId is present
+            //     - use payloadId
             val identityId = identity?.atId?.toString()
             var payloadId = payload?.getOrDefault("@id", null)?.jsonPrimitive?.content
             if (identityId != null && payloadId != null && identityId != payloadId) {
@@ -279,7 +288,8 @@ fun Route.CommitApi() {
             var elementNode: Node = SYSMLV2.element(identityId ?: payloadId!!).asNode()
             // transform payload into property pairs
             mutableListOf<Pair<Property, Set<Node>>>().apply {
-                // delete all outgoing properties
+                // delete all outgoing properties, this happens for all elements whether being deleted or replaced or new
+                // where clause have optional since we don't know if element exists or not
                 deletes.add("""
                     ${elementNode.stringify()} ?p_$index ?o_$index .
                 """.trimIndent())
@@ -288,7 +298,7 @@ fun Route.CommitApi() {
                         ${elementNode.stringify()} ?p_$index ?o_$index .
                     }
                 """.trimIndent())
-                if (payload == null) {
+                if (payload == null) { //if payload is null, this is a delete, done
                     return@apply
                 }
 
@@ -320,7 +330,7 @@ fun Route.CommitApi() {
                                         }.toSet())
                                     }
                                 }
-                                // object
+                                // object - this means a reference
                                 is JsonObject -> {
                                     add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(value["@id"]!!.jsonPrimitive.content).asNode()))
                                 }
@@ -337,7 +347,7 @@ fun Route.CommitApi() {
                 """.trimIndent())
             }
         }
-/*
+/*    //no need to do any locks since we're always commiting to head of branch
         // first, lock the given commit
         val flexoResponseLock = flexoRequestPost {
             orgPath("/repos/$projectId/locks")
