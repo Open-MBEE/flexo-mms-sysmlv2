@@ -152,7 +152,7 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                 val obj = values.elementAt(0)
 
                 // properties
-                if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
+                if(predicate.uri.startsWith(SYSMLV2.SYSML)) {
                     // object is a Literal
                     if (obj.isLiteral) {
                         val lit = obj.asLiteral()
@@ -354,12 +354,9 @@ fun Route.ElementApi() {
     // get multiple elements
     get<Paths.getElementsByProjectCommit> { getElements ->
         // submit POST request to query model
-        val flexoResponse = flexoRequestPost {
-            orgPath("/repos/${getElements.projectId}/commits/${getElements.commitId}/query")
+        val flexoResponse = flexoRequestGet {
+            orgPath("/repos/${getElements.projectId}/branches/master/graph")
 
-            sparqlQuery {
-                modelElementConstructQuery()
-            }
         }
 
         // forward failures to client

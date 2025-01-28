@@ -42,7 +42,7 @@ fun Node.stringify(): String {
             when {
                 literalLanguage.isNotEmpty() -> "$lexical@${literalLanguage}"
                 literalDatatypeURI.isNullOrEmpty() -> lexical
-                else -> "$lexical@${literalDatatypeURI}"
+                else -> "$lexical^^<${literalDatatypeURI}>"
             }
         }
         isURI -> "<"+uri.replace("([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()) {
@@ -71,7 +71,7 @@ fun RDFNode.stringify(): String {
             when {
                 lit.language.isNotEmpty() -> "$lexical@${lit.language}"
                 lit.datatypeURI.isNullOrEmpty() -> lexical
-                else -> "$lexical@${lit.datatypeURI}"
+                else -> "$lexical^^<${lit.datatypeURI}>"
             }
         }
         isURIResource -> "<${this.asResource().uri}>"
