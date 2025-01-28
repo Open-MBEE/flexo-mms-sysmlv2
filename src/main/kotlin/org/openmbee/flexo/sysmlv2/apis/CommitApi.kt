@@ -40,7 +40,7 @@ class InvalidSysmlSerializationError(message: String): Error(message)
 fun FlexoModelHandler.commitFromModel(
     commitIri: String,
     properties: Map<Property, Set<RDFNode>?>,
-    projectUuid: String,
+    projectUuid: UUID,
 ): Commit {
     // generate commit object
     return Commit(
@@ -50,7 +50,7 @@ fun FlexoModelHandler.commitFromModel(
         description = properties[DCTerms.description]?.literal()?: "",
         owningProject = Identified(atId = projectUuid),
         previousCommit = properties[MMS.parent]?.map {
-            Identified(atId = it.asResource().uri.suffix)
+            Identified(atId = UUID.fromString(it.asResource().uri.suffix))
         }?: emptyList()
     )
 }
@@ -227,7 +227,7 @@ fun Route.CommitApi() {
                 val commitIri = commit.asResource().uri;
 
                 // generate commit object
-                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId.toString())
+                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
             }
         })
     }
@@ -251,7 +251,7 @@ fun Route.CommitApi() {
                 val commitIri = commit.asResource().uri;
 
                 // generate commit object
-                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId.toString())
+                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
             }
         })
     }
@@ -378,7 +378,11 @@ fun Route.CommitApi() {
                     }
                     where {
                         ${wheres.joinToString("\n")}
+                        optional {
+                            <urn:this> <urn:always> <urn:matches> .
+                        }
                     }
+                    
                 """.trimIndent()
         // submit POST request to commit model
         val flexoResponseUpdate = flexoRequestPost {
@@ -397,7 +401,7 @@ fun Route.CommitApi() {
 
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponseUpdate.parseLdp {
-            commitFromModel(self!!, primary, projectId)
+            commitFromModel(self!!, primary, UUID.fromString(projectId))
         })
     }
 

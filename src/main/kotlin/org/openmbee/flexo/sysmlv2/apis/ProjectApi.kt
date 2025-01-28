@@ -48,7 +48,7 @@ fun FlexoModelHandlerWithFocalNode.projectFromResponse(
         created = OffsetDateTime.parse(
             outgoing[MMS.created]?.literal()
                 ?: OffsetDateTime.now().toString()),
-        defaultBranch = Identified(branchUuid.toString()),
+        defaultBranch = Identified(branchUuid),
         description = outgoing[DCTerms.description]?.literal()?: "",
         name = outgoing[DCTerms.title]?.literal()?: ""
     )

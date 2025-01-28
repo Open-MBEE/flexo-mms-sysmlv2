@@ -381,7 +381,9 @@ fun Route.ElementApi() {
         val result = buildJsonArray {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
-                    add(extractModelElementToJson(subject.uri))
+                    if (subject.uri != "urn:this") {
+                        add(extractModelElementToJson(subject.uri))
+                    }
                 }
             }
         }

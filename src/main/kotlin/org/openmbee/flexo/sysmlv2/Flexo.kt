@@ -1,6 +1,7 @@
 package org.openmbee.flexo.sysmlv2
 
 import io.ktor.client.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -229,7 +230,9 @@ class FlexoResponse(
 }
 
 suspend fun flexoRequest(method: HttpMethod, auth: String, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    val client = HttpClient()
+    val client = HttpClient() {
+        install(HttpTimeout)
+    }
 
     val builder = FlexoRequestBuilder()
 
@@ -238,6 +241,9 @@ suspend fun flexoRequest(method: HttpMethod, auth: String, setup: FlexoRequestBu
     val request = builder.build()
     request.header(HttpHeaders.Authorization, auth)
     request.method = method
+    request.timeout {
+        requestTimeoutMillis = 600000
+    }
 
     val response = client.request(request)
 
