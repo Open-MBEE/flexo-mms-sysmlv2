@@ -53,6 +53,22 @@ fun FlexoModelHandlerWithFocalNode.projectFromResponse(
         name = outgoing[DCTerms.title]?.literal()?: ""
     )
 }
+fun FlexoModelHandler.projectFromResponse(
+    outgoing: Map<Property, Set<RDFNode>>,
+    projectUuid: UUID = UUID.fromString(outgoing[MMS.id]?.literal()),
+    branchUuid: UUID = UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
+): Project {
+    return Project(
+        atId = projectUuid,
+        atType = Project.AtType.Project,
+        created = OffsetDateTime.parse(
+            outgoing[MMS.created]?.literal()
+                ?: OffsetDateTime.now().toString()),
+        defaultBranch = Identified(branchUuid),
+        description = outgoing[DCTerms.description]?.literal()?: "",
+        name = outgoing[DCTerms.title]?.literal()?: ""
+    )
+}
 
 fun Route.ProjectApi() {
     // delete a project
@@ -164,8 +180,10 @@ fun Route.ProjectApi() {
         }
 
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseLdp {
-            projectFromResponse()
+        call.respond(flexoResponse.parseModel {
+            projectFromResponse(indexOut("$ROOT_CONTEXT/orgs/sysml2/repos/$projectId"),
+                UUID.fromString(projectId),
+                branchUuid)
         })
     }
 }

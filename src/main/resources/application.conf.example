@@ -11,9 +11,9 @@ ktor {
   }
 }
 
-# Typesafe config allows multiple ways to provide configuration values without hard-coding them here.
-# Please see https://github.com/lightbend/config for details.
-auth {
-  oauth {
-  }
+flexo {
+    host = "localhost"
+    host = ${?FLEXO_HOST}
+    port = "8080"
+    port = ${?FLEXO_PORT}
 }

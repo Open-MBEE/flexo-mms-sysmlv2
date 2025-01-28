@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.config.*
 import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import org.apache.commons.io.IOUtils
@@ -108,12 +109,13 @@ fun PipelineContext<*, ApplicationCall>.sysmlv2ElementIri(uuid: UUID): String {
     return "<urn:sysmlv2:${uuid}>"
 }
 
-class FlexoRequestBuilder {
+class FlexoRequestBuilder(config: FlexoConfig) {
     private var headers = mutableListOf<Pair<String, List<String>>>()
     private var path: String = ""
     private var queryParams = mutableMapOf<String, String>()
     private var body: String = ""
-
+    private var flexohost = config.host
+    private var flexoport = config.port
     fun addHeaders(vararg headers: Pair<String, String>) {
         this.headers.addAll(headers.map { it.first to listOf(it.second) })
     }
@@ -148,8 +150,8 @@ class FlexoRequestBuilder {
         return request {
             url {
                 protocol = URLProtocol.HTTP
-                host = "localhost"
-                port = 8080
+                host = flexohost
+                port = flexoport
                 path(path)
 
                 queryParams.forEach {
@@ -229,17 +231,17 @@ class FlexoResponse(
 
 }
 
-suspend fun flexoRequest(method: HttpMethod, auth: String, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     val client = HttpClient() {
         install(HttpTimeout)
     }
-
-    val builder = FlexoRequestBuilder()
+    val flexoconfig = getFlexoConfigValues(call.application.environment.config)
+    val builder = FlexoRequestBuilder(flexoconfig)
 
     setup(builder)
 
     val request = builder.build()
-    request.header(HttpHeaders.Authorization, auth)
+    request.header(HttpHeaders.Authorization, call.request.headers["Authorization"]!!)
     request.method = method
     request.timeout {
         requestTimeoutMillis = 600000
@@ -251,15 +253,15 @@ suspend fun flexoRequest(method: HttpMethod, auth: String, setup: FlexoRequestBu
 }
 
 suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    return flexoRequest(HttpMethod.Get, call.request.headers["Authorization"]!!, setup)
+    return flexoRequest(HttpMethod.Get, setup)
 }
 
 suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    return flexoRequest(HttpMethod.Put, call.request.headers["Authorization"]!!, setup)
+    return flexoRequest(HttpMethod.Put, setup)
 }
 
 suspend fun PipelineContext<Unit, ApplicationCall>.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    return flexoRequest(HttpMethod.Post, call.request.headers["Authorization"]!!, setup)
+    return flexoRequest(HttpMethod.Post, setup)
 }
 
 open class FlexoModelHandler(val model: Model, val prefixes: PrefixMappingImpl) {
@@ -309,4 +311,14 @@ suspend fun PipelineContext<*, ApplicationCall>.forward(flexoResponse: FlexoResp
             name to headers.getAll(name).orEmpty()
         }.toTypedArray())
     }
+}
+
+data class FlexoConfig(
+    val host: String,
+    val port: Int
+)
+fun getFlexoConfigValues(config: ApplicationConfig): FlexoConfig {
+    val host = config.propertyOrNull("flexo.host")?.getString() ?: "localhost"
+    val port = config.propertyOrNull("flexo.port")?.getString()?.toInt() ?: 8080
+    return FlexoConfig(host, port)
 }
