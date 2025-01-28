@@ -311,7 +311,7 @@ fun Route.CommitApi() {
                                 // array
                                 is JsonArray -> {
                                     // store entire array as serialized JSON
-                                    add(SYSMLV2.annotation_json(key) to setOf(NodeFactory.createLiteral(Json.encodeToString(value))))
+                                    add(SYSMLV2.annotationJson(key) to setOf(NodeFactory.createLiteral(Json.encodeToString(value))))
 
                                     // non-empty list and first element is an object
                                     if (value.isNotEmpty() && value[0] is JsonObject) {

@@ -24,28 +24,11 @@ import org.apache.jena.vocabulary.XSD
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.ProjectUsage
 
-const val REIFIED_OUT_IRI = "urn:flexo-mms:reified-out"
-const val REIFIED_INV_IRI = "urn:flexo-mms:reified-inv"
-
 fun modelElementConstructQuery(elementTarget: String="?__element"): String {
     return """
         construct {
             $elementTarget a ?element_type ; 
                 ?element_p ?element_o .
-            
-            ?ownedElement a ?ownedElementType .
-            
-            <$REIFIED_OUT_IRI> ?owningRelation ?owningElement .
-            
-            <$REIFIED_OUT_IRI> ?reified_out_p ?reified_out_o .
-                
-            <$REIFIED_INV_IRI> ?reified_inv_p ?reified_inv_s .
-         
-            [] flexo:subject $elementTarget ;
-                flexo:predicate ?ownedRelation ;
-                flexo:order ?order ;
-                rdf:member ?member ;
-                .
         }
         where {
             {
@@ -68,41 +51,12 @@ fun modelElementConstructQuery(elementTarget: String="?__element"): String {
                 ] .
             }
             
-            [] a rdf:Collection ;
-                flexo:subject $elementTarget ;
-                flexo:predicate ?ownedRelation ;
-                rdf:first <urn:61eff> ;
-                rdf:rest rdf:nil .
-                
-            []
-                flexo:order ?order ;
-                rdf:member ?members ;
-                .
-            
             optional {
                 ?owningElement ?owningRelation ?owningList .
                 
                 ?owningList rdf:rest*/rdf:first $elementTarget .
-
-                flexo:order "[\"a\", \"b\", \"c\"]"
-                    rdf:member $elementTarget, ?b, ?c ;
-                    .
                 
                 ?owningElement ?owningRelation ($elementTarget, ?b, ?c) .
-                
-                ?reified_out
-                    rdf:subject $elementTarget ;
-                    rdf:predicate ?reified_out_p ;
-                    rdf:object ?reified_out_o ;
-                    .
-            }
-            
-            optional {
-                ?reified_inv
-                    rdf:subject ?reified_inv_s ;
-                    rdf:predicate ?reified_inv_p ;
-                    rdf:object $elementTarget ;
-                    .
             }
         }
     """
@@ -114,7 +68,6 @@ class InvalidTripleError(
     predicate: Property,
     value: RDFNode
 ): Error("$message at <$subjectIri> <${predicate.uri}> ${value.stringify()}")
-
 
 fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject {
     // direct outgoing properties of element
@@ -161,7 +114,7 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                 val obj = values.elementAt(0)
 
                 // properties
-                if(predicate.uri.startsWith(SYSMLV2.SYSML)) {
+                if(predicate.uri.startsWith(SYSMLV2.VOCABULARY)) {
                     // object is a Literal
                     if (obj.isLiteral) {
                         val lit = obj.asLiteral()
@@ -343,7 +296,7 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
 fun Route.ElementApi() {
     // get an element
     get<Paths.getElementByProjectCommitId> { getElement ->
-        val elementIri = sysmlv2ElementIri(getElement.elementId)
+        val elementIri = SYSMLV2.element(getElement.elementId.toString()).uri
 
         // submit POST request to query model
         val flexoResponse = flexoRequestPost {
