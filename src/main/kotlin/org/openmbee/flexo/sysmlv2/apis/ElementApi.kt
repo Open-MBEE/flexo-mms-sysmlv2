@@ -136,7 +136,8 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
 
         val relationOrders = mutableMapOf<String, List<String>>()
         val relations = mutableMapOf<String, Set<RDFNode>>()
-
+        //keeps track of json array annotations, if we already deserialized an array, ignore any triple with the same property
+        val seenArrays = mutableSetOf<String>()
         // outgoing properties
         out.map { (predicate, values) ->
             // extract the suffix name part
@@ -150,10 +151,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
             // properties & annotations
             else {
                 // expect exactly 1 object
-                if(values.size != 1) {
-                    // TODO: better error handling
-                    //throw Error("Expected exactly 1 object with property ...")
+                if (values.size != 1 || seenArrays.contains(propertyKey)) {
                     // if not 1 then it's an array, get from json annotation
+                    // if we already seen a json annotation with the same property key then ignore
                     return@map
                 }
 
@@ -204,7 +204,7 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                     }
                     propertyKey = predicate.uri.split(":").last()
                     put(propertyKey, json)
-
+                    seenArrays.add(propertyKey)
                     // annotating the order of elements
                    /* if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
                         // assert JSON element is an array of strings
