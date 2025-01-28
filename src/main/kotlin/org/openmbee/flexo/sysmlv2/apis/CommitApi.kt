@@ -487,14 +487,14 @@ fun Route.CommitApi() {
                                     "urn:sysmlv2:annotation:json:",
                                     strAfter(
                                         str(?incoming_relation_p),
-                                        "urn:sysmlv2:property:"
+                                        "urn:sysmlv2:relation:"
                                     )
                                 )
                             )
                         }
                         
                         values ?element_n {
-                            ${values.joinToString("\n        ")}
+                            ${values.joinToString("\n"+" ".repeat(4*7))}
                         }
                     }
                 """.trimIndent()
