@@ -165,7 +165,7 @@ fun Route.ProjectApi() {
 
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseLdp {
-            projectFromResponse()
+            projectFromResponse(indexOut(""), UUID.fromString(""), branchUuid)
         })
     }
 }

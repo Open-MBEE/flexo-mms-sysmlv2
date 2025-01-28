@@ -8,6 +8,7 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import org.apache.commons.io.IOUtils
+import org.apache.jena.datatypes.xsd.XSDDatatype
 import org.apache.jena.graph.GraphMemFactory
 import org.apache.jena.graph.Node
 import org.apache.jena.rdf.model.Literal
@@ -37,12 +38,20 @@ fun Node.stringify(): String {
         isLiteral -> {
             val lexical = "\""+literalLexicalForm
                 .replace("\\", "\\\\")
-                .replace("\"", "\\\"")+"\""
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")+"\""
 
             when {
                 literalLanguage.isNotEmpty() -> "$lexical@${literalLanguage}"
                 literalDatatypeURI.isNullOrEmpty() -> lexical
-                else -> "$lexical@${literalDatatypeURI}"
+                else -> {
+                    when(literalDatatype) {
+                        XSDDatatype.XSDboolean -> literalLexicalForm
+                        XSDDatatype.XSDdecimal -> literalLexicalForm
+                        XSDDatatype.XSDstring -> lexical
+                        else -> "$lexical^^<${literalDatatypeURI}>"
+                    }
+                }
             }
         }
         isURI -> "<"+uri.replace("([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()) {
@@ -155,13 +164,11 @@ class FlexoRequestBuilder {
                 }
             }
 
-            headersOf(*this@FlexoRequestBuilder.headers.toTypedArray())
-            //this@FlexoRequestBuilder.headers.forEach { (key, value) ->
-            //    header(key, value.joinToString())
-            //}
+            this@FlexoRequestBuilder.headers.forEach { (key, value) ->
+                header(key, value.joinToString())
+            }
 
-            setBody(body)
-            //setBody(this@FlexoRequestBuilder.body)
+            setBody(this@FlexoRequestBuilder.body)
         }
     }
 }
@@ -211,12 +218,13 @@ class FlexoResponse(
 
 }
 
-suspend fun flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     val client = HttpClient()
 
     val builder = FlexoRequestBuilder()
 
-//    builder.addHeaders("Authorization" to "Bearer ")
+    // forward auth header from client
+    builder.addHeaders("Authorization" to (call.request.headers[HttpHeaders.Authorization] ?: ""))
 
     setup(builder)
 
@@ -227,15 +235,15 @@ suspend fun flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Un
     return FlexoResponse(response)
 }
 
-suspend fun flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Get, setup)
 }
 
-suspend fun flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Put, setup)
 }
 
-suspend fun flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Post, setup)
 }
 

@@ -1,1 +1,1 @@
-rootProject.name = "flexo-sysmlv2"
+rootProject.name = "org.openmbee.flexo.sysmlv2"

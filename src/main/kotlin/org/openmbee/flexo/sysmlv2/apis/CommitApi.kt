@@ -18,12 +18,14 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import org.apache.jena.datatypes.xsd.XSDDatatype
 import org.apache.jena.graph.Node
 import org.apache.jena.graph.NodeFactory
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
+import org.apache.jena.vocabulary.XSD
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
@@ -257,8 +259,8 @@ fun Route.CommitApi() {
         val projectId = "${call.parameters["projectId"]}"
 
         val inserts = mutableListOf<String>()
-        val deletes = mutableListOf<String>()
-        val wheres = mutableListOf<String>()
+//        val wheres = mutableListOf<String>()
+        val values = mutableListOf<String>()
 
         // each change (DataVersionRequest)
         for((index, change) in commit.change.withIndex()) {
@@ -276,16 +278,18 @@ fun Route.CommitApi() {
 
                 // encode each key/value
                 payload.forEach { (key, value) ->
+                    // skip null values (although technically not allowed)
+                    if(value == null) return@apply
+
                     // depending on the key
                     when(key) {
                         // reserved @id
                         "@id" -> {
-                            //TODO this can be null
-                            elementNode = SYSMLV2.element(payload["@id"]!!.jsonPrimitive.content).asNode()
+                            elementNode = SYSMLV2.element(value.jsonPrimitive.content).asNode()
                         }
 
                         // reserved @type
-                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(payload["@type"]!!.jsonPrimitive.content).asNode()))
+                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(value.jsonPrimitive.content).asNode()))
 
                         // everything else
                         else -> {
@@ -293,7 +297,17 @@ fun Route.CommitApi() {
                             when(value) {
                                 // boolean, number, string
                                 is JsonPrimitive -> {
-                                    add(SYSMLV2.prop(key) to setOf(NodeFactory.createLiteral(value.content)))
+                                    val datatype = if(value.jsonPrimitive.isString) {
+                                        XSDDatatype.XSDstring
+                                    }
+                                    else if(value.jsonPrimitive.booleanOrNull != null) {
+                                        XSDDatatype.XSDboolean
+                                    }
+                                    else {
+                                        XSDDatatype.XSDdecimal
+                                    }
+
+                                    add(SYSMLV2.prop(key) to setOf(NodeFactory.createLiteral(value.content, datatype)))
                                 }
                                 // array
                                 is JsonArray -> {
@@ -309,9 +323,23 @@ fun Route.CommitApi() {
                                     }
                                 }
                                 // object
-                                // TODO this should be an element reference (Identified)
                                 is JsonObject -> {
-                                    throw Error("Unexpected JSON object at .${key} == ${Json.encodeToString(value)}")
+                                    val valueObj = value.jsonObject
+
+                                    // @id reference
+                                    if(valueObj.containsKey("@id")) {
+                                        if(valueObj.keys.size > 1) {
+                                            throw Error("Unexpected extra keys at .${key}")
+                                        }
+
+                                        //
+                                        add(SYSMLV2.relation(key) to setOf(SYSMLV2.element(valueObj["@id"]!!.jsonPrimitive.content).asNode()))
+                                    }
+                                    else {
+//                                        value.jsonObject.forEach { subkey, subvalue ->
+//                                        }
+                                        throw Error("Unexpected JSON object at .${key} == ${Json.encodeToString(value)}")
+                                    }
                                 }
                             }
                         }
@@ -323,69 +351,74 @@ fun Route.CommitApi() {
                     ${elementNode.stringify()} ${joinToString(" ;\n\t") { pair ->
                         pair.first.stringify()+" "+pair.second.joinToString(", ") { it.stringify() }
                     }} .
-                """.trimIndent())
+                """)
             }
 
             // references an existing element
             if(identity != null) {
-                // generate the RDF data for SPARQL DELETE clause
-                deletes.add("""
-                    ${elementNode.stringify()} ${
-                        // delete all outgoing properties
-                        if(payload == null) "?p_$index ?o_$index"
-                        
-                        // delete the properties being replaced
-                        else properties.joinToString(" ;\n\t") { pair ->
-                            pair.first.stringify()+" ?o_$index"
-                        }
-                    } .
-                    
-                    ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
-                        ?incoming_order_p ?incoming_order_o .
-                """.trimIndent())
+//                // generate the RDF data for SPARQL DELETE clause
+//                deletes.add("""
+//                    ${elementNode.stringify()} ${
+//                        // delete all outgoing properties
+//                        if(payload == null) "?p_$index ?o_$index"
+//
+//                        // delete the properties being replaced
+//                        else properties.joinToString(" ;\n\t") { pair ->
+//                            pair.first.stringify()+" ?o_$index"
+//                        }
+//                    } .
+//
+//                    ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
+//                        ?incoming_order_p ?incoming_order_o .
+//                """.trimIndent())
 
-                // generate the WHERE clause
-                wheres.add("""
-                    ${elementNode.stringify()} ?p_$index ?o_$index .
-                    
-                    optional {
-                        ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
-                            ?incoming_order_p ?incoming_order_o .
-                        
-                        filter(
-                            str(?incoming_order_p) = concat(
-                                "${SYSMLV2.ANNOTATION_JSON}:",
-                                strAfter(
-                                    str(?incoming_relation_p),
-                                    "${SYSMLV2.PROPERTY}:"
-                                )
-                            )
-                        )
-                    }
-                """.trimIndent())
+                // add to values block
+                values.add(elementNode.stringify())
+
+//                // generate the WHERE clause
+//                wheres.add("""
+//                    ${elementNode.stringify()} ?p_$index ?o_$index .
+//
+//                    optional {
+//                        ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
+//                            ?incoming_order_p ?incoming_order_o .
+//
+//                        filter(
+//                            str(?incoming_order_p) = concat(
+//                                "${SYSMLV2.ANNOTATION_JSON}:",
+//                                strAfter(
+//                                    str(?incoming_relation_p),
+//                                    "${SYSMLV2.PROPERTY}:"
+//                                )
+//                            )
+//                        )
+//                    }
+//                """.trimIndent())
             }
         }
 
-        // first, lock the given commit
-        val flexoResponseLock = flexoRequestPost {
-            orgPath("/repos/$projectId/locks")
+//        // first, lock the given commit
+//        val flexoResponseLock = flexoRequestPost {
+//            orgPath("/repos/$projectId/locks")
+//
+//            turtle {
+//                """
+//                    <> mms:commit mor-commit:${"" /*commit.previousCommit*/} .
+//                """.trimIndent()
+//            }
+//        }
+//
+//        // forward failures to client
+//        if(flexoResponseLock.isFailure()) {
+//            return@post forward(flexoResponseLock)
+//        }
+//
+//        // extract lock ID from response model
+//        val lockId = flexoResponseLock.parseLdp {
+//            primary[MMS.id].literal()!!
+//        }
 
-            turtle {
-                """
-                    <> mms:commit mor-commit:${"" /*commit.previousCommit*/} .
-                """.trimIndent()
-            }
-        }
-
-        // forward failures to client
-        if(flexoResponseLock.isFailure()) {
-            return@post forward(flexoResponseLock)
-        }
-
-        // extract lock ID from response model
-        val lockId = flexoResponseLock.parseLdp {
-            primary[MMS.id].literal()!!
-        }
+        val lockId = "none"
 
         // submit POST request to commit model
         val flexoResponseUpdate = flexoRequestPost {
@@ -394,14 +427,38 @@ fun Route.CommitApi() {
             // construct body payload
             sparqlUpdate {
                 """
+                    delete {
+                        ?element_n ?element_p ?element_o .
+
+                        ?incoming ?incoming_p ?element_n ;
+                                ?incoming_order_p ?incoming_order_o .
+                    }
                     insert {
                         ${inserts.joinToString("\n")}
                     }
-                    delete {
-                        ${deletes.joinToString("\n")}
-                    }
                     where {
-                        ${wheres.joinToString("\n")}
+                        optional {
+                            ?element_n ?element_p ?element_o .
+                        }
+                        
+                        optional {
+                            ?incoming ?incoming_p ?element_n ;
+                                ?incoming_order_p ?incoming_order_o .
+                            
+                            filter(
+                                str(?incoming_order_p) = concat(
+                                    "urn:sysmlv2:annotation:json:",
+                                    strAfter(
+                                        str(?incoming_relation_p),
+                                        "urn:sysmlv2:property:"
+                                    )
+                                )
+                            )
+                        }
+                        
+                        values ?element_n {
+                            ${values.joinToString("\n        ")}
+                        }
                     }
                 """.trimIndent()
             }

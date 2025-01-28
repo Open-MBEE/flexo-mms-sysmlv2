@@ -17,6 +17,10 @@ plugins {
     id("com.gradleup.shadow") version "8.3.5"
 }
 
+application {
+    mainClass.set("io.ktor.server.netty.EngineMain")
+}
+
 dependencies {
     implementation(kotlin("stdlib"))
 
