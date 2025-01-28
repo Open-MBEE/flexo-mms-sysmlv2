@@ -175,9 +175,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                     }
                 }
                 // annotations
-                else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION)) {
+                else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
                     // object is not a Literal
-                    if (obj.isLiteral) {
+                    if (!obj.isLiteral) {
                         throw InvalidTripleError("Expected annotation property to point to an RDF literal", elementIri, predicate, obj)
                     }
 

@@ -164,20 +164,18 @@ object MMS_DATATYPE {
 
 object SYSMLV2 {
     val BASE = "urn:sysmlv2:"
-
+    val SYSML = "https://www.omg.org/spec/SysML/"
     val ELEMENT = "${BASE}element:"
     val PROPERTY = "${BASE}property:"
     val RELATION = "${BASE}relation:"
-    val ANNOTATION = "${BASE}annotation:"
-
-    val ANNOTATION_JSON = "${ANNOTATION}json"
+    val ANNOTATION_JSON = "${BASE}annotation:json:"
 
     fun element(uuid: String): Resource {
-        return ResourceFactory.createResource("$ELEMENT:$uuid")
+        return ResourceFactory.createResource("$BASE$uuid")
     }
 
     fun prop(id: String): Property {
-        return ResourceFactory.createProperty(BASE, id)
+        return ResourceFactory.createProperty(SYSML, id)
     }
 
     fun annotation_json(key: String): Property {

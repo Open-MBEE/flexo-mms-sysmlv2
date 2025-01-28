@@ -27,7 +27,7 @@ import kotlinx.serialization.UseSerializers
 @Serializable
 data class DataIdentityRequest(
     @SerialName("@id")
-    val atId: java.util.UUID,
+    val atId: String,
     @SerialName("@type")
     val atType: DataIdentityRequest.AtType? = null
 )

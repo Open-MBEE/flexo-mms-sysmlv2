@@ -26,6 +26,6 @@ import kotlinx.serialization.UseSerializers
 @Serializable
 data class Identified(
     @SerialName("@id")
-    val atId: java.util.UUID
+    val atId: String
 )
 
