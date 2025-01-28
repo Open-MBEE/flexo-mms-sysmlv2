@@ -53,6 +53,22 @@ fun FlexoModelHandler.commitFromModel(
     )
 }
 
+fun JsonPrimitive.toRdfLiteralNode(): Node {
+    // resolve to XSD datatype
+    val datatype = if(jsonPrimitive.isString) {
+        XSDDatatype.XSDstring
+    }
+    else if(jsonPrimitive.booleanOrNull != null) {
+        XSDDatatype.XSDboolean
+    }
+    else {
+        XSDDatatype.XSDdecimal
+    }
+
+    // create typed literal
+    return NodeFactory.createLiteral(content, datatype)
+}
+
 fun Route.CommitApi() {
     get<Paths.getChangeByProjectCommitId> {
         val exampleContentString = """{
@@ -258,7 +274,6 @@ fun Route.CommitApi() {
         val projectId = "${call.parameters["projectId"]}"
 
         val inserts = mutableListOf<String>()
-//        val wheres = mutableListOf<String>()
         val values = mutableListOf<String>()
 
         // each change (DataVersionRequest)
@@ -268,23 +283,42 @@ fun Route.CommitApi() {
 //            // assert @type
 //            assert(atType == DataVersionRequest.AtType.DataVersion) { ".change[$index][\"@type\"] value of \"$atType\" is not supported" }
 
+            // handle combinations of potential identity id and payload id in DataVersionRequest
+            // 1. identityId is present and payloadId is present: if they match, good, if not, bad
+            // 2. identityId is present and payloadId is not present and payload is not null
+            //     - use identityId
+            // 3. both identityId and payloadId are not present, but payload is not null
+            //     - generate a new uuid
+            // 4. identityId is not present and payloadId is present
+            //     - use payloadId
+            val identityId = identity?.atId?.toString()
+            var payloadId = payload?.getOrDefault("@id", null)?.jsonPrimitive?.content
+            if (identityId != null && payloadId != null && identityId != payloadId) {
+                //bad, log error?
+                continue
+            }
+            if (identityId == null && payloadId == null && payload != null) {
+                payloadId = UUID.randomUUID().toString() // generate an id
+            }
+
             // subject node, target element
-            var elementNode: Node = NodeFactory.createVariable("element_${index}")
+            var elementNode: Node = SYSMLV2.element(identityId ?: payloadId!!).asNode()
 
             // transform payload into property pairs
-            val properties = mutableListOf<Pair<Property, Set<Node>>>().apply {
+            mutableListOf<Pair<Property, Set<Node>>>().apply {
+                // if payload is null, this is a delete, done
                 if(payload == null) return@apply
 
                 // encode each key/value
                 payload.forEach { (key, value) ->
                     // skip null values (although technically not allowed)
-                    if(value == null) return@apply
+                    if(value == null) return@forEach
 
                     // depending on the key
                     when(key) {
                         // reserved @id
                         "@id" -> {
-                            elementNode = SYSMLV2.element(value.jsonPrimitive.content).asNode()
+//                            elementNode = SYSMLV2.element(value.jsonPrimitive.content).asNode()
                         }
 
                         // reserved @type
@@ -296,29 +330,33 @@ fun Route.CommitApi() {
                             when(value) {
                                 // boolean, number, string
                                 is JsonPrimitive -> {
-                                    val datatype = if(value.jsonPrimitive.isString) {
-                                        XSDDatatype.XSDstring
-                                    }
-                                    else if(value.jsonPrimitive.booleanOrNull != null) {
-                                        XSDDatatype.XSDboolean
-                                    }
-                                    else {
-                                        XSDDatatype.XSDdecimal
-                                    }
-
-                                    add(SYSMLV2.prop(key) to setOf(NodeFactory.createLiteral(value.content, datatype)))
+                                    add(SYSMLV2.prop(key) to setOf(value.toRdfLiteralNode()))
                                 }
                                 // array
                                 is JsonArray -> {
                                     // store entire array as serialized JSON
                                     add(SYSMLV2.annotationJson(key) to setOf(NodeFactory.createLiteral(Json.encodeToString(value))))
 
-                                    // non-empty list and first element is an object
-                                    if (value.isNotEmpty() && value[0] is JsonObject) {
-                                        // create additional triples to link the elements
-                                        add(SYSMLV2.relation(key) to value.jsonArray.map {
-                                            SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
-                                        }.toSet())
+                                    // non-empty list
+                                    if (value.isNotEmpty()) {
+                                        // and first element is an object
+                                        if(value[0] is JsonObject) {
+                                            // create additional triples to link the elements
+                                            add(SYSMLV2.relation(key) to value.jsonArray.map {
+                                                SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+                                            }.toSet())
+                                        }
+                                        // and first element is a primitive
+                                        else if(value[1] is JsonPrimitive) {
+                                            // create additional triples to provide literals from primitives
+                                            add(SYSMLV2.prop(key) to value.jsonArray.map {
+                                                it.jsonPrimitive.toRdfLiteralNode()
+                                            }.toSet())
+                                        }
+                                        // unexpected
+                                        else {
+                                            throw InvalidSysmlSerializationError("Unexpected JSON element type at .change[$index].$key")
+                                        }
                                     }
                                 }
                                 // object
@@ -337,7 +375,7 @@ fun Route.CommitApi() {
                                     else {
 //                                        value.jsonObject.forEach { subkey, subvalue ->
 //                                        }
-                                        throw Error("Unexpected JSON object at .${key} == ${Json.encodeToString(value)}")
+                                        throw InvalidSysmlSerializationError("Unexpected JSON object at .change[$index].$key == ${Json.encodeToString(value)}")
                                     }
                                 }
                             }
