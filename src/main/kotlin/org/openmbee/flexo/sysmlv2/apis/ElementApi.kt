@@ -121,11 +121,18 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
     val out = indexOut(elementIri)
 
     // extract type
-    val type = out[RDF.type].resource()?.uri?.suffix
+    var type = out[RDF.type].resource()?.uri?.suffix
+    if (type!!.startsWith(SYSMLV2.BASE)) {
+        type = type.split(":").last()
+    }
+    var id = elementIri.suffix
+    if (id.startsWith(SYSMLV2.BASE)) {
+        id = id.split(":").last()
+    }
 
     return buildJsonObject {
         put("@type", type)
-        put("@id", elementIri.suffix)
+        put("@id", id)
 
         val relationOrders = mutableMapOf<String, List<String>>()
         val relations = mutableMapOf<String, Set<RDFNode>>()
@@ -133,7 +140,7 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
         // outgoing properties
         out.map { (predicate, values) ->
             // extract the suffix name part
-            val propertyKey = predicate.uri.suffix
+            var propertyKey = predicate.uri.suffix
 
             // relations
             if(predicate.uri.startsWith(SYSMLV2.RELATION)) {
@@ -145,7 +152,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                 // expect exactly 1 object
                 if(values.size != 1) {
                     // TODO: better error handling
-                    throw Error("Expected exactly 1 object with property ...")
+                    //throw Error("Expected exactly 1 object with property ...")
+                    // if not 1 then it's an array, get from json annotation
+                    return@map
                 }
 
                 // transform each object
@@ -168,9 +177,12 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                     // object is a Resource
                     else {
                         val objUri = obj.asResource().uri
-
+                        var obid = objUri.suffix
+                        if (objUri.startsWith(SYSMLV2.BASE)) {
+                            obid = obid.split(":").last()
+                        }
                         put(propertyKey, buildJsonObject {
-                            put("@id", objUri.suffix)
+                            put("@id", obid)
                         })
                     }
                 }
@@ -190,9 +202,11 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                     } catch (parse: Error) {
                         throw InvalidTripleError("Expected annotation property to encode a JSON element", elementIri, predicate, obj)
                     }
+                    propertyKey = predicate.uri.split(":").last()
+                    put(propertyKey, json)
 
                     // annotating the order of elements
-                    if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
+                   /* if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
                         // assert JSON element is an array of strings
                         val jsonArray = json.jsonArray.also { list ->
                             if(!list.all { it.jsonPrimitive.isString }) {
@@ -206,11 +220,12 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                     // unrecognized annotation
                     else {
                         throw InvalidTripleError("Unrecognized annotation property", elementIri, predicate, obj)
-                    }
+                    }*/
                 }
                 // something else
                 else {
-                    throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
+                    //throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
+                    return@map
                 }
             }
         }
@@ -363,14 +378,16 @@ fun Route.ElementApi() {
         if(flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
         }
+        val result = buildJsonArray {
+            flexoResponse.parseModel {
+                for(subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        }
 
         // parse the response model, extract the elements to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
-            // every subject node in response
-            for(subject in model.listSubjects()) {
-                extractModelElementToJson(subject.uri)
-            }
-        })
+        call.respond(result)
     }
 
     get<Paths.getProjectUsageByProjectCommitElement> {

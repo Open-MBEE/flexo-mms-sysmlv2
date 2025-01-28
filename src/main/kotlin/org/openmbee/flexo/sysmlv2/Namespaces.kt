@@ -179,7 +179,7 @@ object SYSMLV2 {
     }
 
     fun annotation_json(key: String): Property {
-        return ResourceFactory.createProperty("$ANNOTATION_JSON:$key")
+        return ResourceFactory.createProperty("$ANNOTATION_JSON$key")
     }
 
     fun relation(key: String): Property {
