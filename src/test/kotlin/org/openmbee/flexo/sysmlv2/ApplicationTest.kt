@@ -95,7 +95,12 @@ class ApplicationTest {
       "identity": {"@id":"299028fa-6527-4c82-9017-8de82e0663f3"},
       "payload": {
         "@type": "PartDefinition",
-        "name":"Payload System"
+        "name":"Payload System",
+        "aliasIds":["somealias"],
+        "documentation": [{
+            "@id": "9af08108-292b-534a-a527-068c17423dfd"
+        }],
+        "isUnique": false
       }
     }
   ]
