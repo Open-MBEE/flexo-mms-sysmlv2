@@ -399,29 +399,6 @@ fun Route.CommitApi() {
             }
         }
 
-//        // first, lock the given commit
-//        val flexoResponseLock = flexoRequestPost {
-//            orgPath("/repos/$projectId/locks")
-//
-//            turtle {
-//                """
-//                    <> mms:commit mor-commit:${"" /*commit.previousCommit*/} .
-//                """.trimIndent()
-//            }
-//        }
-//
-//        // forward failures to client
-//        if(flexoResponseLock.isFailure()) {
-//            return@post forward(flexoResponseLock)
-//        }
-//
-//        // extract lock ID from response model
-//        val lockId = flexoResponseLock.parseLdp {
-//            primary[MMS.id].literal()!!
-//        }
-
-        val lockId = "none"
-
         // build SPARQL UPDATE string
         var sparqlUpdateString = """
             ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
@@ -483,7 +460,7 @@ fun Route.CommitApi() {
 
         // submit POST request to commit model
         val flexoResponseUpdate = flexoRequestPost {
-            orgPath("/repos/$projectId/locks/$lockId/update")
+            orgPath("/repos/$projectId/branches/master/update")
 
             // construct body payload
             sparqlUpdate {
