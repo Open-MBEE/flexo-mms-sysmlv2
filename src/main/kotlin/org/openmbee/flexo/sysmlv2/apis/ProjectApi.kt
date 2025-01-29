@@ -40,7 +40,7 @@ import java.util.*
 fun projectFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
     projectUuid: UUID = UUID.fromString(outgoing[MMS.id]?.literal()),
-    branchUuid: UUID = UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
+    branchUuid: UUID = UUID.randomUUID()//UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
 ): Project {
     return Project(
         atId = projectUuid,

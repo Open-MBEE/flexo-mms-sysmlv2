@@ -12,7 +12,7 @@ ktor {
 }
 
 flexo {
-    protocol = "localhost"
+    protocol = "http"
     protocol = ${?FLEXO_PROTOCOL}
     host = "localhost"
     host = ${?FLEXO_HOST}

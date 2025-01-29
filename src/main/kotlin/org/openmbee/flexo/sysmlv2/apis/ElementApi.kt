@@ -63,10 +63,19 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
         out.forEach { (predicate, values) ->
             // extract the suffix name part
             var propertyKey = predicate.uri.autoSuffix
-
+            val obj = values.elementAt(0)
             // relations
             if(predicate.uri.startsWith(SYSMLV2.RELATION)) {
-                // prefer the annotation triple for all relations, skip
+                // multiple values means it's an array, skip and prefer JSON annotation
+                // if we've already seen a JSON annotation with the same property key then ignore
+                if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
+                if (obj.isResource()) {
+                    put(propertyKey, buildJsonObject {
+                        put("@id", obj.asResource().uri.autoSuffix)
+                    })
+                } else {
+                    throw InvalidTripleError("Relation cannot be literal", elementIri, predicate, obj)
+                }
             }
             // properties & annotations
             else {
@@ -84,18 +93,16 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                         val lit = obj.asLiteral()
 
                         // depending on its datatype
-                        when (lit.datatype) {
-                            XSD.xboolean -> put(propertyKey, lit.boolean)
-                            XSD.integer -> put(propertyKey, lit.int)
-                            XSD.decimal, XSD.xdouble -> put(propertyKey, lit.float)
+                        when (lit.datatype.uri) {
+                            XSD.xboolean.uri -> put(propertyKey, lit.boolean)
+                            XSD.integer.uri -> put(propertyKey, lit.int)
+                            XSD.decimal.uri, XSD.xdouble.uri -> put(propertyKey, lit.float)
                             else -> put(propertyKey, lit.string)
                         }
                     }
                     // object is a Resource
                     else {
-                        put(propertyKey, buildJsonObject {
-                            put("@id", obj.asResource().uri.autoSuffix)
-                        })
+                        throw InvalidTripleError("Property cannot be resource", elementIri, predicate, obj)
                     }
                 }
                 // annotations
@@ -131,9 +138,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                 }
                 // something else
                 else {
-                    throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
+                    //throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
                 }
-            }
+            //}
         }
     }
 }
