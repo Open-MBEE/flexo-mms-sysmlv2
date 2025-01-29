@@ -81,6 +81,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
         put("@type", type)
         put("@id", id)
 
+        // keeps track of json array annotations, if we already deserialized an array, ignore any triple with the same property
+        val seenArrays = mutableListOf<String>()
+
         // outgoing properties
         out.forEach { (predicate, values) ->
             // extract the suffix name part
@@ -92,17 +95,15 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
             }
             // properties & annotations
             else {
-                // expect exactly 1 object
-                if (values.size != 1) {
-                    // if not 1 then it's an array, get from json annotation
-                    return@forEach
-                }
-
                 // transform the single object
                 val obj = values.elementAt(0)
 
                 // properties
                 if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
+                    // multiple values means it's an array, skip and prefer JSON annotation
+                    // if we've already seen a JSON annotation with the same property key then ignore
+                    if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
+
                     // object is a Literal
                     if (obj.isLiteral) {
                         val lit = obj.asLiteral()
@@ -124,6 +125,11 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                 }
                 // annotations
                 else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
+                    // expect exactly 1 object
+                    if(values.size != 1) {
+                        throw InvalidTripleError("Expected exactly 1 object with this predicate", elementIri, predicate, obj)
+                    }
+
                     // object is not a Literal
                     if (!obj.isLiteral) {
                         throw InvalidTripleError("Expected annotation property to point to an RDF literal", elementIri, predicate, obj)
@@ -144,6 +150,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
 
                     // add parsed element to JSON object
                     put(propertyKey, jsonElement)
+
+                    // do not overwrite this property
+                    seenArrays.add(propertyKey)
                 }
                 // something else
                 else {
