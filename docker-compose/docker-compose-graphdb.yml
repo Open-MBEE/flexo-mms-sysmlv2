@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+
+  openldap-server:
+    image: bitnami/openldap:2.6.4
+    hostname: openldap-server
+    container_name: openldap-server
+    ports:
+      - 1389:1389
+    environment:
+      - LDAP_PORT_NUMBER=1389
+      - LDAP_ROOT=dc=example,dc=org
+      - LDAP_ADMIN_USERNAME=admin
+      - LDAP_ADMIN_PASSWORD=adminpassword
+      - LDAP_USERS=user01,user02
+      - LDAP_USER_DC=users
+      - LDAP_GROUP=group01
+      - LDAP_PASSWORDS=password1,password2
+
+  quad-store-server:
+    image: ontotext/graphdb:10.3.0
+    hostname: quad-server
+    container_name: quad-server
+    env_file:
+      - ./env/flexo-mms-quad-store-graphdb.env
+    command: -Dgraphdb.global.page.cache=true
+    ports:
+      - 7200:7200
+
+  minio-server:
+    image: minio/minio:RELEASE.2022-05-26T05-48-41Z.hotfix.15f13935a
+    hostname: minio-server
+    container_name: minio-server
+    environment:
+      - MINIO_ACCESS_KEY=admintest
+      - MINIO_SECRET_KEY=admintest
+    command: server /tmp/data
+    ports:
+      - 9000:9000
+
+  auth-service:
+    image: openmbee/flexo-mms-auth-service:latest
+    hostname: auth-service
+    container_name: auth-service
+    env_file:
+      - ./env/flexo-mms-jwt.env
+      - ./env/flexo-mms-auth-graphdb.env
+    depends_on:
+      - openldap-server
+      - quad-store-server
+    ports:
+      - 8082:8080
+
+  store-service:
+    image: openmbee/flexo-mms-store-service:latest
+    hostname: store-service
+    container_name: store-service
+    env_file:
+      - ./env/flexo-mms-jwt.env
+      - ./env/flexo-mms-store.env
+    depends_on:
+      - minio-server
+    ports:
+      - 8081:8080
+
+  layer1-service:
+    image: openmbee/flexo-mms-layer1-service:develop-SNAPSHOT
+    hostname: layer1-service
+    container_name: layer1-service
+    env_file:
+      - ./env/flexo-mms-jwt.env
+      - ./env/flexo-mms-layer1-graphdb.env
+    depends_on:
+      - store-service
+      - auth-service
+      - quad-store-server
+    ports:
+      - 8080:8080
+
+networks:
+  default:
+    name: flexo-mms-test-network
+    driver: bridge

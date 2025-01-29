@@ -1,0 +1,361 @@
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+prefix mms: <https://mms.openmbee.org/rdf/ontology/>
+prefix mms-object: <https://mms.openmbee.org/rdf/objects/>
+prefix m: <http://layer1-service/>
+prefix ma: <http://layer1-service/access-control-scope/>
+prefix m-graph: <http://layer1-service/graphs/>
+prefix m-user: <http://layer1-service/users/>
+prefix m-group: <http://layer1-service/groups/>
+prefix m-policy: <http://layer1-service/policies/>
+
+# users and groups which are the subjects of access control policies
+graph m-graph:AccessControl.Agents {
+	m-user:root a mms:User ;
+		mms:id "root" .
+
+	m-user:admin a mms:User ;
+		mms:group m-group:SuperAdmins ;
+		mms:id "admin" .
+
+	m-user:anon a mms:User ;
+		mms:id "anon" .
+
+	<http://layer1-service/users/ldap/user/user01> a mms:User ;
+    	mms:id "ldap/user/user01" .
+
+    <http://layer1-service/users/ldap/user/user02> a mms:User ;
+        mms:id "ldap/user/user02" .
+
+    <http://layer1-service/groups/ldap/group/group01> a mms:Group ;
+        mms:id "ldap/group/group01" .
+
+	m-group:SuperAdmins a mms:Group ;
+		mms:id "super_admins" .
+}
+
+# default policies
+graph m-graph:AccessControl.Policies {
+	m-policy:DefaultSuperAdmins a mms:Policy ;
+		mms:subject m-user:root, m-group:SuperAdmins, <http://layer1-service/users/ldap/user/user01>, <http://layer1-service/groups/ldap/group/group01> ;
+		mms:scope <http://layer1-service/> ;
+		mms:role mms-object:Role.AdminCluster, mms-object:Role.AdminOrg, mms-object:Role.AdminRepo, mms-object:Role.AdminMetadata, mms-object:Role.AdminModel, mms-object:Role.AdminAccessControlAny .
+}
+
+# cluster-specific classes
+graph m-graph:Cluster {
+	<http://layer1-service/> a mms:Cluster .
+
+	<http://layer1-service/access-control-scope/> a mms:AccessControlAny .
+}
+
+# copy of static schema inherited from global MMS definitions
+graph m-graph:Schema {
+	# ====================================
+	# ==            Classes             ==
+	# ====================================
+	mms:Project a rdfs:Class ;
+		rdfs:label "Project" .
+
+	mms:Collection a rdfs:Class ;
+		rdfs:label "Collection" ;
+		rdfs:subClassOf mms:Project .
+
+	mms:Repo a rdfs:Class ;
+		rdfs:label "Repo" ;
+		rdfs:subClassOf mms:Project .
+
+	mms:Ref a rdfs:Class ;
+		rdfs:label "Ref" .
+
+	mms:Branch a rdfs:Class ;
+		rdfs:label "Branch" ;
+		rdfs:subClassOf mms:Ref .
+
+	mms:Lock a rdfs:Class ;
+		rdfs:label "Lock" ;
+		rdfs:subClassOf mms:Ref .
+
+	mms:InterimLock a rdfs:Class ;
+		rdfs:label "InterimLock" ;
+		rdfs:subClassOf mms:Lock .
+
+	mms:Snapshot a rdfs:Class ;
+		rdfs:label "Snapshot" .
+
+	mms:Model a rdfs:Class ;
+		rdfs:label "Model" ;
+		rdfs:subClassOf mms:Snapshot .
+
+	mms:Staging a rdfs:Class ;
+		rdfs:label "Staging" ;
+		rdfs:subClassOf mms:Snapshot .
+
+	mms:Commit a rdfs:Class ;
+		rdfs:label "Commit" .
+
+	mms:Agent a rdfs:Class ;
+		rdfs:label "Agent" .
+
+	mms:User a rdfs:Class ;
+		rdfs:label "User" ;
+		rdfs:subClassOf mms:Agent .
+
+	mms:Group a rdfs:Class ;
+		rdfs:label "Group" ;
+		rdfs:subClassOf mms:Agent .
+
+	mms:Policy a rdfs:Class ;
+		rdfs:label "Policy" .
+
+	# ====================================
+	# ==           Properties           ==
+	# ====================================
+	mms:ref a rdf:Property ;
+		rdfs:label "ref" ;
+		rdfs:range mms:Ref .
+
+	mms:commit a rdf:Property ;
+		rdfs:label "commit" ;
+		rdfs:range mms:Commit .
+
+	mms:snapshot a rdf:Property ;
+		rdfs:label "snapshot" ;
+		rdfs:range mms:Snapshot .
+}
+
+graph m-graph:AccessControl.Definitions {
+	# ====================================
+	# ==             Scopes             ==
+	# ====================================
+	mms:Cluster a rdfs:Class ;
+		rdfs:label "Cluster level scope" ;
+		rdfs:subClassOf mms:Scope ;
+		mms:implies mms:Org, mms:AccessControlAny .
+
+	mms:Org a rdfs:Class ;
+		rdfs:label "Org level scope" ;
+		rdfs:subClassOf mms:Scope ;
+		mms:implies mms:Project .
+
+	mms:Project a rdfs:Class ;
+		rdfs:label "Project level scope" ;
+		rdfs:subClassOf mms:Scope ;
+		mms:implies mms:Repo, mms:Collection .
+
+	mms:Repo a rdfs:Class ;
+		rdfs:label "Repo level scope" ;
+		rdfs:subClassOf mms:Scope ;
+		mms:implies mms:Ref .
+
+	mms:Collection a rdfs:Class ;
+		rdfs:label "Collection level scope" ;
+		rdfs:subClassOf mms:Scope .
+
+	mms:Ref a rdfs:Class ;
+		rdfs:label "Ref level scope" ;
+		rdfs:subClassOf mms:Scope ;
+		mms:implies mms:Branch, mms:Lock .
+
+	mms:AccessControlAny a rdfs:Class ;
+		rdfs:label "AccessControlAny level scope" ;
+		rdfs:subClassOf mms:Scope ;
+		mms:implies mms:Agent, mms:Policy .
+
+	mms:Agent a rdfs:Class ;
+		rdfs:label "Agent level scope" ;
+		rdfs:subClassOf mms:Scope ;
+		mms:implies mms:User, mms:Group .
+
+	mms:User a rdfs:Class ;
+		rdfs:label "User level scope" ;
+		rdfs:subClassOf mms:Scope .
+
+	mms:Group a rdfs:Class ;
+		rdfs:label "Group level scope" ;
+		rdfs:subClassOf mms:Scope .
+
+	mms:Policy a rdfs:Class ;
+		rdfs:label "Policy level scope" ;
+		rdfs:subClassOf mms:Scope .
+
+	# ====================================
+	# ==   Object-Centric Permissions   ==
+	# ====================================
+	mms-object:Permission.CreateCluster a mms:Permission .
+
+	mms-object:Permission.ReadCluster a mms:Permission .
+
+	mms-object:Permission.UpdateCluster a mms:Permission ;
+		mms:implies mms-object:Permission.ReadCluster, mms-object:Permission.CreateOrg, mms-object:Permission.CreateAccessControlAny .
+
+	mms-object:Permission.DeleteCluster a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateCluster, mms-object:Permission.DeleteOrg, mms-object:Permission.DeleteAccessControlAny .
+
+	mms-object:Permission.CreateOrg a mms:Permission .
+
+	mms-object:Permission.ReadOrg a mms:Permission .
+
+	mms-object:Permission.UpdateOrg a mms:Permission ;
+		mms:implies mms-object:Permission.ReadOrg, mms-object:Permission.CreateProject .
+
+	mms-object:Permission.DeleteOrg a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateOrg, mms-object:Permission.DeleteProject .
+
+	mms-object:Permission.CreateProject a mms:Permission ;
+		mms:implies mms-object:Permission.CreateCollection, mms-object:Permission.CreateRepo .
+
+	mms-object:Permission.ReadProject a mms:Permission ;
+		mms:implies mms-object:Permission.ReadCollection, mms-object:Permission.ReadRepo .
+
+	mms-object:Permission.UpdateProject a mms:Permission ;
+		mms:implies mms-object:Permission.ReadProject, mms-object:Permission.UpdateCollection, mms-object:Permission.UpdateRepo .
+
+	mms-object:Permission.DeleteProject a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateProject, mms-object:Permission.DeleteCollection, mms-object:Permission.DeleteRepo .
+
+	mms-object:Permission.CreateCollection a mms:Permission .
+
+	mms-object:Permission.ReadCollection a mms:Permission .
+
+	mms-object:Permission.UpdateCollection a mms:Permission ;
+		mms:implies mms-object:Permission.ReadCollection .
+
+	mms-object:Permission.DeleteCollection a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateCollection .
+
+	mms-object:Permission.CreateRepo a mms:Permission .
+
+	mms-object:Permission.ReadRepo a mms:Permission .
+
+	mms-object:Permission.UpdateRepo a mms:Permission ;
+		mms:implies mms-object:Permission.ReadRepo .
+
+	mms-object:Permission.DeleteRepo a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateRepo, mms-object:Permission.CreateBranch, mms-object:Permission.DeleteBranch, mms-object:Permission.CreateLock, mms-object:Permission.DeleteLock, mms-object:Permission.CreateDiff, mms-object:Permission.DeleteDiff .
+
+	mms-object:Permission.CreateBranch a mms:Permission .
+
+	mms-object:Permission.ReadBranch a mms:Permission .
+
+	mms-object:Permission.UpdateBranch a mms:Permission ;
+		mms:implies mms-object:Permission.ReadBranch .
+
+	mms-object:Permission.DeleteBranch a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateBranch .
+
+	mms-object:Permission.CreateLock a mms:Permission .
+
+	mms-object:Permission.ReadLock a mms:Permission .
+
+	mms-object:Permission.DeleteLock a mms:Permission ;
+		mms:implies mms-object:Permission.ReadLock .
+
+	mms-object:Permission.CreateAccessControlAny a mms:Permission .
+
+	mms-object:Permission.ReadAccessControlAny a mms:Permission .
+
+	mms-object:Permission.UpdateAccessControlAny a mms:Permission ;
+		mms:implies mms-object:Permission.ReadAccessControlAny, mms-object:Permission.CreateAgent, mms-object:Permission.CreatePolicy .
+
+	mms-object:Permission.DeleteAccessControlAny a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateAccessControlAny, mms-object:Permission.DeleteAgent, mms-object:Permission.DeletePolicy .
+
+	mms-object:Permission.CreateAgent a mms:Permission .
+
+	mms-object:Permission.ReadAgent a mms:Permission .
+
+	mms-object:Permission.UpdateAgent a mms:Permission ;
+		mms:implies mms-object:Permission.ReadAgent, mms-object:Permission.CreateUser, mms-object:Permission.CreateGroup .
+
+	mms-object:Permission.DeleteAgent a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateAgent, mms-object:Permission.DeleteUser, mms-object:Permission.DeleteGroup .
+
+	mms-object:Permission.CreateUser a mms:Permission .
+
+	mms-object:Permission.ReadUser a mms:Permission .
+
+	mms-object:Permission.UpdateUser a mms:Permission ;
+		mms:implies mms-object:Permission.ReadUser .
+
+	mms-object:Permission.DeleteUser a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateUser .
+
+	mms-object:Permission.CreateGroup a mms:Permission .
+
+	mms-object:Permission.ReadGroup a mms:Permission .
+
+	mms-object:Permission.UpdateGroup a mms:Permission ;
+		mms:implies mms-object:Permission.ReadGroup .
+
+	mms-object:Permission.DeleteGroup a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateGroup .
+
+	mms-object:Permission.CreatePolicy a mms:Permission .
+
+	mms-object:Permission.ReadPolicy a mms:Permission .
+
+	mms-object:Permission.UpdatePolicy a mms:Permission ;
+		mms:implies mms-object:Permission.ReadPolicy .
+
+	mms-object:Permission.DeletePolicy a mms:Permission ;
+		mms:implies mms-object:Permission.UpdatePolicy .
+
+	# ====================================
+	# ==             Roles              ==
+	# ====================================
+	mms-object:Role.AdminOrg a mms:Role ;
+		mms:permits mms-object:Permission.DeleteOrg .
+
+	mms-object:Role.WriteOrg a mms:Role ;
+		mms:permits mms-object:Permission.UpdateOrg .
+
+	mms-object:Role.ReadOrg a mms:Role ;
+		mms:permits mms-object:Permission.ReadOrg .
+
+	mms-object:Role.AdminRepo a mms:Role ;
+		mms:permits mms-object:Permission.DeleteRepo .
+
+	mms-object:Role.WriteRepo a mms:Role ;
+		mms:permits mms-object:Permission.UpdateRepo .
+
+	mms-object:Role.ReadRepo a mms:Role ;
+		mms:permits mms-object:Permission.ReadRepo .
+
+	mms-object:Role.AdminModel a mms:Role ;
+		mms:permits mms-object:Permission.DeleteModel .
+
+	mms-object:Role.WriteModel a mms:Role ;
+		mms:permits mms-object:Permission.UpdateModel .
+
+	mms-object:Role.ReadModel a mms:Role ;
+		mms:permits mms-object:Permission.ReadModel .
+
+	mms-object:Role.AdminMetadata a mms:Role ;
+		mms:permits mms-object:Permission.DeleteMetadata .
+
+	mms-object:Role.WriteMetadata a mms:Role ;
+		mms:permits mms-object:Permission.UpdateMetadata .
+
+	mms-object:Role.ReadMetadata a mms:Role ;
+		mms:permits mms-object:Permission.ReadMetadata .
+
+	mms-object:Role.AdminCluster a mms:Role ;
+		mms:permits mms-object:Permission.DeleteCluster .
+
+	mms-object:Role.WriteCluster a mms:Role ;
+		mms:permits mms-object:Permission.UpdateCluster .
+
+	mms-object:Role.ReadCluster a mms:Role ;
+		mms:permits mms-object:Permission.ReadCluster .
+
+	mms-object:Role.AdminAccessControlAny a mms:Role ;
+		mms:permits mms-object:Permission.DeleteAccessControlAny .
+
+	mms-object:Role.WriteAccessControlAny a mms:Role ;
+		mms:permits mms-object:Permission.UpdateAccessControlAny .
+
+	mms-object:Role.ReadAccessControlAny a mms:Role ;
+		mms:permits mms-object:Permission.ReadAccessControlAny .
+}
+
