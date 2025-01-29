@@ -37,26 +37,10 @@ import java.util.*
 //      "description" : "description",
 //      "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
 //    }"""
-fun FlexoModelHandlerWithFocalNode.projectFromResponse(
-    outgoing: Map<Property, Set<RDFNode>> = primary,
-    projectUuid: UUID = UUID.fromString(outgoing[MMS.id]?.literal()),
-    branchUuid: UUID = UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
-): Project {
-    return Project(
-        atId = projectUuid,
-        atType = Project.AtType.Project,
-        created = OffsetDateTime.parse(
-            outgoing[MMS.created]?.literal()
-                ?: OffsetDateTime.now().toString()),
-        defaultBranch = Identified(branchUuid),
-        description = outgoing[DCTerms.description]?.literal()?: "",
-        name = outgoing[DCTerms.title]?.literal()?: ""
-    )
-}
-fun FlexoModelHandler.projectFromResponse(
+fun projectFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
     projectUuid: UUID = UUID.fromString(outgoing[MMS.id]?.literal()),
-    branchUuid: UUID = UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
+    branchUuid: UUID = UUID.randomUUID()//UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
 ): Project {
     return Project(
         atId = projectUuid,
@@ -87,7 +71,7 @@ fun Route.ProjectApi() {
 
         // parse the response model, convert it JSON, and reply to client
         call.respond(flexoResponse.parseLdp {
-            projectFromResponse(primary, UUID.fromString(self))
+            projectFromResponse(focalOutgoing)
         })
     }
 
@@ -145,7 +129,7 @@ fun Route.ProjectApi() {
 
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseLdp {
-            projectFromResponse()
+            projectFromResponse(focalOutgoing)
         })
     }
 
@@ -181,9 +165,8 @@ fun Route.ProjectApi() {
 
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
-            projectFromResponse(indexOut("$ROOT_CONTEXT/orgs/sysml2/repos/$projectId"),
-                UUID.fromString(projectId),
-                branchUuid)
+            val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/$projectId")
+            projectFromResponse(outgoing)
         })
     }
 }

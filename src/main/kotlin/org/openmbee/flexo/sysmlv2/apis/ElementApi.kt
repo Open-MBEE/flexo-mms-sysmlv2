@@ -24,88 +24,17 @@ import org.apache.jena.vocabulary.XSD
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.ProjectUsage
 
-const val REIFIED_OUT_IRI = "urn:flexo-mms:reified-out"
-const val REIFIED_INV_IRI = "urn:flexo-mms:reified-inv"
-
 fun modelElementConstructQuery(elementTarget: String="?__element"): String {
     return """
         construct {
             $elementTarget a ?element_type ; 
                 ?element_p ?element_o .
-            
-            ?ownedElement a ?ownedElementType .
-            
-            <$REIFIED_OUT_IRI> ?owningRelation ?owningElement .
-            
-            <$REIFIED_OUT_IRI> ?reified_out_p ?reified_out_o .
-                
-            <$REIFIED_INV_IRI> ?reified_inv_p ?reified_inv_s .
-         
-            [] flexo:subject $elementTarget ;
-                flexo:predicate ?ownedRelation ;
-                flexo:order ?order ;
-                rdf:member ?member ;
-                .
         }
         where {
-            {
-                $elementTarget a ?element_type ;
-                    ?element_p ?element_o .
-                    
-                filter not exists {
-                    ?element_o a rdf:Collection .
-                }
-            }  
-            union {
-                $elementTarget ?ownedRelation 
-                ?element_o rdf:rest*/rdf:first ?ownedElement .
-                
-                ?ownedElement a ?ownedElementType .
-                
-                $elementTarget ?ownedRelation [
-                    flexo:order ?order ;
-                    rdf:member ?member ;
-                ] .
-            }
-            
-            [] a rdf:Collection ;
-                flexo:subject $elementTarget ;
-                flexo:predicate ?ownedRelation ;
-                rdf:first <urn:61eff> ;
-                rdf:rest rdf:nil .
-                
-            []
-                flexo:order ?order ;
-                rdf:member ?members ;
-                .
-            
-            optional {
-                ?owningElement ?owningRelation ?owningList .
-                
-                ?owningList rdf:rest*/rdf:first $elementTarget .
-
-                flexo:order "[\"a\", \"b\", \"c\"]"
-                    rdf:member $elementTarget, ?b, ?c ;
-                    .
-                
-                ?owningElement ?owningRelation ($elementTarget, ?b, ?c) .
-                
-                ?reified_out
-                    rdf:subject $elementTarget ;
-                    rdf:predicate ?reified_out_p ;
-                    rdf:object ?reified_out_o ;
-                    .
-            }
-            
-            optional {
-                ?reified_inv
-                    rdf:subject ?reified_inv_s ;
-                    rdf:predicate ?reified_inv_p ;
-                    rdf:object $elementTarget ;
-                    .
-            }
+            $elementTarget a ?element_type ;
+                ?element_p ?element_o .
         }
-    """
+    """.trimIndent()
 }
 
 class InvalidTripleError(
@@ -115,235 +44,112 @@ class InvalidTripleError(
     value: RDFNode
 ): Error("$message at <$subjectIri> <${predicate.uri}> ${value.stringify()}")
 
-
 fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject {
     // direct outgoing properties of element
     val out = indexOut(elementIri)
 
     // extract type
-    var type = out[RDF.type].resource()?.uri?.suffix
-    if (type!!.startsWith(SYSMLV2.BASE)) {
-        type = type.split(":").last()
-    }
-    var id = elementIri.suffix
-    if (id.startsWith(SYSMLV2.BASE)) {
-        id = id.split(":").last()
-    }
+    val type = out[RDF.type].resource()?.uri?.autoSuffix
+    val id = elementIri.urnSuffix
 
     return buildJsonObject {
         put("@type", type)
         put("@id", id)
 
-        val relationOrders = mutableMapOf<String, List<String>>()
-        val relations = mutableMapOf<String, Set<RDFNode>>()
-        //keeps track of json array annotations, if we already deserialized an array, ignore any triple with the same property
-        val seenArrays = mutableSetOf<String>()
+        // keeps track of json array annotations, if we already deserialized an array, ignore any triple with the same property
+        val seenArrays = mutableListOf<String>()
+
         // outgoing properties
-        out.map { (predicate, values) ->
+        out.forEach { (predicate, values) ->
             // extract the suffix name part
-            var propertyKey = predicate.uri.suffix
+            var propertyKey = predicate.uri.autoSuffix
+
+            // reference the first value
+            val obj = values.elementAt(0)
 
             // relations
             if(predicate.uri.startsWith(SYSMLV2.RELATION)) {
-                // skip
-//                relations.put(propertyKey, values)
+                // multiple values means it's an array, skip and prefer JSON annotation
+                // if we've already seen a JSON annotation with the same property key then ignore
+                if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
+
+                // object is a resource
+                if (obj.isResource) {
+                    put(propertyKey, buildJsonObject {
+                        put("@id", obj.asResource().uri.autoSuffix)
+                    })
+                }
+                // invalid
+                else {
+                    throw InvalidTripleError("Relation cannot be literal", elementIri, predicate, obj)
+                }
             }
-            // properties & annotations
-            else {
-                // expect exactly 1 object
-                if (values.size != 1 || seenArrays.contains(propertyKey)) {
-                    // if not 1 then it's an array, get from json annotation
-                    // if we already seen a json annotation with the same property key then ignore
-                    return@map
-                }
+            // properties
+            else if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
+                // multiple values means it's an array, skip and prefer JSON annotation
+                // if we've already seen a JSON annotation with the same property key then ignore
+                if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
 
-                // transform each object
-                val obj = values.elementAt(0)
-
-                // properties
-                if(predicate.uri.startsWith(SYSMLV2.SYSML)) {
-                    // object is a Literal
-                    if (obj.isLiteral) {
-                        val lit = obj.asLiteral()
-
-                        // depending on its datatype
-                        when (lit.datatype) {
-                            XSD.xboolean -> put(propertyKey, lit.boolean)
-                            XSD.integer -> put(propertyKey, lit.int)
-                            XSD.decimal, XSD.xdouble -> put(propertyKey, lit.float)
-                            else -> put(propertyKey, lit.string)
-                        }
-                    }
-                    // object is a Resource
-                    else {
-                        val objUri = obj.asResource().uri
-                        var obid = objUri.suffix
-                        if (objUri.startsWith(SYSMLV2.BASE)) {
-                            obid = obid.split(":").last()
-                        }
-                        put(propertyKey, buildJsonObject {
-                            put("@id", obid)
-                        })
-                    }
-                }
-                // annotations
-                else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
-                    // object is not a Literal
-                    if (!obj.isLiteral) {
-                        throw InvalidTripleError("Expected annotation property to point to an RDF literal", elementIri, predicate, obj)
-                    }
-
-                    // cast to literal
+                // object is a Literal
+                if (obj.isLiteral) {
                     val lit = obj.asLiteral()
 
-                    // expect valid JSON
-                    val json =  try {
-                        Json.parseToJsonElement(lit.string)
-                    } catch (parse: Error) {
-                        throw InvalidTripleError("Expected annotation property to encode a JSON element", elementIri, predicate, obj)
+                    // depending on its datatype
+                    when (lit.datatype.uri) {
+                        XSD.xboolean.uri -> put(propertyKey, lit.boolean)
+                        XSD.integer.uri -> put(propertyKey, lit.int)
+                        XSD.decimal.uri, XSD.xdouble.uri -> put(propertyKey, lit.float)
+                        else -> put(propertyKey, lit.string)
                     }
-                    propertyKey = predicate.uri.split(":").last()
-                    put(propertyKey, json)
-                    seenArrays.add(propertyKey)
-                    // annotating the order of elements
-                   /* if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
-                        // assert JSON element is an array of strings
-                        val jsonArray = json.jsonArray.also { list ->
-                            if(!list.all { it.jsonPrimitive.isString }) {
-                                throw InvalidTripleError("Not all elements in the array are strings", elementIri, predicate, obj)
-                            }
-                        }
-
-                        // add to object
-                        put(propertyKey, jsonArray)
-                    }
-                    // unrecognized annotation
-                    else {
-                        throw InvalidTripleError("Unrecognized annotation property", elementIri, predicate, obj)
-                    }*/
                 }
-                // something else
+                // object is a Resource
                 else {
-                    //throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
-                    return@map
+                    throw InvalidTripleError("Property cannot be resource", elementIri, predicate, obj)
                 }
+            }
+            // annotations
+            else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
+                // expect exactly 1 object
+                if(values.size != 1) {
+                    throw InvalidTripleError("Expected exactly 1 object with this predicate", elementIri, predicate, obj)
+                }
+
+                // object is not a Literal
+                if (!obj.isLiteral) {
+                    throw InvalidTripleError("Expected annotation property to point to an RDF literal", elementIri, predicate, obj)
+                }
+
+                // cast to literal
+                val lit = obj.asLiteral()
+
+                // expect valid JSON
+                val jsonElement = try {
+                    Json.parseToJsonElement(lit.string)
+                } catch (parse: Error) {
+                    throw InvalidTripleError("Expected annotation property to encode a JSON element", elementIri, predicate, obj)
+                }
+
+                // infer property key from URN
+                propertyKey = predicate.uri.urnSuffix
+
+                // add parsed element to JSON object
+                put(propertyKey, jsonElement)
+
+                // do not overwrite this property
+                seenArrays.add(propertyKey)
+            }
+            // something else
+            else {
+                //throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
             }
         }
     }
 }
 
-
-
-//val exampleContentString = """{
-//  "owner" : {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  },
-//  "textualRepresentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedAnnotation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedElement" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "aliasIds" : [ "aliasIds", "aliasIds" ],
-//  "@type" : "Element",
-//  "ownedRelationship" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "documentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "isImpliedIncluded" : true,
-//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//}"""
-//
-//val exampleContentString = """[ {
-//  "owner" : {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  },
-//  "textualRepresentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedAnnotation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedElement" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "aliasIds" : [ "aliasIds", "aliasIds" ],
-//  "@type" : "Element",
-//  "ownedRelationship" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "documentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "isImpliedIncluded" : true,
-//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//}, {
-//  "owner" : {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  },
-//  "textualRepresentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedAnnotation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedElement" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "aliasIds" : [ "aliasIds", "aliasIds" ],
-//  "@type" : "Element",
-//  "ownedRelationship" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "documentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "isImpliedIncluded" : true,
-//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//} ]"""
-
 fun Route.ElementApi() {
     // get an element
     get<Paths.getElementByProjectCommitId> { getElement ->
-        val elementIri = sysmlv2ElementIri(getElement.elementId)
+        val elementIri = SYSMLV2.element(getElement.elementId.toString()).uri
 
         // submit POST request to query model
         val flexoResponse = flexoRequestPost {
@@ -371,7 +177,6 @@ fun Route.ElementApi() {
         // submit POST request to query model
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getElements.projectId}/branches/master/graph")
-
         }
 
         // forward failures to client

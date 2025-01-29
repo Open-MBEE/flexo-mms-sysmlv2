@@ -1,51 +1,82 @@
 package org.openmbee.flexo.sysmlv2
 
-import org.apache.jena.datatypes.BaseDatatype
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.Resource
 import org.apache.jena.rdf.model.ResourceFactory
-import org.apache.jena.shared.impl.PrefixMappingImpl
+import org.apache.jena.shared.PrefixMapping
 
 val ROOT_CONTEXT = "http://layer1-service"
 
-val DEFAULT_PREFIX_MAPPING = PrefixMappingImpl();
-class Static {
-    companion object {
-        init {
-            val prefixes = mutableMapOf(
-                "rdf" to "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-                "rdfs" to "http://www.w3.org/2000/01/rdf-schema#",
-                "owl" to "http://www.w3.org/2002/07/owl#",
-                "xsd" to "http://www.w3.org/2001/XMLSchema#",
-                "dct" to "http://purl.org/dc/terms/",
-            )
+object SYSMLV2 {
+    val BASE = "urn:sysmlv2:"
+    val VOCABULARY = "https://www.omg.org/spec/SysML/"
+    val ELEMENT = "${BASE}element:"
+    val TYPE = "${BASE}type:"
+    val PROPERTY = "${BASE}property:"
+    val RELATION = "${BASE}relation:"
+    val ANNOTATION_JSON = "${BASE}annotation:json:"
 
-            with("https://mms.openmbee.org/rdf") {
-                prefixes.putAll(mapOf(
-                    "mms" to "$this/ontology/",
-                    "mms-txn" to "$this/ontology/txn.",
-                    "mms-object" to "$this/objects/",
-                    "mms-datatype" to "$this/datatypes/",
-                ))
-            }
-
-            with(ROOT_CONTEXT) {
-                prefixes.putAll(mapOf(
-                    "m" to "$this/",
-                    "m-object" to "$this/objects/",
-                    "m-graph" to "$this/graphs/",
-                    "m-org" to "$this/orgs/",
-                    "m-user" to "$this/users/",
-                    "m-group" to "$this/groups/",
-                    "m-policy" to "$this/policies/",
-
-                    "ma" to "$this/graphs/AccessControl.",
-                ))
-            }
-
-            DEFAULT_PREFIX_MAPPING.setNsPrefixes(prefixes)
-        }
+    fun element(uuid: String): Resource {
+        return ResourceFactory.createResource("$ELEMENT$uuid")
     }
+
+    fun type(type: String): Resource {
+        return ResourceFactory.createResource("$TYPE$type")
+    }
+
+    fun prop(id: String): Property {
+//        return ResourceFactory.createProperty(VOCABULARY, id)
+        return ResourceFactory.createProperty("$PROPERTY$id")
+    }
+
+    fun annotationJson(key: String): Property {
+        return ResourceFactory.createProperty("$ANNOTATION_JSON$key")
+    }
+
+    fun relation(key: String): Property {
+        return ResourceFactory.createProperty("$RELATION$key")
+    }
+}
+
+val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
+    val prefixes = mutableMapOf(
+        "rdf" to "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "rdfs" to "http://www.w3.org/2000/01/rdf-schema#",
+        "owl" to "http://www.w3.org/2002/07/owl#",
+        "xsd" to "http://www.w3.org/2001/XMLSchema#",
+        "dct" to "http://purl.org/dc/terms/",
+        "sysmlv2" to SYSMLV2.BASE,
+        "type" to SYSMLV2.TYPE,
+        "elmt" to SYSMLV2.ELEMENT,
+        "prop" to SYSMLV2.PROPERTY,
+        "rltn" to SYSMLV2.RELATION,
+        "json" to SYSMLV2.ANNOTATION_JSON,
+    )
+
+    with("https://mms.openmbee.org/rdf") {
+        prefixes.putAll(mapOf(
+            "mms" to "$this/ontology/",
+            "mms-txn" to "$this/ontology/txn.",
+            "mms-object" to "$this/objects/",
+            "mms-datatype" to "$this/datatypes/",
+        ))
+    }
+
+    with(ROOT_CONTEXT) {
+        prefixes.putAll(mapOf(
+            "m" to "$this/",
+            "m-object" to "$this/objects/",
+            "m-graph" to "$this/graphs/",
+            "m-org" to "$this/orgs/",
+            "m-user" to "$this/users/",
+            "m-group" to "$this/groups/",
+            "m-policy" to "$this/policies/",
+
+            "ma" to "$this/graphs/AccessControl.",
+        ))
+    }
+
+    setNsPrefixes(prefixes)
 }
 
 object MMS {
@@ -151,38 +182,5 @@ object MMS {
         val commitSource = prop("commitSource")
         val insGraph = prop("insGraph")
         val delGraph = prop("delGraph")
-    }
-}
-
-object MMS_DATATYPE {
-    private val BASE = DEFAULT_PREFIX_MAPPING.nsPrefixMap["mms-datatype"]
-
-    val commitMessage = BaseDatatype("${BASE}commitMessage")
-    val sparql = BaseDatatype("${BASE}sparql")
-    val sparqlGz = BaseDatatype("${BASE}sparqlGz")
-}
-
-object SYSMLV2 {
-    val BASE = "urn:sysmlv2:"
-    val SYSML = "https://www.omg.org/spec/SysML/"
-    val ELEMENT = "${BASE}element:"
-    val PROPERTY = "${BASE}property:"
-    val RELATION = "${BASE}relation:"
-    val ANNOTATION_JSON = "${BASE}annotation:json:"
-
-    fun element(uuid: String): Resource {
-        return ResourceFactory.createResource("$BASE$uuid")
-    }
-
-    fun prop(id: String): Property {
-        return ResourceFactory.createProperty(SYSML, id)
-    }
-
-    fun annotation_json(key: String): Property {
-        return ResourceFactory.createProperty("$ANNOTATION_JSON$key")
-    }
-
-    fun relation(key: String): Property {
-        return ResourceFactory.createProperty("$RELATION:$key")
     }
 }

@@ -32,7 +32,6 @@ data class CommitRequest(
     @SerialName("@type")
     val atType: CommitRequest.AtType? = null,
     val description: kotlin.String? = null,
-    val previousCommit: Identified? = null
 )
 {
     /**
