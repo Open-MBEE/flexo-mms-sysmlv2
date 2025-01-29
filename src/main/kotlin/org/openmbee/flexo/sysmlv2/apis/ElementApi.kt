@@ -74,47 +74,35 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
     val out = indexOut(elementIri)
 
     // extract type
-    var type = out[RDF.type].resource()?.uri?.suffix
-    if (type!!.startsWith(SYSMLV2.BASE)) {
-        type = type.split(":").last()
-    }
-    var id = elementIri.suffix
-    if (id.startsWith(SYSMLV2.BASE)) {
-        id = id.split(":").last()
-    }
+    val type = out[RDF.type].resource()?.uri?.autoSuffix
+    val id = elementIri.urnSuffix
 
     return buildJsonObject {
         put("@type", type)
         put("@id", id)
 
-        val relationOrders = mutableMapOf<String, List<String>>()
-        val relations = mutableMapOf<String, Set<RDFNode>>()
-        //keeps track of json array annotations, if we already deserialized an array, ignore any triple with the same property
-        val seenArrays = mutableSetOf<String>()
         // outgoing properties
-        out.map { (predicate, values) ->
+        out.forEach { (predicate, values) ->
             // extract the suffix name part
-            var propertyKey = predicate.uri.suffix
+            var propertyKey = predicate.uri.autoSuffix
 
             // relations
             if(predicate.uri.startsWith(SYSMLV2.RELATION)) {
-                // skip
-//                relations.put(propertyKey, values)
+                // prefer the annotation triple for all relations, skip
             }
             // properties & annotations
             else {
                 // expect exactly 1 object
-                if (values.size != 1 || seenArrays.contains(propertyKey)) {
+                if (values.size != 1) {
                     // if not 1 then it's an array, get from json annotation
-                    // if we already seen a json annotation with the same property key then ignore
-                    return@map
+                    return@forEach
                 }
 
-                // transform each object
+                // transform the single object
                 val obj = values.elementAt(0)
 
                 // properties
-                if(predicate.uri.startsWith(SYSMLV2.VOCABULARY)) {
+                if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
                     // object is a Literal
                     if (obj.isLiteral) {
                         val lit = obj.asLiteral()
@@ -129,13 +117,8 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                     }
                     // object is a Resource
                     else {
-                        val objUri = obj.asResource().uri
-                        var obid = objUri.suffix
-                        if (objUri.startsWith(SYSMLV2.BASE)) {
-                            obid = obid.split(":").last()
-                        }
                         put(propertyKey, buildJsonObject {
-                            put("@id", obid)
+                            put("@id", obj.asResource().uri.autoSuffix)
                         })
                     }
                 }
@@ -150,35 +133,21 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                     val lit = obj.asLiteral()
 
                     // expect valid JSON
-                    val json =  try {
+                    val jsonElement = try {
                         Json.parseToJsonElement(lit.string)
                     } catch (parse: Error) {
                         throw InvalidTripleError("Expected annotation property to encode a JSON element", elementIri, predicate, obj)
                     }
-                    propertyKey = predicate.uri.split(":").last()
-                    put(propertyKey, json)
-                    seenArrays.add(propertyKey)
-                    // annotating the order of elements
-                   /* if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
-                        // assert JSON element is an array of strings
-                        val jsonArray = json.jsonArray.also { list ->
-                            if(!list.all { it.jsonPrimitive.isString }) {
-                                throw InvalidTripleError("Not all elements in the array are strings", elementIri, predicate, obj)
-                            }
-                        }
 
-                        // add to object
-                        put(propertyKey, jsonArray)
-                    }
-                    // unrecognized annotation
-                    else {
-                        throw InvalidTripleError("Unrecognized annotation property", elementIri, predicate, obj)
-                    }*/
+                    // infer property key from URN
+                    propertyKey = predicate.uri.urnSuffix
+
+                    // add parsed element to JSON object
+                    put(propertyKey, jsonElement)
                 }
                 // something else
                 else {
-                    //throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
-                    return@map
+                    throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
                 }
             }
         }

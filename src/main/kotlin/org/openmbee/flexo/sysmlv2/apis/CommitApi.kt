@@ -23,7 +23,6 @@ import org.apache.jena.graph.Node
 import org.apache.jena.graph.NodeFactory
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
-import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import org.openmbee.flexo.sysmlv2.*
@@ -39,17 +38,17 @@ class InvalidSysmlSerializationError(message: String): Error(message)
 fun FlexoModelHandler.commitFromModel(
     commitIri: String,
     properties: Map<Property, Set<RDFNode>?>,
-    projectUuid: UUID=UUID.fromString(properties[MMS.id].resource()?.uri?.suffix?: ""),
+    projectUuid: UUID=UUID.fromString(properties[MMS.id].resource()?.uri?.uriSuffix?: ""),
 ): Commit {
     // generate commit object
     return Commit(
-        atId = UUID.fromString(commitIri.suffix),
+        atId = UUID.fromString(commitIri.uriSuffix),
         atType = Commit.AtType.Commit,
         created = OffsetDateTime.parse(properties[MMS.submitted]!!.literal()!!),
         description = properties[DCTerms.description]?.literal()?: "",
         owningProject = Identified(atId = projectUuid),
         previousCommit = properties[MMS.parent]?.map {
-            Identified(atId = UUID.fromString(it.asResource().uri.suffix))
+            Identified(atId = UUID.fromString(it.asResource().uri.uriSuffix))
         }?: emptyList()
     )
 }

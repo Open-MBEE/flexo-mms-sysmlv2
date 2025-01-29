@@ -300,8 +300,16 @@ open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
         return PrefixedRdfPropertiesMap(incomingProperties, prefixes)
     }
 
-    var String.suffix: String
-        get() = this.substringAfterLast("/")
+    var String.uriSuffix: String
+        get() = substringAfterLast('/')
+        set(v) {}
+
+    var String.urnSuffix: String
+        get() = substringAfterLast(':')
+        set(v) {}
+
+    var String.autoSuffix: String
+        get() = if(startsWith(SYSMLV2.BASE)) urnSuffix else uriSuffix
         set(v) {}
 }
 
