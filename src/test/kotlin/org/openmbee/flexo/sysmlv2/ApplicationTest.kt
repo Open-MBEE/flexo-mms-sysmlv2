@@ -28,6 +28,14 @@ class ApplicationTest {
 
         val partsTreePayload = javaClass.classLoader.getResource("PartsTreeRedefinition.json")?.readText()
 
+        val res1 = client.post("/projects/92de867a-4eb5-4e9d-83d2-acf0a8166564/commits") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(partsTreePayload)
+        }
+
+        println(res1.status)
+
         //assume the docker compose for layer1 is up locally
         //set the token string from login at the companion object below, sysmlv2 org should have been created on flexo
         //this is calling to this sysmlv2 service's api project put
@@ -144,11 +152,9 @@ class ApplicationTest {
                         append(HttpHeaders.Authorization, "Bearer $token")
                         append(HttpHeaders.ContentType, "text/turtle")
                     }
-                    setBody(
-                        """
-                    <> dct:title "sysmlv2"@en .
-                """.trimIndent()
-                    )
+                    setBody("""
+                        <> dct:title "sysmlv2"@en .
+                    """)
                 }
 
             client.put("http://localhost:8080/orgs/sysmlv2/repos/92de867a-4eb5-4e9d-83d2-acf0a8166564") {

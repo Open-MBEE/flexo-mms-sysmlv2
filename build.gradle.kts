@@ -5,10 +5,6 @@ application {
     mainClass.set("io.ktor.server.netty.EngineMain")
 }
 
-application {
-    mainClass.set("io.ktor.server.netty.EngineMain")
-}
-
 repositories {
     mavenCentral()
     gradlePluginPortal()

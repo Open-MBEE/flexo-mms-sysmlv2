@@ -23,6 +23,7 @@ import org.apache.jena.graph.Node
 import org.apache.jena.graph.NodeFactory
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
+import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import org.openmbee.flexo.sysmlv2.*
@@ -38,7 +39,7 @@ class InvalidSysmlSerializationError(message: String): Error(message)
 fun FlexoModelHandler.commitFromModel(
     commitIri: String,
     properties: Map<Property, Set<RDFNode>?>,
-    projectUuid: UUID,
+    projectUuid: UUID=UUID.fromString(properties[MMS.id].resource()?.uri?.suffix?: ""),
 ): Commit {
     // generate commit object
     return Commit(
@@ -229,10 +230,6 @@ fun Route.CommitApi() {
             return@get forward(flexoResponse)
         }
 
-//        flexoResponse.mapResults {
-//            it["commit_p"]
-//        }
-
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
             // each commit node
@@ -274,6 +271,7 @@ fun Route.CommitApi() {
         val projectId = "${call.parameters["projectId"]}"
 
         val inserts = mutableListOf<String>()
+        val deleteIncoming = mutableListOf<String>()
         val values = mutableListOf<String>()
 
         // each change (DataVersionRequest)
@@ -302,12 +300,21 @@ fun Route.CommitApi() {
             }
 
             // subject node, target element
-            var elementNode: Node = SYSMLV2.element(identityId ?: payloadId!!).asNode()
+            val elementNode: Node = SYSMLV2.element(identityId ?: payloadId!!).asNode()
 
             // transform payload into property pairs
             mutableListOf<Pair<Property, Set<Node>>>().apply {
-                // if payload is null, this is a delete, done
-                if(payload == null) return@apply
+                // add to values block
+                values.add(elementNode.stringify())
+
+                // payload is null, delete element
+                if(payload == null) {
+                    // delete incoming
+                    deleteIncoming.add(elementNode.stringify())
+
+                    // done
+                    return@apply
+                }
 
                 // encode each key/value
                 payload.forEach { (key, value) ->
@@ -322,7 +329,7 @@ fun Route.CommitApi() {
                         }
 
                         // reserved @type
-                        "@type" -> add(RDF.type to setOf(SYSMLV2.element(value.jsonPrimitive.content).asNode()))
+                        "@type" -> add(RDF.type to setOf(SYSMLV2.type(value.jsonPrimitive.content).asNode()))
 
                         // everything else
                         else -> {
@@ -347,7 +354,7 @@ fun Route.CommitApi() {
                                             }.toSet())
                                         }
                                         // and first element is a primitive
-                                        else if(value[1] is JsonPrimitive) {
+                                        else if(value[0] is JsonPrimitive) {
                                             // create additional triples to provide literals from primitives
                                             add(SYSMLV2.prop(key) to value.jsonArray.map {
                                                 it.jsonPrimitive.toRdfLiteralNode()
@@ -385,52 +392,10 @@ fun Route.CommitApi() {
 
                 // generate the RDF data for SPARQL INSERT clause
                 inserts.add("""
-                    ${elementNode.stringify()} ${joinToString(" ;\n\t") { pair ->
+                    ${elementNode.stringify()} ${joinToString(" ;\n") { pair ->
                         pair.first.stringify()+" "+pair.second.joinToString(", ") { it.stringify() }
-                    }} .
-                """)
-            }
-
-            // references an existing element
-            if(identity != null) {
-//                // generate the RDF data for SPARQL DELETE clause
-//                deletes.add("""
-//                    ${elementNode.stringify()} ${
-//                        // delete all outgoing properties
-//                        if(payload == null) "?p_$index ?o_$index"
-//
-//                        // delete the properties being replaced
-//                        else properties.joinToString(" ;\n\t") { pair ->
-//                            pair.first.stringify()+" ?o_$index"
-//                        }
-//                    } .
-//
-//                    ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
-//                        ?incoming_order_p ?incoming_order_o .
-//                """.trimIndent())
-
-                // add to values block
-                values.add(elementNode.stringify())
-
-//                // generate the WHERE clause
-//                wheres.add("""
-//                    ${elementNode.stringify()} ?p_$index ?o_$index .
-//
-//                    optional {
-//                        ?incoming ?incoming_relation_p ${elementNode.stringify()} ;
-//                            ?incoming_order_p ?incoming_order_o .
-//
-//                        filter(
-//                            str(?incoming_order_p) = concat(
-//                                "${SYSMLV2.ANNOTATION_JSON}:",
-//                                strAfter(
-//                                    str(?incoming_relation_p),
-//                                    "${SYSMLV2.PROPERTY}:"
-//                                )
-//                            )
-//                        )
-//                    }
-//                """.trimIndent())
+                    }.reindent(6)} .
+                """.trimIndent())
             }
         }
 
@@ -457,47 +422,72 @@ fun Route.CommitApi() {
 
         val lockId = "none"
 
+        // build SPARQL UPDATE string
+        var sparqlUpdateString = """
+            ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
+                iri.startsWith(SYSMLV2.BASE)
+            }.toList().joinToString("\n") { (id, iri) ->
+                "prefix $id: <$iri>"
+            }.reindent(3)}
+
+            delete {
+                ?element_n ?element_p ?element_o .
+
+                ?incoming ?incoming_p ?element_del ;
+                    ?incoming_order_p ?incoming_order_o .
+            }
+            insert {
+                ${inserts.joinToString("\n\n").reindent(4)}
+            }
+            where {
+                optional {
+                    ?element_n ?element_p ?element_o .
+                }
+                
+                values ?element_n {
+                    ${values.joinToString("\n").reindent(5)}
+                }
+        """
+
+        // only delete incoming if there are elements being deleted
+        if(deleteIncoming.isNotEmpty()) {
+            sparqlUpdateString += """
+                optional {
+                    ?incoming ?incoming_p ?element_del ;
+                        ?incoming_order_p ?incoming_order_o .
+                    
+                    filter(
+                        str(?incoming_order_p) = concat(
+                            "${SYSMLV2.ANNOTATION_JSON}",
+                            strAfter(
+                                str(?incoming_relation_p),
+                                "${SYSMLV2.RELATION}"
+                            )
+                        )
+                    )
+                }
+
+                values ?element_del {
+                    ${deleteIncoming.joinToString("\n").reindent(5)}
+                }
+            """
+        }
+
+        // close the update string
+        sparqlUpdateString += """
+            }
+        """
+
+        // trim indent for better inspectability
+        sparqlUpdateString = sparqlUpdateString.trimIndent()
+
         // submit POST request to commit model
         val flexoResponseUpdate = flexoRequestPost {
             orgPath("/repos/$projectId/locks/$lockId/update")
 
             // construct body payload
             sparqlUpdate {
-                """
-                    delete {
-                        ?element_n ?element_p ?element_o .
-
-                        ?incoming ?incoming_p ?element_n ;
-                                ?incoming_order_p ?incoming_order_o .
-                    }
-                    insert {
-                        ${inserts.joinToString("\n")}
-                    }
-                    where {
-                        optional {
-                            ?element_n ?element_p ?element_o .
-                        }
-                        
-                        optional {
-                            ?incoming ?incoming_p ?element_n ;
-                                ?incoming_order_p ?incoming_order_o .
-                            
-                            filter(
-                                str(?incoming_order_p) = concat(
-                                    "urn:sysmlv2:annotation:json:",
-                                    strAfter(
-                                        str(?incoming_relation_p),
-                                        "urn:sysmlv2:relation:"
-                                    )
-                                )
-                            )
-                        }
-                        
-                        values ?element_n {
-                            ${values.joinToString("\n"+" ".repeat(4*7))}
-                        }
-                    }
-                """.trimIndent()
+                sparqlUpdateString
             }
         }
 

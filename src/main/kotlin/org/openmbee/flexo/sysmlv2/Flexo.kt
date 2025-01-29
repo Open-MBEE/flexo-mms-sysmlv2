@@ -6,7 +6,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.config.*
 import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import org.apache.commons.io.IOUtils
@@ -18,9 +17,13 @@ import org.apache.jena.rdf.model.impl.ModelCom
 import org.apache.jena.riot.RDFLanguages
 import org.apache.jena.riot.RDFParser
 import org.apache.jena.riot.system.PrefixMapAdapter
-import org.apache.jena.shared.impl.PrefixMappingImpl
+import org.apache.jena.shared.PrefixMapping
+import org.apache.jena.vocabulary.RDF
 import java.nio.charset.StandardCharsets
 
+fun String.reindent(width: Int): String {
+    return "\n"+this.trimIndent().prependIndent("    ".repeat(width))
+}
 
 open class RdfBuilder {
     var String.en: Literal
@@ -28,15 +31,46 @@ open class RdfBuilder {
         set(v) {}
 }
 
-fun Node.stringify(): String {
+fun escapeRdfDoubleQuotedLiteralContents(contents: String): String {
+    return contents
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+}
+
+fun escapeRdfIri(iri: String): String {
+    return iri.replace("([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()) {
+        // hex-encode the offending character
+        val hex = it.value[0].code.toString(16)
+
+        // if it's wider than 4 hex digits, use \UXXXXXXXX form; else use \uXXXX
+        if (hex.length > 4) {
+            "\\U" + hex.padStart(8, '0')
+        } else {
+            "\\u" + hex.padStart(4, '0')
+        }
+    }
+}
+
+fun shortenIri(iri: String, prefixes: PrefixMapping): String {
+    return if(iri == RDF.type.uri) return "a"
+    else if(iri.startsWith("urn:")) {
+        prefixes.getNsURIPrefix(iri.substringBeforeLast(':')+':')?.let {
+            "$it:${iri.substringAfterLast(':')}"
+        } ?: "<${escapeRdfIri(iri)}>"
+    }
+    else {
+        prefixes.qnameFor(iri) ?: "<${escapeRdfIri(iri)}>"
+    }
+}
+
+@JvmOverloads
+fun Node.stringify(prefixes: PrefixMapping= DEFAULT_PREFIX_MAPPING): String {
     return when {
         isVariable -> "?$name"
         isBlank -> "_:$blankNodeLabel"
         isLiteral -> {
-            val lexical = "\""+literalLexicalForm
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")+"\""
+            val lexical = "\""+ escapeRdfDoubleQuotedLiteralContents(literalLexicalForm)+"\""
 
             when {
                 literalLanguage.isNotEmpty() -> "$lexical@${literalLanguage}"
@@ -51,28 +85,17 @@ fun Node.stringify(): String {
                 }
             }
         }
-        isURI -> "<"+uri.replace("([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()) {
-            // hex-encode the offending character
-            val hex = it.value[0].code.toString(16)
-
-            // if it's wider than 4 hex digits, use \UXXXXXXXX form; else use \uXXXX
-            if (hex.length > 4) {
-                "\\U" + hex.padStart(8, '0')
-            } else {
-                "\\u" + hex.padStart(4, '0')
-            }
-        }+">"
+        isURI -> shortenIri(uri, prefixes)
         else -> toString()
     }
 }
 
-fun RDFNode.stringify(): String {
+@JvmOverloads
+fun RDFNode.stringify(prefixes: PrefixMapping = DEFAULT_PREFIX_MAPPING): String {
     return when {
         isLiteral -> {
-            val lit = this.asLiteral()
-            val lexical = "\""+lit.lexicalForm
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")+"\""
+            val lit = asLiteral()
+            val lexical = "\""+ escapeRdfDoubleQuotedLiteralContents(lit.lexicalForm)+"\""
 
             when {
                 lit.language.isNotEmpty() -> "$lexical@${lit.language}"
@@ -80,8 +103,8 @@ fun RDFNode.stringify(): String {
                 else -> "$lexical^^<${lit.datatypeURI}>"
             }
         }
-        isURIResource -> "<${this.asResource().uri}>"
-        isAnon -> "_:${this.asResource().id.labelString}"
+        isURIResource -> shortenIri(asResource().uri, prefixes)
+        isAnon -> "_:${asResource().id.labelString}"
         else -> toString()
     }
 }
@@ -254,7 +277,7 @@ suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPost(setup: FlexoReq
     return flexoRequest(HttpMethod.Post, setup)
 }
 
-open class FlexoModelHandler(val model: Model, val prefixes: PrefixMappingImpl) {
+open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
     fun indexOut(iri: String?): Map<Property, Set<RDFNode>> {
         val outgoingProperties: MutableMap<Property, MutableSet<RDFNode>> = mutableMapOf()
         val selfResource = model.getResource(iri)
@@ -285,7 +308,7 @@ open class FlexoModelHandler(val model: Model, val prefixes: PrefixMappingImpl) 
 class FlexoModelHandlerWithFocalNode(
     model: Model,
     val focalIri: String?,
-    prefixes: PrefixMappingImpl= DEFAULT_PREFIX_MAPPING
+    prefixes: PrefixMapping= DEFAULT_PREFIX_MAPPING
 ): FlexoModelHandler(model, prefixes) {
     val focalOutgoing = indexOut(focalIri)
     val focalIncoming = indexInv(focalIri)
