@@ -429,7 +429,7 @@ fun Route.CommitApi() {
         if(deleteIncoming.isNotEmpty()) {
             sparqlUpdateString += """
                 optional {
-                    ?incoming ?incoming_p ?element_del ;
+                    ?incoming ?incoming_relation_p ?element_del ;
                         ?incoming_order_p ?incoming_order_o .
                     
                     filter(

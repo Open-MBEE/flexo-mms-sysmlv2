@@ -63,84 +63,85 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
         out.forEach { (predicate, values) ->
             // extract the suffix name part
             var propertyKey = predicate.uri.autoSuffix
+
+            // reference the first value
             val obj = values.elementAt(0)
+
             // relations
             if(predicate.uri.startsWith(SYSMLV2.RELATION)) {
                 // multiple values means it's an array, skip and prefer JSON annotation
                 // if we've already seen a JSON annotation with the same property key then ignore
                 if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
-                if (obj.isResource()) {
+
+                // object is a resource
+                if (obj.isResource) {
                     put(propertyKey, buildJsonObject {
                         put("@id", obj.asResource().uri.autoSuffix)
                     })
-                } else {
+                }
+                // invalid
+                else {
                     throw InvalidTripleError("Relation cannot be literal", elementIri, predicate, obj)
                 }
             }
-            // properties & annotations
-            else {
-                // transform the single object
-                val obj = values.elementAt(0)
+            // properties
+            else if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
+                // multiple values means it's an array, skip and prefer JSON annotation
+                // if we've already seen a JSON annotation with the same property key then ignore
+                if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
 
-                // properties
-                if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
-                    // multiple values means it's an array, skip and prefer JSON annotation
-                    // if we've already seen a JSON annotation with the same property key then ignore
-                    if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
-
-                    // object is a Literal
-                    if (obj.isLiteral) {
-                        val lit = obj.asLiteral()
-
-                        // depending on its datatype
-                        when (lit.datatype.uri) {
-                            XSD.xboolean.uri -> put(propertyKey, lit.boolean)
-                            XSD.integer.uri -> put(propertyKey, lit.int)
-                            XSD.decimal.uri, XSD.xdouble.uri -> put(propertyKey, lit.float)
-                            else -> put(propertyKey, lit.string)
-                        }
-                    }
-                    // object is a Resource
-                    else {
-                        throw InvalidTripleError("Property cannot be resource", elementIri, predicate, obj)
-                    }
-                }
-                // annotations
-                else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
-                    // expect exactly 1 object
-                    if(values.size != 1) {
-                        throw InvalidTripleError("Expected exactly 1 object with this predicate", elementIri, predicate, obj)
-                    }
-
-                    // object is not a Literal
-                    if (!obj.isLiteral) {
-                        throw InvalidTripleError("Expected annotation property to point to an RDF literal", elementIri, predicate, obj)
-                    }
-
-                    // cast to literal
+                // object is a Literal
+                if (obj.isLiteral) {
                     val lit = obj.asLiteral()
 
-                    // expect valid JSON
-                    val jsonElement = try {
-                        Json.parseToJsonElement(lit.string)
-                    } catch (parse: Error) {
-                        throw InvalidTripleError("Expected annotation property to encode a JSON element", elementIri, predicate, obj)
+                    // depending on its datatype
+                    when (lit.datatype.uri) {
+                        XSD.xboolean.uri -> put(propertyKey, lit.boolean)
+                        XSD.integer.uri -> put(propertyKey, lit.int)
+                        XSD.decimal.uri, XSD.xdouble.uri -> put(propertyKey, lit.float)
+                        else -> put(propertyKey, lit.string)
                     }
-
-                    // infer property key from URN
-                    propertyKey = predicate.uri.urnSuffix
-
-                    // add parsed element to JSON object
-                    put(propertyKey, jsonElement)
-
-                    // do not overwrite this property
-                    seenArrays.add(propertyKey)
                 }
-                // something else
+                // object is a Resource
                 else {
-                    //throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
+                    throw InvalidTripleError("Property cannot be resource", elementIri, predicate, obj)
                 }
-            //}
+            }
+            // annotations
+            else if(predicate.uri.startsWith(SYSMLV2.ANNOTATION_JSON)) {
+                // expect exactly 1 object
+                if(values.size != 1) {
+                    throw InvalidTripleError("Expected exactly 1 object with this predicate", elementIri, predicate, obj)
+                }
+
+                // object is not a Literal
+                if (!obj.isLiteral) {
+                    throw InvalidTripleError("Expected annotation property to point to an RDF literal", elementIri, predicate, obj)
+                }
+
+                // cast to literal
+                val lit = obj.asLiteral()
+
+                // expect valid JSON
+                val jsonElement = try {
+                    Json.parseToJsonElement(lit.string)
+                } catch (parse: Error) {
+                    throw InvalidTripleError("Expected annotation property to encode a JSON element", elementIri, predicate, obj)
+                }
+
+                // infer property key from URN
+                propertyKey = predicate.uri.urnSuffix
+
+                // add parsed element to JSON object
+                put(propertyKey, jsonElement)
+
+                // do not overwrite this property
+                seenArrays.add(propertyKey)
+            }
+            // something else
+            else {
+                //throw InvalidTripleError("Unrecognized triple purpose", elementIri, predicate, obj)
+            }
         }
     }
 }
