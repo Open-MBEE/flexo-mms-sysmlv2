@@ -70,8 +70,9 @@ fun Route.ProjectApi() {
         }
 
         // parse the response model, convert it JSON, and reply to client
-        call.respond(flexoResponse.parseLdp {
-            projectFromResponse(focalOutgoing)
+        call.respond(flexoResponse.parseModel {
+            val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/${getProject.projectId}")
+            projectFromResponse(outgoing)
         })
     }
 
@@ -83,9 +84,9 @@ fun Route.ProjectApi() {
         }
 
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseLdp {
+        call.respond(flexoResponse.parseModel {
             // find all repos and transform each one into a project by its outgoing triples
-            model.listSubjectsWithProperty(RDF.type, model.createResource(MMS.Repo)).mapWith {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
                 projectFromResponse(it.outgoing())
             }.toList()
         })
@@ -95,7 +96,7 @@ fun Route.ProjectApi() {
     post<ProjectRequest>("/projects") { projectRequest ->
         // generate a UUID for the repo
         val repoUuid = UUID.randomUUID()
-
+        
         // generate a UUID for the default branch
         val branchUuid = UUID.randomUUID()
 

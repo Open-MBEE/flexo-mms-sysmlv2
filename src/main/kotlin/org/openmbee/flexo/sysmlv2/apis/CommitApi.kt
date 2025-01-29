@@ -230,7 +230,7 @@ fun Route.CommitApi() {
         }
 
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        /*call.respond(flexoResponse.parseModel {
             // each commit node
             for(commit in indexInv(MMS.Commit.uri)[RDF.type]?: emptySet()) {
                 // reference the commit's IRI
@@ -239,7 +239,15 @@ fun Route.CommitApi() {
                 // generate commit object
                 commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
             }
-        })
+        })*/
+        call.respond(Commit(
+            atId = getCommits.commitId,
+            atType = Commit.AtType.Commit,
+            created = OffsetDateTime.now(),
+            description = "",
+            owningProject = Identified(atId = getCommits.projectId),
+            previousCommit = emptyList()
+        ))
     }
 
     get<Paths.getCommitsByProject> { getCommits ->
@@ -254,7 +262,7 @@ fun Route.CommitApi() {
         }
 
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        /*call.respond(flexoResponse.parseModel {
             // each commit node
             for(commit in indexInv(MMS.Commit.uri)[RDF.type]?: emptySet()) {
                 // reference the commit's IRI
@@ -263,7 +271,15 @@ fun Route.CommitApi() {
                 // generate commit object
                 commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
             }
-        })
+        })*/
+        call.respond(listOf(Commit(
+            atId = UUID.randomUUID(),
+            atType = Commit.AtType.Commit,
+            created = OffsetDateTime.now(),
+            description = "",
+            owningProject = Identified(atId = getCommits.projectId),
+            previousCommit = emptyList()
+        )))
     }
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
@@ -422,7 +438,7 @@ fun Route.CommitApi() {
                 
                 values ?element_n {
                     ${values.joinToString("\n").reindent(5)}
-                }
+                }               
         """
 
         // only delete incoming if there are elements being deleted
@@ -457,25 +473,48 @@ fun Route.CommitApi() {
         // trim indent for better inspectability
         sparqlUpdateString = sparqlUpdateString.trimIndent()
 
+        // to get around flexo update issue
+        val turtleLoad = """
+            ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
+                iri.startsWith(SYSMLV2.BASE)
+            }.toList().joinToString("\n") { (id, iri) ->
+                "@prefix $id: <$iri> ."
+            }.reindent(3)}
+            
+            ${inserts.joinToString("\n\n").reindent(4)}
+        """
         // submit POST request to commit model
-        val flexoResponseUpdate = flexoRequestPost {
+        /*val flexoResponseUpdate = flexoRequestPost {
             orgPath("/repos/$projectId/branches/master/update")
 
             // construct body payload
             sparqlUpdate {
                 sparqlUpdateString
             }
+        }*/
+        val flexoResponseLoad = flexoRequestPut {
+            orgPath("/repos/$projectId/branches/master/graph")
+            turtle {
+                turtleLoad
+            }
         }
-
         // forward failures to client
-        if(flexoResponseUpdate.isFailure()) {
-            return@post forward(flexoResponseUpdate)
+        if(flexoResponseLoad.isFailure()) {
+            return@post forward(flexoResponseLoad)
         }
 
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponseUpdate.parseLdp {
-            commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
-        })
+        // TODO load model doesn't return location header or commit info
+        //call.respond(flexoResponseLoad.parseLdp {
+        //    commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
+        //})
+        call.respond(Commit(
+            atId = UUID.randomUUID(),
+            atType = Commit.AtType.Commit,
+            created = OffsetDateTime.now(),
+            description = "",
+            owningProject = Identified(atId = UUID.fromString(projectId)),
+            previousCommit = emptyList()
+        ))
     }
-
 }
