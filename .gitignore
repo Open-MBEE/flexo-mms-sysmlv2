@@ -2,7 +2,7 @@
 build/
 scrap/
 
-*.env
+
 *.ignore
 .git-*
 

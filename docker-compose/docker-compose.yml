@@ -80,6 +80,20 @@ services:
     ports:
       - 8080:8080
 
+  sysmlv2-service:
+    image: openmbee/flexo-sysmlv2:demo
+    hostname: flexo-sysmlv2
+    container_name: flexo-sysmlv2
+    environment:
+      - FLEXO_HOST=layer1-service
+      - FLEXO_PROTOCOL=http
+      - FLEXO_PORT=8080
+      - FLEXO_SYSMLV2_ORG=sysmlv2
+    depends_on:
+      - layer1-service
+    ports:
+      - 8083:8080
+      
 networks:
   default:
     name: flexo-mms-test-network
