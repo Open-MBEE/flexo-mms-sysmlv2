@@ -425,8 +425,12 @@ fun Route.CommitApi() {
             delete {
                 ?element_n ?element_p ?element_o .
 
-                ?incoming ?incoming_p ?element_del ;
-                    ?incoming_order_p ?incoming_order_o .
+                ${if(deleteIncoming.isNotEmpty()) {
+                    """
+                        ?incoming ?incoming_relation_p ?element_del ;
+                            ?incoming_order_p ?incoming_order_o .
+                    """.reindent(4)
+                } else ""}
             }
             insert {
                 ${inserts.joinToString("\n\n").reindent(4)}

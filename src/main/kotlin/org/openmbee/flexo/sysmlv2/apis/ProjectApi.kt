@@ -11,6 +11,8 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
+import io.ktor.client.request.*
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
@@ -94,9 +96,17 @@ fun Route.ProjectApi() {
 
     // create new project via POST
     post<ProjectRequest>("/projects") { projectRequest ->
+        //just always make sure org is there
+        flexoRequestPut {
+            orgPath("")
+            turtle {"""
+               <> dct:title "sysmlv2"@en .
+            """
+            }
+        }
         // generate a UUID for the repo
         val repoUuid = UUID.randomUUID()
-        
+
         // generate a UUID for the default branch
         val branchUuid = UUID.randomUUID()
 
@@ -136,6 +146,14 @@ fun Route.ProjectApi() {
 
     // create new project via PUT
     put<ProjectRequest>("/projects/{projectId}") { projectRequest ->
+        //just always make sure org is there
+        flexoRequestPut {
+            orgPath("")
+            turtle {"""
+               <> dct:title "sysmlv2"@en .
+            """
+            }
+        }
         val projectId = "${call.parameters["projectId"]}"
 
         // generate a UUID for the default branch
