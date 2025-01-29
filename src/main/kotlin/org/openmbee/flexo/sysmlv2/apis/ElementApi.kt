@@ -31,35 +31,10 @@ fun modelElementConstructQuery(elementTarget: String="?__element"): String {
                 ?element_p ?element_o .
         }
         where {
-            {
-                $elementTarget a ?element_type ;
-                    ?element_p ?element_o .
-                    
-                filter not exists {
-                    ?element_o a rdf:Collection .
-                }
-            }  
-            union {
-                $elementTarget ?ownedRelation 
-                ?element_o rdf:rest*/rdf:first ?ownedElement .
-                
-                ?ownedElement a ?ownedElementType .
-                
-                $elementTarget ?ownedRelation [
-                    flexo:order ?order ;
-                    rdf:member ?member ;
-                ] .
-            }
-            
-            optional {
-                ?owningElement ?owningRelation ?owningList .
-                
-                ?owningList rdf:rest*/rdf:first $elementTarget .
-                
-                ?owningElement ?owningRelation ($elementTarget, ?b, ?c) .
-            }
+            $elementTarget a ?element_type ;
+                ?element_p ?element_o .
         }
-    """
+    """.trimIndent()
 }
 
 class InvalidTripleError(
@@ -163,114 +138,6 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
     }
 }
 
-
-
-//val exampleContentString = """{
-//  "owner" : {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  },
-//  "textualRepresentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedAnnotation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedElement" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "aliasIds" : [ "aliasIds", "aliasIds" ],
-//  "@type" : "Element",
-//  "ownedRelationship" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "documentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "isImpliedIncluded" : true,
-//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//}"""
-//
-//val exampleContentString = """[ {
-//  "owner" : {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  },
-//  "textualRepresentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedAnnotation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedElement" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "aliasIds" : [ "aliasIds", "aliasIds" ],
-//  "@type" : "Element",
-//  "ownedRelationship" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "documentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "isImpliedIncluded" : true,
-//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//}, {
-//  "owner" : {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  },
-//  "textualRepresentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedAnnotation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "ownedElement" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "aliasIds" : [ "aliasIds", "aliasIds" ],
-//  "@type" : "Element",
-//  "ownedRelationship" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "documentation" : [ {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  }, {
-//    "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//  } ],
-//  "isImpliedIncluded" : true,
-//  "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-//  "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//} ]"""
-
 fun Route.ElementApi() {
     // get an element
     get<Paths.getElementByProjectCommitId> { getElement ->
@@ -302,7 +169,6 @@ fun Route.ElementApi() {
         // submit POST request to query model
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getElements.projectId}/branches/master/graph")
-
         }
 
         // forward failures to client
