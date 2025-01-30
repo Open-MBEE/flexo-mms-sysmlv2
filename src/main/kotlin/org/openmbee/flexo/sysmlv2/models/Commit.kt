@@ -39,7 +39,8 @@ data class Commit(
     val created: java.time.OffsetDateTime,
     val description: kotlin.String,
     val owningProject: Identified,
-    val previousCommit: kotlin.collections.List<Identified>
+    //val previousCommit: kotlin.collections.List<Identified>
+    val previousCommit: Identified?
 )
 {
     /**

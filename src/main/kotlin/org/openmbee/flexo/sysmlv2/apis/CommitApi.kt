@@ -47,9 +47,10 @@ fun FlexoModelHandler.commitFromModel(
         created = OffsetDateTime.parse(properties[MMS.submitted]!!.literal()!!),
         description = properties[DCTerms.description]?.literal()?: "",
         owningProject = Identified(atId = projectUuid),
-        previousCommit = properties[MMS.parent]?.map {
-            Identified(atId = UUID.fromString(it.asResource().uri.uriSuffix))
-        }?: emptyList()
+        //previousCommit = properties[MMS.parent]?.map {
+        //    Identified(atId = UUID.fromString(it.asResource().uri.uriSuffix))
+        //}?: emptyList()
+        previousCommit = null
     )
 }
 
@@ -246,7 +247,7 @@ fun Route.CommitApi() {
             created = OffsetDateTime.now(),
             description = "",
             owningProject = Identified(atId = getCommits.projectId),
-            previousCommit = emptyList()
+            previousCommit = null
         ))
     }
 
@@ -278,7 +279,7 @@ fun Route.CommitApi() {
             created = OffsetDateTime.now(),
             description = "",
             owningProject = Identified(atId = getCommits.projectId),
-            previousCommit = emptyList()
+            previousCommit = null
         )))
     }
 
@@ -518,7 +519,7 @@ fun Route.CommitApi() {
             created = OffsetDateTime.now(),
             description = "",
             owningProject = Identified(atId = UUID.fromString(projectId)),
-            previousCommit = emptyList()
+            previousCommit = null
         ))
     }
 }
