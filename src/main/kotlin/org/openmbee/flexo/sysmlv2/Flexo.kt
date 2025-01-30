@@ -248,9 +248,9 @@ suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod,
 
     // create request builder
     val builder = FlexoRequestBuilder(method)
-
+    val auth = call.request.headers["Authorization"]?: GlobalFlexoConfig.auth
     // forward auth header from client
-    builder.addHeaders(HttpHeaders.Authorization to (call.request.headers["Authorization"]?: ""))
+    builder.addHeaders(HttpHeaders.Authorization to auth)
 
     // apply caller setup
     setup(builder)

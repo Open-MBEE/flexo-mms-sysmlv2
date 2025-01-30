@@ -75,7 +75,8 @@ data class FlexoConfig(
     val host: String,
     val port: Int,
     val org: String,
-    val defaultTimeout: Long
+    val defaultTimeout: Long,
+    val auth: String
 )
 
 /**
@@ -88,6 +89,6 @@ val Application.flexoConfig: FlexoConfig
         val port = property("flexo.port")?.getString()?.toInt() ?: 8080
         val org = property("flexo.org")?.getString() ?: "sysmlv2"
         val defaultTimeout = property("flexo.defaultTimeout")?.getString()?.toLong() ?: 60_000L
-
-        return FlexoConfig(protocol, host, port, org, defaultTimeout)
+        val auth = property("flexo.auth")?.getString() ?: ""
+        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth)
     }
