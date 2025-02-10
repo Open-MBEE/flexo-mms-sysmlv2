@@ -4,7 +4,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.util.pipeline.PipelineContext
 import org.openmbee.flexo.sysmlv2.DEFAULT_PREFIX_MAPPING
 import org.openmbee.flexo.sysmlv2.SYSMLV2
-import org.openmbee.flexo.sysmlv2.apiService.ApiServiceError
+
 import org.openmbee.flexo.sysmlv2.flexoRequestPut
 
 
@@ -21,7 +21,9 @@ open public class RdfServiceFlexo(modelGraph:GraphConfig, projectGraph:GraphConf
     override suspend fun endTransaction(transactionID:String?){
         for (gc in this.rdfGraphs.values) {
             val updater = gc.updater
-            val update = gc.updater.getCombinedUpdate() // << MAY REQUIRE SOME CHANGE
+            //val update = gc.updater.getCombinedUpdate() // << Single update
+            val updates = gc.updater.getUpdateList() // << Multiple updates due to Flexo issue
+            for (update in updates) {
             if (!update.isEmpty()) {
                 if (this.exportStream !=null) {// ToDo log service
                     this.exportStream.println("##SparQL Update ${LocalDateTime.now()}")
@@ -50,6 +52,7 @@ open public class RdfServiceFlexo(modelGraph:GraphConfig, projectGraph:GraphConf
 
                 }
             }
+                }
         }
     }
 
