@@ -207,95 +207,66 @@ fun Route.CommitApi() {
         call.respond(Json.decodeFromString<List<DataVersion>>(exampleContentString))
     }
 
-    get<Paths.getCommitByProjectAndId> { getCommits ->
+    get<Paths.getCommitByProjectAndId> { getCommit ->
         // submit GET request to retrieve project metadata
-        val flexoResponse = flexoRequestPost {
-            orgPath("/repos/${getCommits.projectId}/query")
-
-            sparqlQuery {
-                """
-                    prefix mms: <${MMS.uri}>
-
-                    select ?commit_p ?commit_o {
-                        ?commit a mms:Commit ;
-                            mms:id ${NodeFactory.createLiteral(getCommits.commitId.toString()).stringify()} ;
-                            ?commit_p ?commit_o .
-                    }
-                """.trimIndent()
-            }
+        val flexoResponse = flexoRequestGet {
+            orgPath("/repos/${getCommit.projectId}/commits/${getCommit.commitId}")
         }
 
         // forward failures to client
         if(flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
         }
-
         // parse the response model, convert it to JSON, and reply to client
-        /*call.respond(flexoResponse.parseModel {
-            // each commit node
-            for(commit in indexInv(MMS.Commit.uri)[RDF.type]?: emptySet()) {
-                // reference the commit's IRI
-                val commitIri = commit.asResource().uri;
+        var commit: Commit? = null
+        flexoResponse.parseModel {
+            val commits = model.listResourcesWithProperty(RDF.type, MMS.Commit)
+            if (commits.hasNext())
+                commit = commitFromModel(commits.next().uri, indexOut(commits.next().uri), getCommit.projectId)
 
-                // generate commit object
-                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
-            }
-        })*/
-        call.respond(Commit(
-            atId = getCommits.commitId,
-            atType = Commit.AtType.Commit,
-            created = OffsetDateTime.now(),
-            description = "",
-            owningProject = Identified(atId = getCommits.projectId),
-            previousCommit = null
-        ))
+        }
+        call.respond(commit?: "")
     }
 
     get<Paths.getCommitsByProject> { getCommits ->
         // submit GET request to retrieve project metadata
         val flexoResponse = flexoRequestGet {
-            orgPath("/repos/${getCommits.projectId}")
+            orgPath("/repos/${getCommits.projectId}/commits")
         }
 
         // forward failures to client
         if(flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
         }
-
+        val commits = mutableListOf<Commit>()
         // parse the response model, convert it to JSON, and reply to client
-        /*call.respond(flexoResponse.parseModel {
-            // each commit node
-            for(commit in indexInv(MMS.Commit.uri)[RDF.type]?: emptySet()) {
-                // reference the commit's IRI
-                val commitIri = commit.asResource().uri;
-
-                // generate commit object
-                commitFromModel(commitIri, indexOut(commitIri), getCommits.projectId)
+        flexoResponse.parseModel {
+            model.listResourcesWithProperty(RDF.type, MMS.Commit).forEach { commit ->
+                commits.add(commitFromModel(commit.uri, indexOut(commit.uri), getCommits.projectId))
             }
-        })*/
-        call.respond(listOf(Commit(
-            atId = UUID.randomUUID(),
-            atType = Commit.AtType.Commit,
-            created = OffsetDateTime.now(),
-            description = "",
-            owningProject = Identified(atId = getCommits.projectId),
-            previousCommit = null
-        )))
+        }
+        call.respond(commits)
     }
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
-        val projectId = "${call.parameters["projectId"]}"
-
+        val projectId = call.parameters["projectId"]
+        var branchId = call.parameters["defaultingBranchId"]
         val inserts = mutableListOf<String>()
         val deleteIncoming = mutableListOf<String>()
         val values = mutableListOf<String>()
 
+        if (branchId == null) {
+            val projectResponse = flexoRequestGet {
+                orgPath("/repos/$projectId")
+            }
+            projectResponse.parseModel {
+                val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/$projectId")
+                branchId = outgoing[SYSMLV2.defaultBranchId()]?.literal()?: "master"
+            }
+        }
         // each change (DataVersionRequest)
         for((index, change) in commit.change.withIndex()) {
             val (payload, atType, identity) = change
-
-//            // assert @type
-//            assert(atType == DataVersionRequest.AtType.DataVersion) { ".change[$index][\"@type\"] value of \"$atType\" is not supported" }
 
             // handle combinations of potential identity id and payload id in DataVersionRequest
             // 1. identityId is present and payloadId is present: if they match, good, if not, bad
@@ -305,7 +276,7 @@ fun Route.CommitApi() {
             //     - generate a new uuid
             // 4. identityId is not present and payloadId is present
             //     - use payloadId
-            val identityId = identity?.atId?.toString()
+            val identityId = identity?.atId
             var payloadId = payload?.getOrDefault("@id", null)?.jsonPrimitive?.content
             if (identityId != null && payloadId != null && identityId != payloadId) {
                 //bad, log error?
@@ -327,7 +298,6 @@ fun Route.CommitApi() {
                 if(payload == null) {
                     // delete incoming
                     deleteIncoming.add(elementNode.stringify())
-
                     // done
                     return@apply
                 }
@@ -341,9 +311,7 @@ fun Route.CommitApi() {
                     when(key) {
                         // reserved @id
                         "@id" -> {
-//                            elementNode = SYSMLV2.element(value.jsonPrimitive.content).asNode()
                         }
-
                         // reserved @type
                         "@type" -> add(RDF.type to setOf(SYSMLV2.type(value.jsonPrimitive.content).asNode()))
 
@@ -365,7 +333,7 @@ fun Route.CommitApi() {
                                         // and first element is an object
                                         if(value[0] is JsonObject) {
                                             // create additional triples to link the elements
-                                            add(SYSMLV2.relation(key) to value.jsonArray.map {
+                                            add(SYSMLV2.prop(key) to value.jsonArray.map {
                                                 SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
                                             }.toSet())
                                         }
@@ -391,13 +359,9 @@ fun Route.CommitApi() {
                                         if(valueObj.keys.size > 1) {
                                             throw Error("Unexpected extra keys at .${key}")
                                         }
-
-                                        //
-                                        add(SYSMLV2.relation(key) to setOf(SYSMLV2.element(valueObj["@id"]!!.jsonPrimitive.content).asNode()))
+                                        add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(valueObj["@id"]!!.jsonPrimitive.content).asNode()))
                                     }
                                     else {
-//                                        value.jsonObject.forEach { subkey, subvalue ->
-//                                        }
                                         throw InvalidSysmlSerializationError("Unexpected JSON object at .change[$index].$key == ${Json.encodeToString(value)}")
                                     }
                                 }
@@ -418,108 +382,41 @@ fun Route.CommitApi() {
         // build SPARQL UPDATE string
         var sparqlUpdateString = """
             ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
-                iri.startsWith(SYSMLV2.BASE)
+                iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE)
             }.toList().joinToString("\n") { (id, iri) ->
                 "prefix $id: <$iri>"
             }.reindent(3)}
 
             delete {
                 ?element_n ?element_p ?element_o .
-
-                ${if(deleteIncoming.isNotEmpty()) {
-                    """
-                        ?incoming ?incoming_relation_p ?element_del ;
-                            ?incoming_order_p ?incoming_order_o .
-                    """.reindent(4)
-                } else ""}
-            }
-            insert {
-                ${inserts.joinToString("\n\n").reindent(4)}
-            }
-            where {
+            } where {
+                values ?element_n {
+                    ${values.joinToString("\n").reindent(5)}
+                } 
                 optional {
                     ?element_n ?element_p ?element_o .
                 }
-                
-                values ?element_n {
-                    ${values.joinToString("\n").reindent(5)}
-                }               
-        """
-
-        // only delete incoming if there are elements being deleted
-        if(deleteIncoming.isNotEmpty()) {
-            sparqlUpdateString += """
-                optional {
-                    ?incoming ?incoming_relation_p ?element_del ;
-                        ?incoming_order_p ?incoming_order_o .
-                    
-                    filter(
-                        str(?incoming_order_p) = concat(
-                            "${SYSMLV2.ANNOTATION_JSON}",
-                            strAfter(
-                                str(?incoming_relation_p),
-                                "${SYSMLV2.RELATION}"
-                            )
-                        )
-                    )
-                }
-
-                values ?element_del {
-                    ${deleteIncoming.joinToString("\n").reindent(5)}
-                }
-            """
-        }
-
-        // close the update string
-        sparqlUpdateString += """
-            }
+            };
+            insert data {
+                ${inserts.joinToString("\n\n").reindent(4)}
+            }           
         """
 
         // trim indent for better inspectability
         sparqlUpdateString = sparqlUpdateString.trimIndent()
 
-        // to get around flexo update issue
-        val turtleLoad = """
-            ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
-                iri.startsWith(SYSMLV2.BASE)
-            }.toList().joinToString("\n") { (id, iri) ->
-                "@prefix $id: <$iri> ."
-            }.reindent(3)}
-            
-            ${inserts.joinToString("\n\n").reindent(4)}
-        """
         // submit POST request to commit model
-        /*val flexoResponseUpdate = flexoRequestPost {
-            orgPath("/repos/$projectId/branches/master/update")
+        val flexoResponseUpdate = flexoRequestPost {
+            orgPath("/repos/$projectId/branches/$branchId/update")
 
             // construct body payload
             sparqlUpdate {
                 sparqlUpdateString
             }
-        }*/
-        val flexoResponseLoad = flexoRequestPut {
-            orgPath("/repos/$projectId/branches/master/graph")
-            turtle {
-                turtleLoad
-            }
         }
-        // forward failures to client
-        if(flexoResponseLoad.isFailure()) {
-            return@post forward(flexoResponseLoad)
-        }
-
         // parse the response model, convert it to JSON, and reply to client
-        // TODO load model doesn't return location header or commit info
-        //call.respond(flexoResponseLoad.parseLdp {
-        //    commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
-        //})
-        call.respond(Commit(
-            atId = UUID.randomUUID(),
-            atType = Commit.AtType.Commit,
-            created = OffsetDateTime.now(),
-            description = "",
-            owningProject = Identified(atId = UUID.fromString(projectId)),
-            previousCommit = null
-        ))
+        call.respond(flexoResponseUpdate.parseLdp {
+            commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
+        })
     }
 }

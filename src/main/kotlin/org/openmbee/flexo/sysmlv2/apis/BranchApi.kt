@@ -11,24 +11,43 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
 import io.ktor.server.resources.get
-import io.ktor.server.resources.post
-import io.ktor.server.resources.put
 import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
+import org.apache.jena.rdf.model.Property
+import org.apache.jena.rdf.model.RDFNode
+import org.apache.jena.vocabulary.DCTerms
+import org.apache.jena.vocabulary.RDF
+import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Branch
 import org.openmbee.flexo.sysmlv2.models.BranchRequest
+import org.openmbee.flexo.sysmlv2.models.Identified
+import java.time.OffsetDateTime
+import java.util.*
 
+fun FlexoModelHandler.branchFromResponse(
+    outgoing: Map<Property, Set<RDFNode>>,
+    projectUuid: UUID,
+    branchUuid: UUID
+): Branch {
+    val commit = Identified(UUID.fromString(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix))
+    return Branch(
+        atId = branchUuid,
+        atType = Branch.AtType.Branch,
+        created = OffsetDateTime.parse(
+            outgoing[MMS.created]?.literal()
+                ?: OffsetDateTime.now().toString()
+        ),
+        owningProject = Identified(projectUuid),
+        referencedCommit = commit,
+        name = outgoing [DCTerms.title]?.literal() ?: "",
+        head = commit
+    )
+}
 fun Route.BranchApi() {
 
     delete<Paths.deleteBranchByProjectAndId> {
@@ -50,57 +69,37 @@ fun Route.BranchApi() {
         call.respond(Json.decodeFromString<Branch>(exampleContentString))
     }
 
-    get<Paths.getBranchesByProject> {
-        val exampleContentString = """[ {
-          "head" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "Branch",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "name" : "name",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "referencedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }, {
-          "head" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "Branch",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "name" : "name",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "referencedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        } ]"""
-
-        call.respond(Json.decodeFromString<List<Branch>>(exampleContentString))
+    get<Paths.getBranchesByProject> { path ->
+        // submit GET request for all branches
+        val flexoResponse = flexoRequestGet {
+            orgPath("/repos/${path.projectId}/branches")
+        }
+        // parse the response model, convert it to JSON, and reply to client
+        call.respond(flexoResponse.parseModel {
+            val branches = mutableListOf<Branch>()
+            // find all repos and transform each one into a project by its outgoing triples
+            model.listSubjectsWithProperty(RDF.type, MMS.Branch).forEach {
+                if (it.uri.uriSuffix == "master") {
+                    return@forEach
+                }
+                branches.add(branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix)))
+            }
+            branches
+        })
     }
 
-    get<Paths.getBranchesByProjectAndId> {
-        val exampleContentString = """{
-          "head" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "Branch",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "name" : "name",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "referencedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<Branch>(exampleContentString))
+    get<Paths.getBranchesByProjectAndId> { path ->
+        // submit GET request for all branches
+        val flexoResponse = flexoRequestGet {
+            orgPath("/repos/${path.projectId}/branches/${path.branchId}")
+        }
+        // parse the response model, convert it to JSON, and reply to client
+        call.respond(flexoResponse.parseModel {
+            // find all repos and transform each one into a project by its outgoing triples
+            model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
+                branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+            }.toList().get(0)
+        })
     }
 
     post<BranchRequest>("/projects/{projectId}/branches") {

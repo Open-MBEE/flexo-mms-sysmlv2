@@ -301,7 +301,7 @@ open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
     }
 
     var String.uriSuffix: String
-        get() = substringAfterLast('/')
+        get() = if(startsWith(SYSMLV2.VOCABULARY)) substringAfterLast('#') else substringAfterLast('/')
         set(v) {}
 
     var String.urnSuffix: String
