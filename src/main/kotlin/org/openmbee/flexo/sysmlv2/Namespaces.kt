@@ -12,6 +12,7 @@ object SYSMLV2 {
     val VOCABULARY = "https://www.omg.org/spec/SysML#"
     val ELEMENT = "${BASE}element:"
     val ANNOTATION_JSON = "${BASE}annotation:json:"
+    val DEFAULT_BRANCH_ID = ResourceFactory.createProperty("${BASE}defaultBranchId")
 
     fun element(uuid: String): Resource {
         return ResourceFactory.createResource("$ELEMENT$uuid")
@@ -28,10 +29,6 @@ object SYSMLV2 {
     fun annotationJson(key: String): Property {
         return ResourceFactory.createProperty("$ANNOTATION_JSON$key")
     }
-
-    fun defaultBranchId(): Property {
-        return ResourceFactory.createProperty("${BASE}defaultBranchId")
-    }
 }
 
 val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
@@ -41,7 +38,7 @@ val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
         "owl" to "http://www.w3.org/2002/07/owl#",
         "xsd" to "http://www.w3.org/2001/XMLSchema#",
         "dct" to "http://purl.org/dc/terms/",
-        "sysmlv2" to SYSMLV2.VOCABULARY,
+        "sysml" to SYSMLV2.VOCABULARY,
         "elmt" to SYSMLV2.ELEMENT,
         "json" to SYSMLV2.ANNOTATION_JSON,
     )
@@ -154,6 +151,8 @@ object MMS {
     val delete = prop("delete")
     val insert = prop("insert")
     val where = prop("where")
+
+    val nil = ResourceFactory.createResource("${DEFAULT_PREFIX_MAPPING.getNsPrefixURI("rdf")}nil")
 
     val contentType = prop("contentType")
 

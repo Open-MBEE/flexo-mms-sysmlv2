@@ -38,7 +38,7 @@ class InvalidSysmlSerializationError(message: String): Error(message)
 fun FlexoModelHandler.commitFromModel(
     commitIri: String,
     properties: Map<Property, Set<RDFNode>?>,
-    projectUuid: UUID=UUID.fromString(properties[MMS.id].resource()?.uri?.uriSuffix?: ""),
+    projectUuid: UUID
 ): Commit {
     // generate commit object
     return Commit(
@@ -242,15 +242,19 @@ fun Route.CommitApi() {
         // parse the response model, convert it to JSON, and reply to client
         flexoResponse.parseModel {
             model.listResourcesWithProperty(RDF.type, MMS.Commit).forEach { commit ->
-                commits.add(commitFromModel(commit.uri, indexOut(commit.uri), getCommits.projectId))
+                val outs = indexOut(commit.uri)
+                //skip root commit since it's automatically added by flexo
+                if (outs[MMS.parent].resource()!! == MMS.nil) return@forEach
+                commits.add(commitFromModel(commit.uri, outs, getCommits.projectId))
             }
         }
+        commits.sortByDescending {it.created}
         call.respond(commits)
     }
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
         val projectId = call.parameters["projectId"]
-        var branchId = call.parameters["defaultingBranchId"]
+        var branchId = call.parameters["branchId"]
         val inserts = mutableListOf<String>()
         val deleteIncoming = mutableListOf<String>()
         val values = mutableListOf<String>()
@@ -261,7 +265,7 @@ fun Route.CommitApi() {
             }
             projectResponse.parseModel {
                 val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/$projectId")
-                branchId = outgoing[SYSMLV2.defaultBranchId()]?.literal()?: "master"
+                branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal()?: "master"
             }
         }
         // each change (DataVersionRequest)
@@ -413,6 +417,9 @@ fun Route.CommitApi() {
             sparqlUpdate {
                 sparqlUpdateString
             }
+        }
+        if(flexoResponseUpdate.isFailure()) {
+            return@post forward(flexoResponseUpdate)
         }
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponseUpdate.parseLdp {

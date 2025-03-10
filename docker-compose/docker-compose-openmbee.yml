@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+
+  layer1-service:
+    image: openmbee/flexo-mms-layer1-service:develop-SNAPSHOT
+    hostname: layer1-service
+    container_name: layer1-service
+    env_file:
+      - ./env/flexo-mms-jwt.env
+      - ./env/flexo-mms-layer1-openmbee.env
+    ports:
+      - 8080:8080
+
+  sysmlv2-service:
+    image: openmbee/flexo-sysmlv2:demo
+    hostname: flexo-sysmlv2
+    container_name: flexo-sysmlv2
+    env_file:
+      - ./env/flexo-sysmlv2.env
+    depends_on:
+      - layer1-service
+    ports:
+      - 8083:8080
+
+networks:
+  default:
+    name: flexo-mms-test-network
+    driver: bridge

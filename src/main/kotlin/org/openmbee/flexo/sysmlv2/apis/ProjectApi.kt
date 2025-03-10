@@ -31,7 +31,7 @@ import java.util.*
 fun projectFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
     projectUuid: UUID = UUID.fromString(outgoing[MMS.id]?.literal()),
-    branchUuid: UUID = UUID.fromString(outgoing[SYSMLV2.defaultBranchId()]?.literal())
+    branchUuid: UUID = UUID.fromString(outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal())
 ): Project {
     return Project(
         atId = projectUuid,
@@ -45,11 +45,11 @@ fun projectFromResponse(
     )
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.createProject(
-    projectUuid: UUID, projectRequest: ProjectRequest): FlexoResponse {
+suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateProject(
+    projectUuid: UUID, projectRequest: ProjectRequest, post: Boolean): FlexoResponse {
     // generate a UUID for the default branch if not provided
     val branchUuid = projectRequest.defaultBranch?.atId ?: UUID.randomUUID()
-    // submit POST request to create new repo
+    // submit POST request to create new repo or update repo
     val flexoResponse = flexoRequestPost {
         orgPath("/repos")
 
@@ -63,7 +63,7 @@ suspend fun PipelineContext<*, ApplicationCall>.createProject(
             thisSubject(
                 DCTerms.title to projectRequest.name.en,
                 DCTerms.description to projectRequest.description?.en,
-                SYSMLV2.defaultBranchId() to branchUuid.toString().en
+                SYSMLV2.DEFAULT_BRANCH_ID to branchUuid.toString().en
             )
         }
     }
@@ -72,19 +72,21 @@ suspend fun PipelineContext<*, ApplicationCall>.createProject(
     if(flexoResponse.isFailure()) {
         return flexoResponse
     }
-    //create default branch
-    val defaultBranchResponse = flexoRequestPut {
-        orgPath("/repos/${projectUuid}/branches/${branchUuid}")
-        turtle {
-            thisSubject(
-                MMS.ref to ResourceFactory.createResource("./master"),
-                DCTerms.title to branchUuid.toString().en
-            )
+    if (post) { //creating new project
+        //create default branch
+        val defaultBranchResponse = flexoRequestPut {
+            orgPath("/repos/${projectUuid}/branches/${branchUuid}")
+            turtle {
+                thisSubject(
+                    MMS.ref to ResourceFactory.createResource("./master"),
+                    DCTerms.title to "Initial".en
+                )
+            }
         }
-    }
-    // forward failures to client
-    if(defaultBranchResponse.isFailure()) {
-        return defaultBranchResponse
+        // forward failures to client
+        if(defaultBranchResponse.isFailure()) {
+            return defaultBranchResponse
+        }
     }
     return flexoResponse
 }
@@ -103,18 +105,23 @@ fun Route.ProjectApi() {
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getProject.projectId}")
         }
-
-        // parse the response model, convert it JSON, and reply to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
         call.respond(flexoResponse.parseModel {
-            val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/${getProject.projectId}")
-            projectFromResponse(outgoing)
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 
     // get all projects
-    get<Paths.getProjects> { getProjects ->
+    get<Paths.getProjects> {
         val flexoResponse = flexoRequestGet {
             orgPath("/repos")
+        }
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
@@ -129,7 +136,7 @@ fun Route.ProjectApi() {
     post<ProjectRequest>("/projects") { projectRequest ->
         // generate a UUID for the project
         val projectId = UUID.randomUUID()
-        val flexoResponse = createProject(projectId, projectRequest)
+        val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
@@ -138,10 +145,10 @@ fun Route.ProjectApi() {
         })
     }
 
-    // create new project via PUT
+    // update project via PUT
     put<ProjectRequest>("/projects/{projectId}") { projectRequest ->
         val projectId = "${call.parameters["projectId"]}"
-        val flexoResponse = createProject(UUID.fromString(projectId), projectRequest)
+        val flexoResponse = createOrUpdateProject(UUID.fromString(projectId), projectRequest, false)
         if (flexoResponse.isFailure()) {
             return@put forward(flexoResponse)
         }

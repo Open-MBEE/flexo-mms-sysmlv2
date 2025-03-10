@@ -189,7 +189,7 @@ class FlexoRequestBuilder(
             setBody(this@FlexoRequestBuilder.body)
 
             timeout {
-                requestTimeoutMillis = this@FlexoRequestBuilder.timeout
+                requestTimeoutMillis = this@FlexoRequestBuilder.timeout * 1000
             }
         }
     }

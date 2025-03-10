@@ -15,14 +15,12 @@ import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.*
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.vocabulary.RDF
 import org.apache.jena.vocabulary.XSD
 import org.openmbee.flexo.sysmlv2.*
-import org.openmbee.flexo.sysmlv2.models.ProjectUsage
 
 fun modelElementConstructQuery(elementTarget: String="?__element"): String {
     return """
@@ -180,25 +178,43 @@ fun Route.ElementApi() {
     }
 
     get<Paths.getProjectUsageByProjectCommitElement> {
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${it.projectId}/locks/Commit.${it.commitId}/query")
+            sparqlQuery {
+                """
+                prefix sysml: <https://www.omg.org/spec/SysML#>
+                construct {
+                  ?element a sysml:ProjectUsage ;
+                         ?element_p ?element_o .
+                }
+                where {
+                  ?element a sysml:ProjectUsage ;
+                        ?element_p ?element_o .
+                }
+                """.trimIndent()
+            }
+        }
 
-        val exampleContentString = """{
-          "@type" : "ProjectUsage",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "usedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "usedProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<ProjectUsage>(exampleContentString))
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+        // parse the response model, extract the elements to JSON, and reply to client
+        val result = buildJsonArray {
+            flexoResponse.parseModel {
+                for(subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        }
+        call.respond(result)
     }
 
     get<Paths.getRootsByProjectCommit> {
         // submit POST request to query model
         val flexoResponse = flexoRequestPost {
             orgPath("/repos/${it.projectId}/locks/Commit.${it.commitId}/query")
-            // TODO check this query
             sparqlQuery {
                 """
                 prefix sysml: <https://www.omg.org/spec/SysML#>
@@ -217,7 +233,7 @@ fun Route.ElementApi() {
                      {
                         ?element sysml:source ?source ;
                                  sysml:target ?target ;
-                                 sysml:ownedRelatedElement ?related .
+                                 sysml:owningRelatedElement ?related .
                      }          
                   }
                 }

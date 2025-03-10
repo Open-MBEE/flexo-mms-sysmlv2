@@ -20,6 +20,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
+import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import org.openmbee.flexo.sysmlv2.*
@@ -74,10 +75,13 @@ fun Route.BranchApi() {
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/branches")
         }
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
             val branches = mutableListOf<Branch>()
-            // find all repos and transform each one into a project by its outgoing triples
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).forEach {
                 if (it.uri.uriSuffix == "master") {
                     return@forEach
@@ -89,21 +93,43 @@ fun Route.BranchApi() {
     }
 
     get<Paths.getBranchesByProjectAndId> { path ->
-        // submit GET request for all branches
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/branches/${path.branchId}")
         }
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
-            // find all repos and transform each one into a project by its outgoing triples
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
-            }.toList().get(0)
+            }.toList()[0]
         })
     }
 
-    post<BranchRequest>("/projects/{projectId}/branches") {
-        call.respond(it)
+    post<BranchRequest>("/projects/{projectId}/branches") { request ->
+        val projectId = call.parameters["projectId"]
+        val branchId = UUID.randomUUID()
+        val createBranchResponse = flexoRequestPost {
+            orgPath("/repos/${projectId}/branches")
+            // set branch ID slug
+            addHeaders(
+                "Slug" to branchId.toString()
+            )
+            turtle {
+                thisSubject(
+                    MMS.ref to ResourceFactory.createResource("../locks/Commit.${request.head.atId}"),
+                    DCTerms.title to request.name.en
+                )
+            }
+        }
+        // forward failures to client
+        if(createBranchResponse.isFailure()) {
+            return@post forward(createBranchResponse)
+        }
+        call.respond(createBranchResponse.parseLdp {
+            branchFromResponse(focalOutgoing, UUID.fromString(projectId), branchId)
+        })
     }
-
 }
