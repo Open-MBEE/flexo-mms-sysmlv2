@@ -231,9 +231,7 @@ fun Route.ElementApi() {
                      }
                      union
                      {
-                        ?element sysml:source ?source ;
-                                 sysml:target ?target ;
-                                 sysml:owningRelatedElement ?related .
+                        ?element sysml:owningRelatedElement ?related .
                      }          
                   }
                 }
