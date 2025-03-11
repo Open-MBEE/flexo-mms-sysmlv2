@@ -218,14 +218,11 @@ fun Route.CommitApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        var commit: Commit? = null
-        flexoResponse.parseModel {
-            val commits = model.listResourcesWithProperty(RDF.type, MMS.Commit)
-            if (commits.hasNext())
-                commit = commitFromModel(commits.next().uri, indexOut(commits.next().uri), getCommit.projectId)
-
-        }
-        call.respond(commit?: "")
+        call.respond(flexoResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
+                commitFromModel(it.uri, it.outgoing(), getCommit.projectId)
+            }.toList()[0]
+        })
     }
 
     get<Paths.getCommitsByProject> { getCommits ->

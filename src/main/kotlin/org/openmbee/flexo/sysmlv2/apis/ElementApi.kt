@@ -139,7 +139,7 @@ fun Route.ElementApi() {
         val flexoResponse = flexoRequestPost {
             orgPath("/repos/${getElement.projectId}/locks/Commit.${getElement.commitId}/query")
             sparqlQuery {
-                modelElementConstructQuery(elementIri)
+                modelElementConstructQuery("<$elementIri>")
             }
         }
 
