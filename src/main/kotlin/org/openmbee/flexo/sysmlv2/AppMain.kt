@@ -5,6 +5,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.autohead.*
+import io.ktor.server.plugins.callloging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
@@ -22,6 +23,7 @@ fun Application.module() {
     GlobalFlexoConfig = flexoConfig
 
     install(DefaultHeaders)
+    install(CallLogging)
     /*install(DropwizardMetrics) {
         val reporter = Slf4jReporter.forRegistry(registry)
             .outputTo(this@main.log)

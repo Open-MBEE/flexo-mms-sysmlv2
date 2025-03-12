@@ -261,7 +261,7 @@ fun Route.CommitApi() {
                 orgPath("/repos/$projectId")
             }
             projectResponse.parseModel {
-                val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/$projectId")
+                val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
                 branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal()?: "master"
             }
         }
