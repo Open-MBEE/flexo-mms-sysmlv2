@@ -20,6 +20,9 @@ flexo {
     port = ${?FLEXO_PORT}
     org = "sysmlv2"
     org = ${?FLEXO_SYSMLV2_ORG}
-    defaultTimeout = "60000"
+    # timeout in seconds
+    defaultTimeout = "1800"
     defaultTimeout = ${?FLEXO_DEFAULT_TIMEOUT}
+    auth = ""
+    auth = ${?FLEXO_AUTH}
 }

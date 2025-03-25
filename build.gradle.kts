@@ -20,7 +20,7 @@ plugins {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    val ktorVersion = "2.2.1"
+    val ktorVersion = "2.3.13"
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
@@ -30,7 +30,7 @@ dependencies {
     implementation("io.ktor:ktor-server-auth:$ktorVersion")
 //    implementation("io.ktor:ktor-server-auth-jwt:$ktorVersion")
     implementation("io.ktor:ktor-server-auto-head-response:$ktorVersion")
-//    implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
+    implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
     implementation("io.ktor:ktor-server-compression:$ktorVersion")
 //    implementation("io.ktor:ktor-server-conditional-headers:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
@@ -47,7 +47,7 @@ dependencies {
     testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
 
-    implementation("ch.qos.logback:logback-classic:1.2.9")
+    implementation("ch.qos.logback:logback-classic:1.4.11")
     implementation("io.dropwizard.metrics:metrics-core:4.1.18")
 
     val junitVersion = "5.10.1"

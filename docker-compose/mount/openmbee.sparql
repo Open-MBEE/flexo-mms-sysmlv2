@@ -2,13 +2,13 @@ prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 prefix mms: <https://mms.openmbee.org/rdf/ontology/>
 prefix mms-object: <https://mms.openmbee.org/rdf/objects/>
-prefix m: <http://layer1-service/>
-prefix ma: <http://layer1-service/access-control-scope/>
-prefix m-graph: <http://layer1-service/graphs/>
-prefix m-user: <http://layer1-service/users/>
-prefix m-group: <http://layer1-service/groups/>
-prefix m-policy: <http://layer1-service/policies/>
-
+prefix m: <https://flexo.openmbee.org/>
+prefix ma: <https://flexo.openmbee.org/access-control-scope/>
+prefix m-graph: <https://flexo.openmbee.org/graphs/>
+prefix m-user: <https://flexo.openmbee.org/users/>
+prefix m-group: <https://flexo.openmbee.org/groups/>
+prefix m-policy: <https://flexo.openmbee.org/policies/>
+insert data {
 # users and groups which are the subjects of access control policies
 graph m-graph:AccessControl.Agents {
 	m-user:root a mms:User ;
@@ -21,13 +21,13 @@ graph m-graph:AccessControl.Agents {
 	m-user:anon a mms:User ;
 		mms:id "anon" .
 
-<http://layer1-service/users/ldap/user/user01> a mms:User ;
+    <https://flexo.openmbee.org/users/ldap/user/user01> a mms:User ;
     	mms:id "ldap/user/user01" .
 
-    <http://layer1-service/users/ldap/user/user02> a mms:User ;
+    <https://flexo.openmbee.org/users/ldap/user/user02> a mms:User ;
         mms:id "ldap/user/user02" .
 
-    <http://layer1-service/groups/ldap/group/group01> a mms:Group ;
+    <https://flexo.openmbee.org/groups/ldap/group/group01> a mms:Group ;
         mms:id "ldap/group/group01" .
 
 	m-group:SuperAdmins a mms:Group ;
@@ -38,16 +38,16 @@ graph m-graph:AccessControl.Agents {
 # default policies
 graph m-graph:AccessControl.Policies {
 	m-policy:DefaultSuperAdmins a mms:Policy ;
-		mms:subject m-user:root, m-group:SuperAdmins, <http://layer1-service/users/ldap/user/user01>, <http://layer1-service/groups/ldap/group/group01> ;
-		mms:scope <http://layer1-service/> ;
+		mms:subject m-user:root, m-group:SuperAdmins, <https://flexo.openmbee.org/users/ldap/user/user01>, <https://flexo.openmbee.org/groups/ldap/group/group01> ;
+		mms:scope <https://flexo.openmbee.org/> ;
 		mms:role mms-object:Role.AdminCluster, mms-object:Role.AdminOrg, mms-object:Role.AdminRepo, mms-object:Role.AdminMetadata, mms-object:Role.AdminModel, mms-object:Role.AdminAccessControlAny .
 }
 
 # cluster-specific classes
 graph m-graph:Cluster {
-	<http://layer1-service/> a mms:Cluster .
+	<https://flexo.openmbee.org/> a mms:Cluster .
 
-	<http://layer1-service/access-control-scope/> a mms:AccessControlAny .
+	<https://flexo.openmbee.org/access-control-scope/> a mms:AccessControlAny .
 }
 
 # copy of static schema inherited from global MMS definitions
@@ -400,3 +400,4 @@ graph m-graph:AccessControl.Definitions {
 		mms:permits mms-object:Permission.ReadAccessControlAny .
 }
 
+}
