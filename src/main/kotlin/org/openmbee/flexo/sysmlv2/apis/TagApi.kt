@@ -51,24 +51,26 @@ fun FlexoModelHandler.tagFromResponse(
 }
 fun Route.TagApi() {
 
-    delete<Paths.deleteTagByProjectAndId> {
-        val exampleContentString = """{
-          "@type" : "Tag",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "taggedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "name" : "name",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "referencedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-
-        call.respond(Json.decodeFromString<Tag>(exampleContentString))
+    delete<Paths.deleteTagByProjectAndId> { path ->
+        // add annotation to indicate it's deleted
+        val patchResponse = flexoRequestPatch {
+            orgPath("/repos/${path.projectId}/locks/${path.tagId}")
+            sparqlUpdate {
+                """
+                    insert data {
+                        <> <${SYSMLV2.DELETED.uri}> "true" .
+                    }
+                """.trimIndent()
+            }
+        }
+        if (patchResponse.isFailure()) {
+            return@delete forward(patchResponse)
+        }
+        call.respond(patchResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
+                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+            }.toList()[0]
+        })
     }
 
     get<Paths.getTagByProjectAndId> { path ->
@@ -97,16 +99,13 @@ fun Route.TagApi() {
         }
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
-            val tags = mutableListOf<Tag>()
             // find all locks and transform each one into a tag by its outgoing triples
-            model.listSubjectsWithProperty(RDF.type, MMS.Lock).forEach {
-                // ignore flexo created locks
-                if (it.uri.uriSuffix.startsWith("Commit.")) {
-                    return@forEach
-                }
-                tags.add(tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix)))
-            }
-            tags
+            model.listSubjectsWithProperty(RDF.type, MMS.Lock).filterDrop {
+                // ignore flexo created locks and deleted
+                (it.uri.uriSuffix.startsWith("Commit.") || it.hasProperty(SYSMLV2.DELETED))
+            }.mapWith {
+                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+            }.toList()
         })
     }
 

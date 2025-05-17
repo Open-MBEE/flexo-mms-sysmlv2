@@ -277,6 +277,10 @@ suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPost(setup: FlexoReq
     return flexoRequest(HttpMethod.Post, setup)
 }
 
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPatch(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+    return flexoRequest(HttpMethod.Patch, setup)
+}
+
 open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
     fun indexOut(iri: String?): Map<Property, Set<RDFNode>> {
         val outgoingProperties: MutableMap<Property, MutableSet<RDFNode>> = mutableMapOf()

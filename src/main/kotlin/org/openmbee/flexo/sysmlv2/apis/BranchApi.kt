@@ -51,23 +51,26 @@ fun FlexoModelHandler.branchFromResponse(
 }
 fun Route.BranchApi() {
 
-    delete<Paths.deleteBranchByProjectAndId> {
-        val exampleContentString = """{
-          "head" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "Branch",
-          "created" : "2000-01-23T04:56:07.000+00:00",
-          "name" : "name",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "referencedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<Branch>(exampleContentString))
+    delete<Paths.deleteBranchByProjectAndId> { path ->
+        // add annotation to indicate it's deleted
+        val patchResponse = flexoRequestPatch {
+            orgPath("/repos/${path.projectId}/branches/${path.branchId}")
+            sparqlUpdate {
+                """
+                    insert data {
+                        <> <${SYSMLV2.DELETED.uri}> "true" .
+                    }
+                """.trimIndent()
+            }
+        }
+        if (patchResponse.isFailure()) {
+            return@delete forward(patchResponse)
+        }
+        call.respond(patchResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
+                branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+            }.toList()[0]
+        })
     }
 
     get<Paths.getBranchesByProject> { path ->
@@ -81,14 +84,11 @@ fun Route.BranchApi() {
         }
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
-            val branches = mutableListOf<Branch>()
-            model.listSubjectsWithProperty(RDF.type, MMS.Branch).forEach {
-                if (it.uri.uriSuffix == "master") {
-                    return@forEach
-                }
-                branches.add(branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix)))
-            }
-            branches
+            model.listSubjectsWithProperty(RDF.type, MMS.Branch).filterDrop {
+                (it.hasProperty(SYSMLV2.DELETED) || it.uri.uriSuffix == "master")
+            }.mapWith {
+                branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+            }.toList()
         })
     }
 
