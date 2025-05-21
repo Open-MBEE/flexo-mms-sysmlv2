@@ -91,7 +91,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n          \"@type\" : \"Project\",\n          \"name\" : \"name\",\n          \"description\" : \"description\"\n}",
+					"raw": "{\n          \"@type\" : \"Project\",\n          \"name\" : \"test1\",\n          \"description\" : \"description\"\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -105,6 +105,100 @@
 					],
 					"path": [
 						"projects"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "post project 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"response has token\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.collectionVariables.set(\"projectId2\", jsonData[\"@id\"]);",
+							"    pm.collectionVariables.set(\"defaultBranchId2\", jsonData.defaultBranch[\"@id\"]);",
+							"",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n          \"@type\" : \"Project\",\n          \"name\" : \"test2\",\n          \"description\" : \"description\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "update project 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n          \"@type\" : \"Project\",\n          \"name\" : \"test2-modified\",\n          \"description\" : \"some other description\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId2}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId2}}"
 					]
 				}
 			},
@@ -199,6 +293,50 @@
 			"response": []
 		},
 		{
+			"name": "create branch 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"response has token\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.collectionVariables.set(\"newBranchId2\", jsonData[\"@id\"]);",
+							"",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"head\": {\n        \"@id\": \"{{commitId}}\"\n    },\n    \"name\": \"testing branch 2\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/branches",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"branches"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "create tag",
 			"event": [
 				{
@@ -243,6 +381,50 @@
 			"response": []
 		},
 		{
+			"name": "create tag 2",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"response has token\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.collectionVariables.set(\"tagId2\", jsonData[\"@id\"]);",
+							"",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"taggedCommit\": {\n        \"@id\": \"{{commitId}}\"\n    },\n    \"name\": \"testing tag 2\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/tags",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"tags"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "getprojects",
 			"request": {
 				"method": "GET",
@@ -254,6 +436,24 @@
 					],
 					"path": [
 						"projects"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "delete project 2",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/projects/{{projectId2}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId2}}"
 					]
 				}
 			},
@@ -317,6 +517,26 @@
 			"response": []
 		},
 		{
+			"name": "delete branch 2",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/branches/{{newBranchId2}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"branches",
+						"{{newBranchId2}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "get tags",
 			"request": {
 				"method": "GET",
@@ -350,6 +570,26 @@
 						"{{projectId}}",
 						"tags",
 						"{{tagId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "delete tag 2",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/tags/{{tagId2}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"tags",
+						"{{tagId2}}"
 					]
 				}
 			},
@@ -504,6 +744,87 @@
 				}
 			},
 			"response": []
+		},
+		{
+			"name": "flexo get graph",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJ1c2VyMDEiLCJncm91cHMiOlsic3VwZXJfYWRtaW5zIl0sImV4cCI6MTc2OTY3MzYwMH0.UqU5KOPSCbYyqbj3BBZs4u7lWbpHyDHPEd7Tbd4wWsM",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{flexoHost}}/orgs/sysmlv2/repos/{{projectId}}/locks/Commit.{{commitId}}/graph",
+					"host": [
+						"{{flexoHost}}"
+					],
+					"path": [
+						"orgs",
+						"sysmlv2",
+						"repos",
+						"{{projectId}}",
+						"locks",
+						"Commit.{{commitId}}",
+						"graph"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "flexo query",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJ1c2VyMDEiLCJncm91cHMiOlsic3VwZXJfYWRtaW5zIl0sImV4cCI6MTc2OTY3MzYwMH0.UqU5KOPSCbYyqbj3BBZs4u7lWbpHyDHPEd7Tbd4wWsM",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/sparql-query",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "prefix elmt: <urn:sysmlv2:element:>\nprefix sysml: <https://www.omg.org/spec/SysML#>\nprefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n\nconstruct {\n    ?e ?p ?o .\n} where {\n    ?e ?p ?o .\n}",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{flexoHost}}/orgs/sysmlv2/repos/{{projectId}}/locks/Commit.{{commitId}}/query",
+					"host": [
+						"{{flexoHost}}"
+					],
+					"path": [
+						"orgs",
+						"sysmlv2",
+						"repos",
+						"{{projectId}}",
+						"locks",
+						"Commit.{{commitId}}",
+						"query"
+					]
+				}
+			},
+			"response": []
 		}
 	],
 	"event": [
@@ -558,6 +879,22 @@
 			"key": "flexoHost",
 			"value": "http://localhost:8080",
 			"type": "string"
+		},
+		{
+			"key": "projectId2",
+			"value": ""
+		},
+		{
+			"key": "defaultBranchId2",
+			"value": ""
+		},
+		{
+			"key": "newBranchId2",
+			"value": ""
+		},
+		{
+			"key": "tagId2",
+			"value": ""
 		}
 	]
 }

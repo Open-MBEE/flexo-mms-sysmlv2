@@ -58,7 +58,7 @@ fun Route.TagApi() {
             sparqlUpdate {
                 """
                     insert data {
-                        <> <${SYSMLV2.DELETED.uri}> "true" .
+                        <> <${SYSMLV2.DELETED.uri}> true .
                     }
                 """.trimIndent()
             }

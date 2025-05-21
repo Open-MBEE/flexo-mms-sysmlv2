@@ -153,8 +153,10 @@ fun Route.ProjectApi() {
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
-        call.respond(flexoResponse.parseLdp {
-            projectFromResponse(focalOutgoing)
+        call.respond(flexoResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 
@@ -175,7 +177,7 @@ fun Route.ProjectApi() {
             projectResponse.parseModel {
                 val repo = model.listSubjectsWithProperty(RDF.type, MMS.Repo).nextResource()!!
                 existingBranch = Identified(UUID.fromString(repo.outgoing()[SYSMLV2.DEFAULT_BRANCH_ID].literal()))
-                existingDesc = repo.outgoing()[DCTerms.description].literal()
+                existingDesc = repo.outgoing()[DCTerms.description]?.literal()
             }
             request = ProjectRequest(projectRequest.name, null,
                 projectRequest.defaultBranch ?: existingBranch,
@@ -185,8 +187,10 @@ fun Route.ProjectApi() {
         if (flexoResponse.isFailure()) {
             return@put forward(flexoResponse)
         }
-        call.respond(flexoResponse.parseLdp {
-            projectFromResponse(focalOutgoing)
+        call.respond(flexoResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 }
