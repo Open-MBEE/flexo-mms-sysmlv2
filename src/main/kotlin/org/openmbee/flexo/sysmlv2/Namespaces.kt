@@ -13,6 +13,7 @@ object SYSMLV2 {
     val ELEMENT = "${BASE}element:"
     val ANNOTATION_JSON = "${BASE}annotation:json:"
     val DEFAULT_BRANCH_ID = ResourceFactory.createProperty("${BASE}defaultBranchId")
+    val DELETED = ResourceFactory.createProperty("${BASE}deleted")
 
     fun element(uuid: String): Resource {
         return ResourceFactory.createResource("$ELEMENT$uuid")

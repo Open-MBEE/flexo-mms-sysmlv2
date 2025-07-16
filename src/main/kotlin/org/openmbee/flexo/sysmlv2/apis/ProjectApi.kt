@@ -50,14 +50,8 @@ suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateProject(
     // generate a UUID for the default branch if not provided
     val branchUuid = projectRequest.defaultBranch?.atId ?: UUID.randomUUID()
     // submit POST request to create new repo or update repo
-    val flexoResponse = flexoRequestPost {
-        orgPath("/repos")
-
-        // set project ID slug
-        addHeaders(
-            "Slug" to projectUuid.toString()
-        )
-
+    val flexoResponse = flexoRequestPut {
+        orgPath("/repos/${projectUuid}")
         // construct body payload
         turtle {
             thisSubject(
@@ -92,11 +86,27 @@ suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateProject(
 }
 
 fun Route.ProjectApi() {
-    // delete a project
+    //delete a project (soft delete)
     delete<Paths.deleteProjectById> { deleteProject ->
-        call.application.log.debug("${deleteProject.projectId}")
-
-        notImplemented()
+        // add annotation to indicate it's deleted
+        val patchResponse = flexoRequestPatch {
+            orgPath("/repos/${deleteProject.projectId}")
+            sparqlUpdate {
+                """
+                    insert data {
+                        <> <${SYSMLV2.DELETED.uri}> true .
+                    }
+                """.trimIndent()
+            }
+        }
+        if (patchResponse.isFailure()) {
+            return@delete forward(patchResponse)
+        }
+        call.respond(patchResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
+        })
     }
 
     // get a project by its ID
@@ -126,7 +136,10 @@ fun Route.ProjectApi() {
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
             // find all repos and transform each one into a project by its outgoing triples
-            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+            // filter out deleted = true
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).filterDrop {
+                it.hasProperty(SYSMLV2.DELETED)
+            }.mapWith {
                 projectFromResponse(it.outgoing())
             }.toList()
         })
@@ -140,20 +153,44 @@ fun Route.ProjectApi() {
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
-        call.respond(flexoResponse.parseLdp {
-            projectFromResponse(focalOutgoing)
+        call.respond(flexoResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 
     // update project via PUT
     put<ProjectRequest>("/projects/{projectId}") { projectRequest ->
         val projectId = "${call.parameters["projectId"]}"
-        val flexoResponse = createOrUpdateProject(UUID.fromString(projectId), projectRequest, false)
+        var request = projectRequest
+        // fill in existing info if not included
+        if (projectRequest.defaultBranch == null || projectRequest.description == null) {
+            val projectResponse = flexoRequestGet {
+                orgPath("/repos/${projectId}")
+            }
+            if (projectResponse.isFailure()) {
+                return@put forward(projectResponse)
+            }
+            var existingBranch: Identified? = null
+            var existingDesc: String? = null
+            projectResponse.parseModel {
+                val repo = model.listSubjectsWithProperty(RDF.type, MMS.Repo).nextResource()!!
+                existingBranch = Identified(UUID.fromString(repo.outgoing()[SYSMLV2.DEFAULT_BRANCH_ID].literal()))
+                existingDesc = repo.outgoing()[DCTerms.description]?.literal()
+            }
+            request = ProjectRequest(projectRequest.name, null,
+                projectRequest.defaultBranch ?: existingBranch,
+                projectRequest.description ?: existingDesc)
+        }
+        val flexoResponse = createOrUpdateProject(UUID.fromString(projectId), request, false)
         if (flexoResponse.isFailure()) {
             return@put forward(flexoResponse)
         }
-        call.respond(flexoResponse.parseLdp {
-            projectFromResponse(focalOutgoing)
+        call.respond(flexoResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 }
