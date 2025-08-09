@@ -305,9 +305,6 @@ fun Route.CommitApi() {
 
                 // encode each key/value
                 payload.forEach { (key, value) ->
-                    // skip null values (although technically not allowed)
-                    if(value == null) return@forEach
-
                     // depending on the key
                     when(key) {
                         // reserved @id
@@ -320,9 +317,14 @@ fun Route.CommitApi() {
                         else -> {
                             // depending on JSON type of value
                             when(value) {
-                                // boolean, number, string
                                 is JsonPrimitive -> {
-                                    add(SYSMLV2.prop(key) to setOf(value.toRdfLiteralNode()))
+                                    // rdf nil means empty list in rdf...but since we're not using rdf lists to represent anything, have it represent sysml null
+                                    if (value == JsonNull) {
+                                        add(SYSMLV2.prop(key) to setOf(RDF.nil.asNode()))
+                                    } else {
+                                        // boolean, number, string
+                                        add(SYSMLV2.prop(key) to setOf(value.toRdfLiteralNode()))
+                                    }
                                 }
                                 // array
                                 is JsonArray -> {
@@ -383,7 +385,7 @@ fun Route.CommitApi() {
         // build SPARQL UPDATE string
         var sparqlUpdateString = """
             ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
-                iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE)
+                iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE) || id == "rdf"
             }.toList().joinToString("\n") { (id, iri) ->
                 "prefix $id: <$iri>"
             }.reindent(3)}

@@ -35,6 +35,31 @@ fun modelElementConstructQuery(elementTarget: String="?__element"): String {
     """.trimIndent()
 }
 
+fun listElementsConstructQuery(limit: Int?=null, offset: Int?=null): String {
+    if (limit == null && offset == null) return """
+        construct {
+            ?s ?p ?o .
+        } where {
+            ?s ?o ?o .
+        }
+    """.trimIndent()
+    return """
+        prefix sysml: <https://www.omg.org/spec/SysML#>
+        construct {
+            ?e ?element_p ?element_o .
+        }
+        where {
+            {
+                 select ?e
+                 where {
+                     ?e sysml:elementId ?id .
+                 } order by ?id limit $limit offset $offset
+            }
+            ?e ?element_p ?element_o .
+        }
+    """.trimIndent()
+}
+
 class InvalidTripleError(
     message: String,
     subjectIri: String,
@@ -69,9 +94,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                 // multiple values means it's an array, skip and prefer JSON annotation
                 // if we've already seen a JSON annotation with the same property key then ignore
                 if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
-
-                // object is a resource
-                if (obj.isResource) {
+                if (obj == RDF.nil) {
+                    put(propertyKey, JsonNull)
+                } else if (obj.isResource) {
                     put(propertyKey, buildJsonObject {
                         put("@id", obj.asResource().uri.autoSuffix)
                     })
