@@ -33,215 +33,32 @@ import org.openmbee.flexo.sysmlv2.models.QueryRequest
 fun Route.QueryApi() {
 
     delete<Paths.deleteQueryByProjectAndId> {
-        val exampleContentString = """{
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<Query>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueriesByProject> {
-        val exampleContentString = """[ {
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }, {
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        } ]"""
-        call.respond(Json.decodeFromString<List<Query>>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueryByProjectAndId> {
-        val exampleContentString = """{
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<Query>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueryResultsByProjectIdQuery> {
-        val exampleContentString = """[ {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueryResultsByProjectIdQueryId> {
-        val exampleContentString = """[ {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
+
+        call.respond("")
     }
 
     post<QueryRequest>("/projects/{projectId}/query-results") {
+        print(it.atType)
         call.respond(it)
     }
 

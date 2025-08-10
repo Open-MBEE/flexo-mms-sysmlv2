@@ -24,28 +24,20 @@ import org.openmbee.flexo.sysmlv2.models.Constraint
  *
  * @param atType
  * @param constraint
- * @param `operator`
+ * @param operator
  */
 @Serializable
+@SerialName("CompositeConstraint")
 data class CompositeConstraint(
-    @SerialName("@type")
-    val atType: CompositeConstraint.AtType,
     val constraint: kotlin.collections.List<Constraint>,
-    val `operator`: CompositeConstraint.`Operator`
-)
+    val operator: CompositeConstraint.Operator
+) : Constraint()
 {
-    /**
-    *
-    * Values: CompositeConstraint
-    */
-    enum class AtType(val value: kotlin.String){
-        CompositeConstraint("CompositeConstraint");
-    }
     /**
     *
     * Values: and,or
     */
-    enum class `Operator`(val value: kotlin.String){
+    enum class Operator(val value: kotlin.String){
         and("and"),
         or("or");
     }
