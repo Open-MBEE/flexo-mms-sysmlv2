@@ -31,8 +31,7 @@ object SYSMLV2 {
         return ResourceFactory.createProperty("$ANNOTATION_JSON$key")
     }
 }
-
-val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
+val SYSMLV2_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
     val prefixes = mutableMapOf(
         "rdf" to "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
         "rdfs" to "http://www.w3.org/2000/01/rdf-schema#",
@@ -43,7 +42,10 @@ val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
         "elmt" to SYSMLV2.ELEMENT,
         "json" to SYSMLV2.ANNOTATION_JSON,
     )
-
+    setNsPrefixes(prefixes)
+}
+val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
+    val prefixes = SYSMLV2_PREFIX_MAPPING.nsPrefixMap.toMutableMap()
     with("https://mms.openmbee.org/rdf") {
         prefixes.putAll(mapOf(
             "mms" to "$this/ontology/",

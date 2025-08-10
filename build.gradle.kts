@@ -60,6 +60,7 @@ dependencies {
 
     val jenaVersion = "4.10.0"
     implementation("org.apache.jena:jena-arq:${jenaVersion}")
+    implementation("org.apache.jena:jena-querybuilder:${jenaVersion}")
 }
 
 tasks.wrapper {

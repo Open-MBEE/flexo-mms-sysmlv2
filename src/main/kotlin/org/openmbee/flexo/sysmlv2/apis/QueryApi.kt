@@ -11,24 +11,88 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
+import io.ktor.server.resources.*
 import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
-import io.ktor.server.resources.get
-import io.ktor.server.resources.post
-import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.JsonObject
-import org.openmbee.flexo.sysmlv2.models.Query
+import kotlinx.serialization.json.*
+import org.apache.jena.arq.querybuilder.ConstructBuilder
+import org.apache.jena.arq.querybuilder.Converters
+import org.apache.jena.graph.Node
+import org.apache.jena.sparql.expr.Expr
+import org.apache.jena.vocabulary.RDF
+import org.openmbee.flexo.sysmlv2.*
+import org.openmbee.flexo.sysmlv2.models.CompositeConstraint
+import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraint
 import org.openmbee.flexo.sysmlv2.models.QueryRequest
+
+fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
+    val p: Node
+    var pvar: String = property
+    val v: Node
+    when(property) {
+        "@id" -> { p = SYSMLV2.prop("elementId").asNode(); pvar = "id" }
+        "@type" -> { p = RDF.type.asNode(); pvar = "Metatype" }
+        else -> { p = SYSMLV2.prop(property).asNode() }
+    }
+    when(value) {
+        is JsonObject -> {
+            if (value.containsKey("@id")) {
+                v = SYSMLV2.element(value.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+            } else {
+                throw BadRequestException("PrimitiveConstraint value object must contain @id")
+            }
+        }
+        is JsonPrimitive -> {
+            if (value == JsonNull) {
+                v = RDF.nil.asNode()
+            } else {
+                v = value.toRdfLiteralNode()
+            }
+        }
+        is JsonArray -> {throw BadRequestException("PrimitiveConstraint value cannot be array")}
+    }
+    if (value == JsonNull) {
+        cb.addOptional(Converters.makeVar("e"), p, Converters.makeVar(pvar))
+    } else {
+        cb.addWhere(Converters.makeVar("e"), p, Converters.makeVar(pvar))
+    }
+    val exprFactory = cb.exprFactory
+    return when(operator) {
+        PrimitiveConstraint.Operator.Equal -> {
+            if (value == JsonNull) {
+                exprFactory.or(exprFactory.not(exprFactory.bound("?$pvar")), exprFactory.eq("?$pvar", v))
+            } else {
+                exprFactory.eq("?$pvar", v)
+            }
+        }
+        PrimitiveConstraint.Operator.Less_Than -> {
+            exprFactory.lt("?$pvar", v)
+        }
+        PrimitiveConstraint.Operator.Greater_Than -> {
+            exprFactory.gt("?$pvar", v)
+        }
+    }
+}
+fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
+    val c = mutableListOf<Expr>()
+    constraint.forEach {
+        if (it is PrimitiveConstraint) {
+            c.add(it.toSparql(cb))
+        }
+        if (it is CompositeConstraint) {
+            c.add(it.toSparql(cb))
+        }
+    }
+    val exprFactory = cb.exprFactory
+    return c.reduce {acc, b ->
+        when(operator) {
+            CompositeConstraint.Operator.and -> exprFactory.and(acc, b)
+            CompositeConstraint.Operator.or -> exprFactory.or(acc, b)
+        }
+    }
+}
 
 fun Route.QueryApi() {
 
@@ -58,8 +122,48 @@ fun Route.QueryApi() {
     }
 
     post<QueryRequest>("/projects/{projectId}/query-results") {
-        print(it.atType)
-        call.respond(it)
+        val projectId = call.parameters["projectId"]!!
+        val commitId = call.parameters["commitId"]
+        var branchId = "master"
+        if (commitId == null) {
+            val projectResponse = flexoRequestGet {
+                orgPath("/repos/$projectId")
+            }
+            projectResponse.parseModel {
+                val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
+                branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal() ?: "master"
+            }
+        }
+        val cb = ConstructBuilder().addConstruct("?e", "?p", "?o")
+            .addWhere("?e", "?p", "?o")
+            .addPrefixes(SYSMLV2_PREFIX_MAPPING)
+        val filter = when(it.where) {
+            is CompositeConstraint -> it.where.toSparql(cb)
+            is PrimitiveConstraint -> it.where.toSparql(cb)
+            else -> null
+        }
+        cb.addFilter(filter)
+        val queryPath = if (commitId == null) "/repos/$projectId/branches/$branchId/query" else "/repos/$projectId/locks/Commit.$commitId/query"
+        val flexoResponse = flexoRequestPost {
+            orgPath(queryPath)
+            sparqlQuery {
+                cb.toString()
+            }
+        }
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@post forward(flexoResponse)
+        }
+
+        // parse the response model, extract the elements to JSON, and reply to client
+        val result = buildJsonArray {
+            flexoResponse.parseModel {
+                for(subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        }
+        call.respond(result)
     }
 
     post<QueryRequest>("/projects/{projectId}/queries") {
