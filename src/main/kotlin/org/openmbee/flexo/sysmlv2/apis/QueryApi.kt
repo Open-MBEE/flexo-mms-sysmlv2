@@ -18,7 +18,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
 import org.apache.jena.arq.querybuilder.ConstructBuilder
-import org.apache.jena.arq.querybuilder.Converters
 import org.apache.jena.graph.Node
 import org.apache.jena.sparql.expr.Expr
 import org.apache.jena.vocabulary.RDF
@@ -48,34 +47,36 @@ fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
             if (value == JsonNull) {
                 v = RDF.nil.asNode()
             } else {
-                v = value.toRdfLiteralNode()
+                v = if (property == "@type") SYSMLV2.type(value.content).asNode() else value.toRdfLiteralNode()
             }
         }
         is JsonArray -> {throw BadRequestException("PrimitiveConstraint value cannot be array")}
     }
     if (value == JsonNull) {
-        cb.addOptional(Converters.makeVar("e"), p, Converters.makeVar(pvar))
+        cb.addOptional("?e", p, "?$pvar")
     } else {
-        cb.addWhere(Converters.makeVar("e"), p, Converters.makeVar(pvar))
+        cb.addWhere("?e", p, "?$pvar")
     }
-    val exprFactory = cb.exprFactory
-    return when(operator) {
+    val ef = cb.exprFactory
+    val expr = when(operator) {
         PrimitiveConstraint.Operator.Equal -> {
             if (value == JsonNull) {
-                exprFactory.or(exprFactory.not(exprFactory.bound("?$pvar")), exprFactory.eq("?$pvar", v))
+                ef.or(ef.not(ef.bound("?$pvar")), ef.eq("?$pvar", v))
             } else {
-                exprFactory.eq("?$pvar", v)
+                ef.eq("?$pvar", v)
             }
         }
         PrimitiveConstraint.Operator.Less_Than -> {
-            exprFactory.lt("?$pvar", v)
+            ef.lt("?$pvar", v)
         }
         PrimitiveConstraint.Operator.Greater_Than -> {
-            exprFactory.gt("?$pvar", v)
+            ef.gt("?$pvar", v)
         }
     }
+    return if (inverse) ef.not(expr) else expr
 }
 fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
+    if (constraint.size < 2) throw BadRequestException("CompositeConstraint must have at least 2 constraints")
     val c = mutableListOf<Expr>()
     constraint.forEach {
         if (it is PrimitiveConstraint) {
@@ -85,11 +86,11 @@ fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
             c.add(it.toSparql(cb))
         }
     }
-    val exprFactory = cb.exprFactory
+    val ef = cb.exprFactory
     return c.reduce {acc, b ->
         when(operator) {
-            CompositeConstraint.Operator.and -> exprFactory.and(acc, b)
-            CompositeConstraint.Operator.or -> exprFactory.or(acc, b)
+            CompositeConstraint.Operator.and -> ef.and(acc, b)
+            CompositeConstraint.Operator.or -> ef.or(acc, b)
         }
     }
 }

@@ -17,8 +17,6 @@ import kotlinx.serialization.*
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.json.JsonElement
 
-import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintValue
-
 /**
  *
  * @param atType
