@@ -11,238 +11,160 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
+import io.ktor.server.resources.*
 import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
-import io.ktor.server.resources.get
-import io.ktor.server.resources.post
-import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.JsonObject
-import org.openmbee.flexo.sysmlv2.models.Query
+import kotlinx.serialization.json.*
+import org.apache.jena.arq.querybuilder.ConstructBuilder
+import org.apache.jena.graph.Node
+import org.apache.jena.sparql.expr.Expr
+import org.apache.jena.vocabulary.RDF
+import org.openmbee.flexo.sysmlv2.*
+import org.openmbee.flexo.sysmlv2.models.CompositeConstraint
+import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraint
 import org.openmbee.flexo.sysmlv2.models.QueryRequest
+
+fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
+    val p: Node
+    var pvar: String = property
+    val v: Node
+    when(property) {
+        "@id" -> { p = SYSMLV2.prop("elementId").asNode(); pvar = "id" }
+        "@type" -> { p = RDF.type.asNode(); pvar = "Metatype" }
+        else -> { p = SYSMLV2.prop(property).asNode() }
+    }
+    when(value) {
+        is JsonObject -> {
+            if (value.containsKey("@id")) {
+                v = SYSMLV2.element(value.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+            } else {
+                throw BadRequestException("PrimitiveConstraint value object must contain @id")
+            }
+        }
+        is JsonPrimitive -> {
+            if (value == JsonNull) {
+                v = RDF.nil.asNode()
+            } else {
+                v = if (property == "@type") SYSMLV2.type(value.content).asNode() else value.toRdfLiteralNode()
+            }
+        }
+        is JsonArray -> {throw BadRequestException("PrimitiveConstraint value cannot be array")}
+    }
+    if (value == JsonNull) {
+        cb.addOptional("?e", p, "?$pvar")
+    } else {
+        cb.addWhere("?e", p, "?$pvar")
+    }
+    val ef = cb.exprFactory
+    val expr = when(operator) {
+        PrimitiveConstraint.Operator.Equal -> {
+            if (value == JsonNull) {
+                ef.or(ef.not(ef.bound("?$pvar")), ef.eq("?$pvar", v))
+            } else {
+                ef.eq("?$pvar", v)
+            }
+        }
+        PrimitiveConstraint.Operator.Less_Than -> {
+            ef.lt("?$pvar", v)
+        }
+        PrimitiveConstraint.Operator.Greater_Than -> {
+            ef.gt("?$pvar", v)
+        }
+    }
+    return if (inverse) ef.not(expr) else expr
+}
+fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
+    if (constraint.size < 2) throw BadRequestException("CompositeConstraint must have at least 2 constraints")
+    val c = mutableListOf<Expr>()
+    constraint.forEach {
+        if (it is PrimitiveConstraint) {
+            c.add(it.toSparql(cb))
+        }
+        if (it is CompositeConstraint) {
+            c.add(it.toSparql(cb))
+        }
+    }
+    val ef = cb.exprFactory
+    return c.reduce {acc, b ->
+        when(operator) {
+            CompositeConstraint.Operator.and -> ef.and(acc, b)
+            CompositeConstraint.Operator.or -> ef.or(acc, b)
+        }
+    }
+}
 
 fun Route.QueryApi() {
 
     delete<Paths.deleteQueryByProjectAndId> {
-        val exampleContentString = """{
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<Query>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueriesByProject> {
-        val exampleContentString = """[ {
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }, {
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        } ]"""
-        call.respond(Json.decodeFromString<List<Query>>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueryByProjectAndId> {
-        val exampleContentString = """{
-          "select" : [ "select", "select" ],
-          "@type" : "Query",
-          "where" : {
-            "@type" : "CompositeConstraint",
-            "constraint" : [ null, null ],
-            "operator" : "and"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owningProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<Query>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueryResultsByProjectIdQuery> {
-        val exampleContentString = """[ {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
+
+        call.respond("")
     }
 
     get<Paths.getQueryResultsByProjectIdQueryId> {
-        val exampleContentString = """[ {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
+
+        call.respond("")
     }
 
     post<QueryRequest>("/projects/{projectId}/query-results") {
-        call.respond(it)
+        val projectId = call.parameters["projectId"]!!
+        val commitId = call.parameters["commitId"]
+        var branchId = "master"
+        if (commitId == null) {
+            val projectResponse = flexoRequestGet {
+                orgPath("/repos/$projectId")
+            }
+            projectResponse.parseModel {
+                val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
+                branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal() ?: "master"
+            }
+        }
+        val cb = ConstructBuilder().addConstruct("?e", "?p", "?o")
+            .addWhere("?e", "?p", "?o")
+            .addPrefixes(SYSMLV2_PREFIX_MAPPING)
+        val filter = when(it.where) {
+            is CompositeConstraint -> it.where.toSparql(cb)
+            is PrimitiveConstraint -> it.where.toSparql(cb)
+            else -> null
+        }
+        cb.addFilter(filter)
+        val queryPath = if (commitId == null) "/repos/$projectId/branches/$branchId/query" else "/repos/$projectId/locks/Commit.$commitId/query"
+        val flexoResponse = flexoRequestPost {
+            orgPath(queryPath)
+            sparqlQuery {
+                cb.toString()
+            }
+        }
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@post forward(flexoResponse)
+        }
+
+        // parse the response model, extract the elements to JSON, and reply to client
+        val result = buildJsonArray {
+            flexoResponse.parseModel {
+                for(subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        }
+        call.respond(result)
     }
 
     post<QueryRequest>("/projects/{projectId}/queries") {

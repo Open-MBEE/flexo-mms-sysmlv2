@@ -13,50 +13,11 @@
 
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.UseSerializers
 
-import org.openmbee.flexo.sysmlv2.models.CompositeConstraint
-import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraint
-import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintValue
-
-/**
- *
- * @param atType
- * @param constraint
- * @param `operator`
- * @param inverse
- * @param `property`
- * @param `value`
- */
+// see https://stackoverflow.com/questions/66690712/kotlinx-serialization-polymorphic-serializer-was-not-found-for-missing-class-di
 @Serializable
-data class Constraint(
-    @SerialName("@type")
-    val atType: Constraint.AtType,
-    val constraint: kotlin.collections.List<Constraint>,
-    val `operator`: Constraint.`Operator`,
-    val inverse: kotlin.Boolean,
-    val `property`: kotlin.String,
-    val `value`: PrimitiveConstraintValue
-)
-{
-    /**
-    *
-    * Values: PrimitiveConstraint
-    */
-    enum class AtType(val value: kotlin.String){
-        PrimitiveConstraint("PrimitiveConstraint");
-    }
-    /**
-    *
-    * Values: Equal,Greater_Than,Less_Than
-    */
-    enum class `Operator`(val value: kotlin.String){
-        Equal("="),
-        Greater_Than(">"),
-        Less_Than("<");
-    }
-}
+sealed class Constraint
 

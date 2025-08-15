@@ -37,6 +37,7 @@ fun Application.module() {
             isLenient = true
             prettyPrint = true
             ignoreUnknownKeys = true
+            classDiscriminator = "@type"
         })
         /*gson {
             registerTypeAdapter(OffsetDateTime::class.java, OffsetDateTimeAdapter)

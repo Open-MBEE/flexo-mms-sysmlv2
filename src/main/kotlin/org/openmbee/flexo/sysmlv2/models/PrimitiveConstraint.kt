@@ -13,12 +13,9 @@
 
 package org.openmbee.flexo.sysmlv2.models
 
+import kotlinx.serialization.*
 import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseSerializers
-
-import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintValue
+import kotlinx.serialization.json.JsonElement
 
 /**
  *
@@ -29,29 +26,25 @@ import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraintValue
  * @param `value`
  */
 @Serializable
-data class PrimitiveConstraint(
-    @SerialName("@type")
-    val atType: PrimitiveConstraint.AtType,
-    val inverse: kotlin.Boolean,
-    val `operator`: PrimitiveConstraint.`Operator`,
-    val `property`: kotlin.String,
-    val `value`: PrimitiveConstraintValue
-)
+@SerialName("PrimitiveConstraint")
+data class PrimitiveConstraint @OptIn(ExperimentalSerializationApi::class) constructor(
+    @EncodeDefault
+    val inverse: kotlin.Boolean = false,
+    val operator: PrimitiveConstraint.Operator,
+    val property: kotlin.String,
+    val value: JsonElement, //can be Identified, boolean, string, number
+) : Constraint()
 {
-    /**
-    *
-    * Values: PrimitiveConstraint
-    */
-    enum class AtType(val value: kotlin.String){
-        PrimitiveConstraint("PrimitiveConstraint");
-    }
     /**
     *
     * Values: Equal,Greater_Than,Less_Than
     */
-    enum class `Operator`(val value: kotlin.String){
+    enum class Operator(val value: kotlin.String){
+        @SerialName("=")
         Equal("="),
+        @SerialName(">")
         Greater_Than(">"),
+        @SerialName("<")
         Less_Than("<");
     }
 }

@@ -243,6 +243,7 @@ fun Route.ElementApi() {
             sparqlQuery {
                 """
                 prefix sysml: <https://www.omg.org/spec/SysML#>
+                prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                 construct {
                   ?element a ?element_type ;
                          ?element_p ?element_o .
@@ -250,15 +251,11 @@ fun Route.ElementApi() {
                 where {
                   ?element a ?element_type ;
                         ?element_p ?element_o .
-                  filter not exists {
-                     {
-                        ?element sysml:owner ?owner .
-                     }
-                     union
-                     {
-                        ?element sysml:owningRelatedElement ?related .
-                     }          
-                  }
+                  
+                  optional { ?element sysml:owner ?owner . }
+                  optional { ?element sysml:owningRelatedElement ?related . }
+
+                  filter ((!bound(?owner) || ?owner = rdf:nil) && (!bound(?related) || ?related = rdf:nil))
                 }
                 """.trimIndent()
             }
