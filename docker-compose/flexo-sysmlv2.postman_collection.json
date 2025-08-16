@@ -746,6 +746,94 @@
 			"response": []
 		},
 		{
+			"name": "post query",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJ1c2VyMDEiLCJncm91cHMiOlsic3VwZXJfYWRtaW5zIl0sImV4cCI6MTc2OTY3MzYwMH0.UqU5KOPSCbYyqbj3BBZs4u7lWbpHyDHPEd7Tbd4wWsM",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\" : \"CompositeConstraint\",\n        \"constraint\" : [ \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"owningRelatedElement\", \"value\": {\n                    \"@id\": \"c2387c83-5774-4342-921a-729064d959ab\"\n            }}, \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"@type\", \"value\": \"NamespaceImport\"}\n        ],\n        \"operator\" : \"or\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/query-results",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"query-results"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "post query 2",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJ1c2VyMDEiLCJncm91cHMiOlsic3VwZXJfYWRtaW5zIl0sImV4cCI6MTc2OTY3MzYwMH0.UqU5KOPSCbYyqbj3BBZs4u7lWbpHyDHPEd7Tbd4wWsM",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\": \"PrimitiveConstraint\", \n        \"inverse\": false, \n        \"operator\": \"=\", \n        \"property\": \"name\", \n        \"value\": \"1c-Parts Tree Redefinition\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/query-results",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"query-results"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "flexo get graph",
 			"request": {
 				"auth": {
