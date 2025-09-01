@@ -81,6 +81,18 @@ suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateProject(
         if(defaultBranchResponse.isFailure()) {
             return defaultBranchResponse
         }
+        val queryResponse = flexoRequestPut {
+            orgPath("/repos/${projectUuid}/scratches/queries")
+            turtle {
+                thisSubject(
+                    DCTerms.title to "queries".en
+                )
+            }
+        }
+        // forward failures to client
+        if(queryResponse.isFailure()) {
+            return queryResponse
+        }
     }
     return flexoResponse
 }

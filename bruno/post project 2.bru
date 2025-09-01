@@ -1,0 +1,32 @@
+meta {
+  name: post project 2
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{host}}/projects
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+            "@type" : "Project",
+            "name" : "test2",
+            "description" : "description"
+  }
+}
+
+vars:post-response {
+  projectId2: res('@id')
+  defaultBranchId2: res('defaultBranch.@id')
+}
+
+settings {
+  encodeUrl: true
+}

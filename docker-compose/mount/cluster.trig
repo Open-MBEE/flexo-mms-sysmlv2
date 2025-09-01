@@ -21,7 +21,7 @@ graph m-graph:AccessControl.Agents {
 	m-user:anon a mms:User ;
 		mms:id "anon" .
 
-<http://layer1-service/users/ldap/user/user01> a mms:User ;
+    <http://layer1-service/users/ldap/user/user01> a mms:User ;
     	mms:id "ldap/user/user01" .
 
     <http://layer1-service/users/ldap/user/user02> a mms:User ;
@@ -83,6 +83,9 @@ graph m-graph:Schema {
 
 	mms:Artifact a rdfs:Class ;
 		rdfs:label "Artifact" .
+
+	mms:Scratch a rdfs:Class ;
+		rdfs:label "Scratch" .
 
 	mms:Snapshot a rdfs:Class ;
 		rdfs:label "Snapshot" .
@@ -150,7 +153,7 @@ graph m-graph:AccessControl.Definitions {
 	mms:Repo a rdfs:Class ;
 		rdfs:label "Repo level scope" ;
 		rdfs:subClassOf mms:Scope ;
-		mms:implies mms:Ref, mms:Artifact, mms:Commit .
+		mms:implies mms:Ref, mms:Artifact, mms:Commit, mms:Scratch .
 
 	mms:Collection a rdfs:Class ;
 		rdfs:label "Collection level scope" ;
@@ -185,6 +188,10 @@ graph m-graph:AccessControl.Definitions {
 
 	mms:Policy a rdfs:Class ;
 		rdfs:label "Policy level scope" ;
+		rdfs:subClassOf mms:Scope .
+
+	mms:Scratch a rdfs:Class ;
+		rdfs:label "Scratch level scope" ;
 		rdfs:subClassOf mms:Scope .
 
 	# ====================================
@@ -237,10 +244,10 @@ graph m-graph:AccessControl.Definitions {
 	mms-object:Permission.ReadRepo a mms:Permission .
 
 	mms-object:Permission.UpdateRepo a mms:Permission ;
-		mms:implies mms-object:Permission.ReadRepo, mms-object:Permission.ReadCommit, mms-object:Permission.UpdateBranch, mms-object:Permission.UpdateLock, mms-object:Permission.UpdateCommit, mms-object:Permission.UpdateRef .
+		mms:implies mms-object:Permission.ReadRepo, mms-object:Permission.ReadCommit, mms-object:Permission.ReadScratch, mms-object:Permission.UpdateBranch, mms-object:Permission.UpdateLock, mms-object:Permission.UpdateCommit, mms-object:Permission.UpdateRef, mms-object:Permission.UpdateArtifact, mms-object:Permission.UpdateScratch .
 
 	mms-object:Permission.DeleteRepo a mms:Permission ;
-		mms:implies mms-object:Permission.UpdateRepo, mms-object:Permission.CreateRef, mms-object:Permission.DeleteRef, mms-object:Permission.CreateArtifact, mms-object:Permission.DeleteArtifact, mms-object:Permission.CreateDiff, mms-object:Permission.DeleteDiff .
+		mms:implies mms-object:Permission.UpdateRepo, mms-object:Permission.CreateRef, mms-object:Permission.DeleteRef, mms-object:Permission.CreateArtifact, mms-object:Permission.DeleteArtifact, mms-object:Permission.CreateDiff, mms-object:Permission.DeleteDiff, mms-object:Permission.CreateScratch, mms-object:Permission.DeleteScratch .
 
 	mms-object:Permission.CreateRef a mms:Permission .
 
@@ -281,6 +288,16 @@ graph m-graph:AccessControl.Definitions {
 
 	mms-object:Permission.DeleteArtifact a mms:Permission ;
 		mms:implies mms-object:Permission.UpdateArtifact .
+
+	mms-object:Permission.CreateScratch a mms:Permission .
+
+	mms-object:Permission.ReadScratch a mms:Permission .
+
+	mms-object:Permission.UpdateScratch a mms:Permission ;
+		mms:implies mms-object:Permission.ReadScratch .
+
+	mms-object:Permission.DeleteScratch a mms:Permission ;
+		mms:implies mms-object:Permission.UpdateScratch .
 
 	mms-object:Permission.CreateCommit a mms:Permission .
 

@@ -12,9 +12,8 @@ repositories {
 
 plugins {
     application
-    kotlin("jvm") version "1.9.24"
-    kotlin("plugin.serialization") version "1.9.24"
-    id("com.gradleup.shadow") version "8.3.5"
+    kotlin("jvm") version "2.1.21"
+    kotlin("plugin.serialization") version "2.1.21"
 }
 
 dependencies {
@@ -47,7 +46,7 @@ dependencies {
     testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
 
-    implementation("ch.qos.logback:logback-classic:1.4.11")
+    implementation("ch.qos.logback:logback-classic:1.5.18")
     implementation("io.dropwizard.metrics:metrics-core:4.1.18")
 
     val junitVersion = "5.10.1"
@@ -68,18 +67,11 @@ tasks.wrapper {
     distributionType = Wrapper.DistributionType.ALL
 }
 
-tasks.shadowJar {
-    archiveBaseName.set("flexo-sysmlv2")
-    archiveClassifier.set("")
-    archiveVersion.set("")
-}
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(17))
 }
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+kotlin {
+    jvmToolchain(17)
 }
 tasks {
     test {

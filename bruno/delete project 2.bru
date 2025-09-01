@@ -1,0 +1,15 @@
+meta {
+  name: delete project 2
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{host}}/projects/{{projectId2}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

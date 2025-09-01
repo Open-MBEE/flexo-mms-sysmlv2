@@ -1,0 +1,15 @@
+meta {
+  name: delete tag 2
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{host}}/projects/{{projectId}}/tags/{{tagId2}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

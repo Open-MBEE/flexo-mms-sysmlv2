@@ -748,16 +748,6 @@
 		{
 			"name": "post query",
 			"request": {
-				"auth": {
-					"type": "bearer",
-					"bearer": [
-						{
-							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJ1c2VyMDEiLCJncm91cHMiOlsic3VwZXJfYWRtaW5zIl0sImV4cCI6MTc2OTY3MzYwMH0.UqU5KOPSCbYyqbj3BBZs4u7lWbpHyDHPEd7Tbd4wWsM",
-							"type": "string"
-						}
-					]
-				},
 				"method": "POST",
 				"header": [
 					{
@@ -792,17 +782,255 @@
 		{
 			"name": "post query 2",
 			"request": {
-				"auth": {
-					"type": "bearer",
-					"bearer": [
-						{
-							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJ1c2VyMDEiLCJncm91cHMiOlsic3VwZXJfYWRtaW5zIl0sImV4cCI6MTc2OTY3MzYwMH0.UqU5KOPSCbYyqbj3BBZs4u7lWbpHyDHPEd7Tbd4wWsM",
-							"type": "string"
-						}
-					]
-				},
 				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\": \"PrimitiveConstraint\", \n        \"inverse\": true, \n        \"operator\": \"=\", \n        \"property\": \"name\", \n        \"value\": \"1c-Parts Tree Redefinition\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/query-results",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"query-results"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "create query",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"response has token\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.collectionVariables.set(\"queryId\", jsonData[\"@id\"]);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\" : \"CompositeConstraint\",\n        \"constraint\" : [ \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"owningRelatedElement\", \"value\": {\n                    \"@id\": \"c2387c83-5774-4342-921a-729064d959ab\"\n            }}, \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"@type\", \"value\": \"NamespaceImport\"}\n        ],\n        \"operator\" : \"or\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/queries",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"queries"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get queries",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/queries",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"queries"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get query by id",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/queries/{{queryId}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"queries",
+						"{{queryId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get query result by id",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/queries/{{queryId}}/results",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"queries",
+						"{{queryId}}",
+						"results"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "update query",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"response has token\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.collectionVariables.set(\"queryId\", jsonData[\"@id\"]);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
 				"header": [
 					{
 						"key": "Content-Type",
@@ -820,14 +1048,62 @@
 					}
 				},
 				"url": {
-					"raw": "{{host}}/projects/{{projectId}}/query-results",
+					"raw": "{{host}}/projects/{{projectId}}/queries/{{queryId}}",
 					"host": [
 						"{{host}}"
 					],
 					"path": [
 						"projects",
 						"{{projectId}}",
-						"query-results"
+						"queries",
+						"{{queryId}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "delete query",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "text"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/projects/{{projectId}}/queries/{{queryId}}",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"projects",
+						"{{projectId}}",
+						"queries",
+						"{{queryId}}"
 					]
 				}
 			},
@@ -982,6 +1258,10 @@
 		},
 		{
 			"key": "tagId2",
+			"value": ""
+		},
+		{
+			"key": "queryId",
 			"value": ""
 		}
 	]

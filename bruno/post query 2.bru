@@ -1,0 +1,33 @@
+meta {
+  name: post query 2
+  type: http
+  seq: 26
+}
+
+post {
+  url: {{host}}/projects/{{projectId}}/query-results
+  body: text
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:text {
+  {
+      "select" : [ "@id", "@type" ],
+      "@type" : "Query",
+      "where" : {
+          "@type": "PrimitiveConstraint", 
+          "inverse": true, 
+          "operator": "=", 
+          "property": "name", 
+          "value": "1c-Parts Tree Redefinition"
+      }
+  }
+}
+
+settings {
+  encodeUrl: true
+}

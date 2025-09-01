@@ -1,0 +1,15 @@
+meta {
+  name: get relationships
+  type: http
+  seq: 24
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/commits/{{commitId}}/elements/06ab54be-f218-48b4-bc02-f394f22d406f/relationships
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

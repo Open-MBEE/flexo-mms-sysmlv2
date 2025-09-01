@@ -16,15 +16,24 @@ import io.ktor.server.plugins.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.pipeline.PipelineContext
 import kotlinx.serialization.json.*
+import kotlinx.serialization.encodeToString
 import org.apache.jena.arq.querybuilder.ConstructBuilder
+import org.apache.jena.arq.querybuilder.UpdateBuilder
 import org.apache.jena.graph.Node
+import org.apache.jena.rdf.model.Property
+import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.sparql.expr.Expr
+import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.CompositeConstraint
+import org.openmbee.flexo.sysmlv2.models.Identified
 import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraint
+import org.openmbee.flexo.sysmlv2.models.Query
 import org.openmbee.flexo.sysmlv2.models.QueryRequest
+import java.util.UUID
 
 fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
     val p: Node
@@ -95,83 +104,213 @@ fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
     }
 }
 
+suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateQuery(
+    queryId: UUID, projectId: UUID, queryRequest: QueryRequest, post: Boolean): Pair<FlexoResponse, Query> {
+    val query = Query(atId = queryId,
+        atType = Query.AtType.Query,
+        owningProject = Identified(projectId),
+        select = queryRequest.select!!,
+        where = queryRequest.where!!)
+    val queryString = Json.encodeToString<Query>(query)
+    val queryUri = SYSMLV2.query(queryId.toString())
+    val insertBuilder = UpdateBuilder().addInsert(queryUri, DCTerms.description, queryString)
+    val flexoResponse = flexoRequestPost {
+        orgPath("/repos/$projectId/scratches/queries/update")
+        // construct body payload
+        sparqlUpdate {
+            """
+                delete { <$queryUri> ?p ?o . } where {  <$queryUri> ?p ?o . };
+                ${insertBuilder.buildRequest()}
+            """.trimIndent()
+        }
+    }
+    return Pair(flexoResponse, query)
+}
+
+suspend fun PipelineContext<*, ApplicationCall>.runQuery(
+    query: QueryRequest, projectId: String, commitId: String?): FlexoResponse {
+    var branchId = "master"
+    if (commitId == null) {
+        // get default branch of project
+        val projectResponse = flexoRequestGet {
+            orgPath("/repos/$projectId")
+        }
+        projectResponse.parseModel {
+            val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
+            branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal() ?: "master"
+        }
+    }
+    val cb = ConstructBuilder().addConstruct("?e", "?p", "?o")
+        .addWhere("?e", "?p", "?o")
+        .addPrefixes(SYSMLV2_PREFIX_MAPPING)
+    val filter = when(query.where) {
+        is CompositeConstraint -> query.where.toSparql(cb)
+        is PrimitiveConstraint -> query.where.toSparql(cb)
+        null -> null
+    }
+    cb.addFilter(filter)
+    val queryPath = if (commitId == null) "/repos/$projectId/branches/$branchId/query"
+                    else "/repos/$projectId/locks/Commit.$commitId/query"
+    return flexoRequestPost {
+        orgPath(queryPath)
+        sparqlQuery {
+            cb.toString()
+        }
+    }
+}
+
+suspend fun PipelineContext<*, ApplicationCall>.getQuery(projectId: UUID, queryId: UUID): Pair<FlexoResponse, Query?> {
+    val uri = SYSMLV2.query(queryId.toString()).uri
+    val flexoResponse = flexoRequestPost {
+        orgPath("/repos/$projectId/scratches/queries/query")
+        sparqlQuery {
+                """
+                    construct { 
+                        <$uri> ?p ?o .
+                    } where {
+                        <$uri> ?p ?o .
+                    }
+                """.trimIndent()
+        }
+    }
+    if (flexoResponse.isFailure()) {
+        return Pair(flexoResponse, null)
+    }
+    // parse the response model, convert it to JSON, and reply to client
+    return Pair(flexoResponse, (flexoResponse.parseModel {
+        model.listSubjects().mapWith { it2 ->
+            queryFromResponse(it2.outgoing())
+        }.toList()[0]
+    }))
+}
+
+fun queryFromResponse(
+    outgoing: Map<Property, Set<RDFNode>>,
+): Query {
+    val query = outgoing[DCTerms.description]?.literal()?: ""
+    return Json.decodeFromString<Query>(query)
+}
+
 fun Route.QueryApi() {
 
     delete<Paths.deleteQueryByProjectAndId> {
-
-        call.respond("")
+        val projectId = it.projectId
+        val queryId = it.queryId
+        val query = getQuery(projectId, queryId)
+        if (query.first.isFailure()) {
+            return@delete forward(query.first)
+        }
+        val uri = SYSMLV2.query(queryId.toString()).uri
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/$projectId/scratches/queries/update")
+            sparqlUpdate {
+                """
+                    delete { 
+                        <$uri> ?p ?o .
+                    } where {
+                        <$uri> ?p ?o .
+                    }
+                """.trimIndent()
+            }
+        }
+        if(flexoResponse.isFailure()) {
+            return@delete forward(flexoResponse)
+        }
+        call.respond<Query>(query.second!!)
     }
 
     get<Paths.getQueriesByProject> {
-
-        call.respond("")
+        val projectId = it.projectId
+        val flexoResponse = flexoRequestGet {
+            orgPath("/repos/$projectId/scratches/queries/graph")
+        }
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+        // parse the response model, convert it to JSON, and reply to client
+        call.respond(flexoResponse.parseModel {
+            model.listSubjects().mapWith { it2 ->
+                queryFromResponse(it2.outgoing())
+            }.toList()
+        })
     }
 
     get<Paths.getQueryByProjectAndId> {
-
-        call.respond("")
+        val projectId = it.projectId
+        val queryId = it.queryId
+        val res = getQuery(projectId, queryId)
+        if (res.first.isFailure()) {
+            return@get forward(res.first)
+        }
+        // parse the response model, convert it to JSON, and reply to client
+        call.respond<Query>(res.second!!)
     }
 
     get<Paths.getQueryResultsByProjectIdQuery> {
-
-        call.respond("")
+        throw NotImplementedError()
     }
 
     get<Paths.getQueryResultsByProjectIdQueryId> {
+        val projectId = it.projectId
+        val queryId = it.queryId
+        val commitId = it.commitId
+        // get query
+        val res = getQuery(projectId, queryId)
+        if (res.first.isFailure()) {
+            return@get forward(res.first)
+        }
+        val query = res.second!!
+        val flexoResponse = runQuery(QueryRequest(where = query.where), projectId.toString(), commitId?.toString())
+        // forward failures to client
+        if (flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
 
-        call.respond("")
+        // parse the response model, extract the elements to JSON, and reply to client
+        call.respond(buildJsonArray {
+            flexoResponse.parseModel {
+                for (subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        })
     }
 
     post<QueryRequest>("/projects/{projectId}/query-results") {
         val projectId = call.parameters["projectId"]!!
         val commitId = call.parameters["commitId"]
-        var branchId = "master"
-        if (commitId == null) {
-            val projectResponse = flexoRequestGet {
-                orgPath("/repos/$projectId")
-            }
-            projectResponse.parseModel {
-                val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
-                branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal() ?: "master"
-            }
-        }
-        val cb = ConstructBuilder().addConstruct("?e", "?p", "?o")
-            .addWhere("?e", "?p", "?o")
-            .addPrefixes(SYSMLV2_PREFIX_MAPPING)
-        val filter = when(it.where) {
-            is CompositeConstraint -> it.where.toSparql(cb)
-            is PrimitiveConstraint -> it.where.toSparql(cb)
-            else -> null
-        }
-        cb.addFilter(filter)
-        val queryPath = if (commitId == null) "/repos/$projectId/branches/$branchId/query" else "/repos/$projectId/locks/Commit.$commitId/query"
-        val flexoResponse = flexoRequestPost {
-            orgPath(queryPath)
-            sparqlQuery {
-                cb.toString()
-            }
-        }
+        val flexoResponse = runQuery(it, projectId, commitId)
         // forward failures to client
-        if(flexoResponse.isFailure()) {
+        if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
-
         // parse the response model, extract the elements to JSON, and reply to client
-        val result = buildJsonArray {
+        call.respond(buildJsonArray {
             flexoResponse.parseModel {
-                for(subject in model.listSubjects()) {
+                for (subject in model.listSubjects()) {
                     add(extractModelElementToJson(subject.uri))
                 }
             }
-        }
-        call.respond(result)
+        })
     }
 
     post<QueryRequest>("/projects/{projectId}/queries") {
-        call.respond(it)
+        val projectId = UUID.fromString(call.parameters["projectId"]!!)
+        val uuid = UUID.randomUUID()
+        val response = createOrUpdateQuery(uuid, projectId, it, true)
+        if (response.first.isFailure()) {
+            return@post forward(response.first)
+        }
+        call.respond(response.second)
     }
 
     put<QueryRequest>("/projects/{projectId}/queries/{queryId}") {
-        call.respond(it)
+        val projectId = UUID.fromString(call.parameters["projectId"]!!)
+        val uuid = UUID.fromString(call.parameters["queryId"]!!)
+        val response = createOrUpdateQuery(uuid, projectId, it, false)
+        if (response.first.isFailure()) {
+            return@put forward(response.first)
+        }
+        call.respond(response.second)
     }
 }

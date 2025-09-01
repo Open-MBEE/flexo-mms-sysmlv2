@@ -1,0 +1,15 @@
+meta {
+  name: getprojects
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{host}}/projects
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

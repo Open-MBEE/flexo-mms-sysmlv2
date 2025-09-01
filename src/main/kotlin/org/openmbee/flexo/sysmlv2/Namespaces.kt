@@ -11,6 +11,7 @@ object SYSMLV2 {
     val BASE = "urn:sysmlv2:"
     val VOCABULARY = "https://www.omg.org/spec/SysML#"
     val ELEMENT = "${BASE}element:"
+    val QUERY = "${BASE}query:"
     val ANNOTATION_JSON = "${BASE}annotation:json:"
     val DEFAULT_BRANCH_ID = ResourceFactory.createProperty("${BASE}defaultBranchId")
     val DELETED = ResourceFactory.createProperty("${BASE}deleted")
@@ -18,15 +19,15 @@ object SYSMLV2 {
     fun element(uuid: String): Resource {
         return ResourceFactory.createResource("$ELEMENT$uuid")
     }
-
     fun type(type: String): Resource {
         return ResourceFactory.createResource("$VOCABULARY$type")
     }
-
+    fun query(id: String): Resource {
+        return ResourceFactory.createResource("$QUERY$id")
+    }
     fun prop(id: String): Property {
         return ResourceFactory.createProperty("$VOCABULARY$id")
     }
-
     fun annotationJson(key: String): Property {
         return ResourceFactory.createProperty("$ANNOTATION_JSON$key")
     }
