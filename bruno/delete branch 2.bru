@@ -1,0 +1,15 @@
+meta {
+  name: delete branch 2
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{host}}/projects/{{projectId}}/branches/{{newBranchId2}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,0 +1,28 @@
+meta {
+  name: create tag
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{host}}/projects/{{projectId}}/tags
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "taggedCommit": {
+          "@id": "{{commitId}}"
+      },
+      "name": "testing tag"
+  }
+}
+
+vars:post-response {
+  tagId: res('@id')
+}
+
+settings {
+  encodeUrl: true
+}

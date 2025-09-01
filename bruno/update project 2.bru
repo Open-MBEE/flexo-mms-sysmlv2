@@ -1,0 +1,27 @@
+meta {
+  name: update project 2
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{host}}/projects/{{projectId2}}
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+            "@type" : "Project",
+            "name" : "test2-modified",
+            "description" : "some other description"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

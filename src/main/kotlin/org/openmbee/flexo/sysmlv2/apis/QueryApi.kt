@@ -202,8 +202,8 @@ fun Route.QueryApi() {
         }
         val uri = SYSMLV2.query(queryId.toString()).uri
         val flexoResponse = flexoRequestPost {
-            orgPath("/repos/$projectId/scratches/queries/query")
-            sparqlQuery {
+            orgPath("/repos/$projectId/scratches/queries/update")
+            sparqlUpdate {
                 """
                     delete { 
                         <$uri> ?p ?o .

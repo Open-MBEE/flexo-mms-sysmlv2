@@ -1,0 +1,15 @@
+meta {
+  name: get single tag
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/tags/{{tagId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

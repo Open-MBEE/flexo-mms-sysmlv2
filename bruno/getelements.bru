@@ -1,0 +1,15 @@
+meta {
+  name: getelements
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/commits/{{commitId}}/elements
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

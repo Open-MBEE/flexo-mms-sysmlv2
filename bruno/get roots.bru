@@ -1,0 +1,15 @@
+meta {
+  name: get roots
+  type: http
+  seq: 23
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/commits/{{commitId}}/roots
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}
