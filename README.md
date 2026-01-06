@@ -18,10 +18,20 @@ This stands up a server at localhost:8080
 
 ## Running in docker
 
+Via Docker Compose that starts the prerequisite services:
+
+```
+docker compose -f .\docker-compose\docker-compose.yml up
+```
+
+To run a single container for the SysML v2 server (other components need to be started separately):
+
 ```
 docker build -t org.openmbee.flexo.sysmlv2 .
-docker run -p 8080:8080 org.openmbee.flexo.sysmlv2
+docker run -p 127.0.0.1:8083:8080 org.openmbee.flexo.sysmlv2
 ```
+
+You should then be able to access the http://localhost:8083/projects endpoint, for example.
 
 ## Documentation for API Endpoints
 
