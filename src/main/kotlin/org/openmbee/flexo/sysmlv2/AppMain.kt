@@ -1,5 +1,7 @@
 package org.openmbee.flexo.sysmlv2
 
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -15,13 +17,17 @@ import kotlinx.serialization.json.Json
 import org.openmbee.flexo.sysmlv2.apis.*
 
 lateinit var GlobalFlexoConfig: FlexoConfig
-
+lateinit var FlexoHttpClient: HttpClient
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 @Suppress("unused")
 fun Application.module() {
     GlobalFlexoConfig = flexoConfig
-
+    FlexoHttpClient = HttpClient() {
+        install(HttpTimeout) {
+            requestTimeoutMillis = GlobalFlexoConfig.defaultTimeout * 1000
+        }
+    }
     install(DefaultHeaders)
     install(CallLogging)
     /*install(DropwizardMetrics) {
@@ -50,15 +56,17 @@ fun Application.module() {
     //install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
     install(Resources)
     install(Routing) {
-        BranchApi()
-        CommitApi()
-        DiffMergeApi()
-        ElementApi()
-        MetaApi()
-        ProjectApi()
-        QueryApi()
-        RelationshipApi()
-        TagApi()
+        route(GlobalFlexoConfig.basePath) {
+            BranchApi()
+            CommitApi()
+            DiffMergeApi()
+            ElementApi()
+            MetaApi()
+            ProjectApi()
+            QueryApi()
+            RelationshipApi()
+            TagApi()
+        }
     }
 }
 
@@ -79,7 +87,8 @@ data class FlexoConfig(
     val port: Int,
     val org: String,
     val defaultTimeout: Long,
-    val auth: String
+    val auth: String,
+    val basePath: String
 )
 
 /**
@@ -93,5 +102,6 @@ val Application.flexoConfig: FlexoConfig
         val org = property("flexo.org")?.getString() ?: "sysmlv2"
         val defaultTimeout = property("flexo.defaultTimeout")?.getString()?.toLong() ?: 60_000L
         val auth = property("flexo.auth")?.getString() ?: ""
-        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth)
+        val basePath = property("flexo.basePath")?.getString() ?: ""
+        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath)
     }

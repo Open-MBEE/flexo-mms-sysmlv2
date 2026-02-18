@@ -242,10 +242,7 @@ class FlexoResponse(
 
 suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     // prepare client
-    val client = HttpClient() {
-        install(HttpTimeout)
-    }
-
+    val client = FlexoHttpClient
     // create request builder
     val builder = FlexoRequestBuilder(method)
     val auth = call.request.headers["Authorization"]?: GlobalFlexoConfig.auth

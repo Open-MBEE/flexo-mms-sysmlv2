@@ -25,4 +25,6 @@ flexo {
     defaultTimeout = ${?FLEXO_DEFAULT_TIMEOUT}
     auth = ""
     auth = ${?FLEXO_AUTH}
+    basePath = ""
+    basePath = ${?BASEPATH}
 }
