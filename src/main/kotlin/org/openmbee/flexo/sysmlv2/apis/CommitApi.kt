@@ -252,10 +252,10 @@ fun Route.CommitApi() {
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
         val projectId = call.parameters["projectId"]
         var branchId = call.parameters["branchId"]
+        val replace = call.parameters["replace"]
         val inserts = mutableListOf<String>()
         val deleteIncoming = mutableListOf<String>()
         val values = mutableListOf<String>()
-
         if (branchId == null) {
             val projectResponse = flexoRequestGet {
                 orgPath("/repos/$projectId")
@@ -381,14 +381,16 @@ fun Route.CommitApi() {
                 """.trimIndent())
             }
         }
-
-        // build SPARQL UPDATE string
-        var sparqlUpdateString = """
-            ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
-                iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE) || id == "rdf"
-            }.toList().joinToString("\n") { (id, iri) ->
-                "prefix $id: <$iri>"
-            }.reindent(3)}
+        if (replace == null || replace != "true") { //regular update
+            // build SPARQL UPDATE string
+            var sparqlUpdateString = """
+            ${
+                DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
+                    iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE) || id == "rdf"
+                }.toList().joinToString("\n") { (id, iri) ->
+                    "prefix $id: <$iri>"
+                }.reindent(3)
+            }
 
             delete {
                 ?element_n ?element_p ?element_o .
@@ -403,26 +405,52 @@ fun Route.CommitApi() {
             insert data {
                 ${inserts.joinToString("\n\n").reindent(4)}
             }           
-        """
+            """
 
-        // trim indent for better inspectability
-        sparqlUpdateString = sparqlUpdateString.trimIndent()
+            // trim indent for better inspectability
+            sparqlUpdateString = sparqlUpdateString.trimIndent()
 
-        // submit POST request to commit model
-        val flexoResponseUpdate = flexoRequestPost {
-            orgPath("/repos/$projectId/branches/$branchId/update")
+            // submit POST request to commit model
+            val flexoResponseUpdate = flexoRequestPost {
+                orgPath("/repos/$projectId/branches/$branchId/update")
 
-            // construct body payload
-            sparqlUpdate {
-                sparqlUpdateString
+                // construct body payload
+                sparqlUpdate {
+                    sparqlUpdateString
+                }
             }
+            if (flexoResponseUpdate.isFailure()) {
+                return@post forward(flexoResponseUpdate)
+            }
+            // parse the response model, convert it to JSON, and reply to client
+            call.respond(flexoResponseUpdate.parseLdp {
+                commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
+            })
+        } else { //model load - replaces model
+            val turtleLoad = """
+            ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
+                iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE) || id == "rdf"
+            }.toList().joinToString("\n") { (id, iri) ->
+                "@prefix $id: <$iri> ."
+            }.reindent(3)}
+            
+            ${inserts.joinToString("\n\n").reindent(4)}
+            """
+            val flexoResponseLoad = flexoRequestPut {
+                orgPath("/repos/$projectId/branches/$branchId/graph")
+                turtle {
+                    turtleLoad
+                }
+            }
+            // forward failures to client
+            if(flexoResponseLoad.isFailure()) {
+                return@post forward(flexoResponseLoad)
+            }
+            call.respond(flexoResponseLoad.parseModel {
+                model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
+                    commitFromModel(it.uri, it.outgoing(), UUID.fromString(projectId))
+                }.toList()[0]
+            })
         }
-        if(flexoResponseUpdate.isFailure()) {
-            return@post forward(flexoResponseUpdate)
-        }
-        // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponseUpdate.parseLdp {
-            commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
-        })
     }
 }
