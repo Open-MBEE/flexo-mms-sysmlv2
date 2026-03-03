@@ -19,8 +19,8 @@ This stands up a server at localhost:8080
 ## Running in docker
 
 ```
-docker build -t org.openmbee.flexo.sysmlv2 .
-docker run -p 8080:8080 org.openmbee.flexo.sysmlv2
+docker build --platform linux/amd64 -t openmbee/flexo-sysmlv2:temp .
+docker run -p 8080:8080 openmbee/flexo-sysmlv2:temp
 ```
 
 ## Documentation for API Endpoints
