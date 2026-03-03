@@ -384,13 +384,11 @@ fun Route.CommitApi() {
         if (replace == null || replace != "true") { //regular update
             // build SPARQL UPDATE string
             var sparqlUpdateString = """
-            ${
-                DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
-                    iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE) || id == "rdf"
-                }.toList().joinToString("\n") { (id, iri) ->
-                    "prefix $id: <$iri>"
-                }.reindent(3)
-            }
+            ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
+                iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE) || id == "rdf"
+            }.toList().joinToString("\n") { (id, iri) ->
+                "prefix $id: <$iri>"
+            }.reindent(3)}
 
             delete {
                 ?element_n ?element_p ?element_o .
