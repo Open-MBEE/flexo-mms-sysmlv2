@@ -159,8 +159,8 @@ fun Route.ProjectApi() {
 
     // create new project via POST
     post<ProjectRequest>("/projects") { projectRequest ->
-        // generate a UUID for the project
-        val projectId = UUID.randomUUID()
+        // use provided project ID or generate a UUID if not provided
+        val projectId = projectRequest.atId ?: UUID.randomUUID()
         val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
@@ -191,9 +191,13 @@ fun Route.ProjectApi() {
                 existingBranch = Identified(UUID.fromString(repo.outgoing()[SYSMLV2.DEFAULT_BRANCH_ID].literal()))
                 existingDesc = repo.outgoing()[DCTerms.description]?.literal()
             }
-            request = ProjectRequest(projectRequest.name, null,
-                projectRequest.defaultBranch ?: existingBranch,
-                projectRequest.description ?: existingDesc)
+            request = ProjectRequest(
+                name = projectRequest.name,
+                atId = null,
+                atType = null,
+                defaultBranch = projectRequest.defaultBranch ?: existingBranch,
+                description = projectRequest.description ?: existingDesc
+            )
         }
         val flexoResponse = createOrUpdateProject(UUID.fromString(projectId), request, false)
         if (flexoResponse.isFailure()) {
