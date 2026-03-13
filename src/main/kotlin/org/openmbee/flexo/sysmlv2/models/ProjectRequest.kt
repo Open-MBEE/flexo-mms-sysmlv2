@@ -21,6 +21,7 @@ import kotlinx.serialization.UseSerializers
 /**
  *
  * @param name
+ * @param atId Optional project ID. If not provided, a random UUID will be generated.
  * @param atType
  * @param defaultBranch
  * @param description
@@ -28,6 +29,8 @@ import kotlinx.serialization.UseSerializers
 @Serializable
 data class ProjectRequest(
     val name: kotlin.String,
+    @SerialName("@id")
+    val atId: java.util.UUID? = null,
     @SerialName("@type")
     val atType: ProjectRequest.AtType? = null,
     val defaultBranch: Identified? = null,

@@ -110,7 +110,8 @@ fun Route.BranchApi() {
 
     post<BranchRequest>("/projects/{projectId}/branches") { request ->
         val projectId = call.parameters["projectId"]
-        val branchId = UUID.randomUUID()
+        // use provided branch ID or generate a UUID if not provided
+        val branchId = request.atId ?: UUID.randomUUID()
         val createBranchResponse = flexoRequestPost {
             orgPath("/repos/${projectId}/branches")
             // set branch ID slug
