@@ -44,24 +44,25 @@ fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
         "@type" -> { p = RDF.type.asNode(); pvar = "Metatype" }
         else -> { p = SYSMLV2.prop(property).asNode() }
     }
-    when(value) {
+    val firstVal = value.get(0) //TODO what if value is empty list??? or > 1 value
+    when(firstVal) {
         is JsonObject -> {
-            if (value.containsKey("@id")) {
-                v = SYSMLV2.element(value.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+            if (firstVal.containsKey("@id")) {
+                v = SYSMLV2.element(firstVal.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
             } else {
                 throw BadRequestException("PrimitiveConstraint value object must contain @id")
             }
         }
         is JsonPrimitive -> {
-            if (value == JsonNull) {
+            if (firstVal == JsonNull) {
                 v = RDF.nil.asNode()
             } else {
-                v = if (property == "@type") SYSMLV2.type(value.content).asNode() else value.toRdfLiteralNode()
+                v = if (property == "@type") SYSMLV2.type(firstVal.content).asNode() else firstVal.toRdfLiteralNode()
             }
         }
         is JsonArray -> {throw BadRequestException("PrimitiveConstraint value cannot be array")}
     }
-    if (value == JsonNull) {
+    if (firstVal == JsonNull) {
         cb.addOptional("?e", p, "?$pvar")
     } else {
         cb.addWhere("?e", p, "?$pvar")
@@ -78,8 +79,14 @@ fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
         PrimitiveConstraint.Operator.Less_Than -> {
             ef.lt("?$pvar", v)
         }
+        PrimitiveConstraint.Operator.Less_Than_Equal -> {
+            ef.le("?$pvar", v)
+        }
         PrimitiveConstraint.Operator.Greater_Than -> {
             ef.gt("?$pvar", v)
+        }
+        PrimitiveConstraint.Operator.Greater_Than_Equal -> {
+            ef.ge("?$pvar", v)
         }
     }
     return if (inverse) ef.not(expr) else expr

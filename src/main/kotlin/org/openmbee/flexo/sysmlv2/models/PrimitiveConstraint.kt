@@ -32,7 +32,7 @@ data class PrimitiveConstraint @OptIn(ExperimentalSerializationApi::class) const
     val inverse: kotlin.Boolean = false,
     val operator: PrimitiveConstraint.Operator,
     val property: kotlin.String,
-    val value: JsonElement, //can be Identified, boolean, string, number
+    val value: kotlin.collections.List<JsonElement>, //can be Identified, boolean, string, number
 ) : Constraint()
 {
     /**
@@ -45,7 +45,12 @@ data class PrimitiveConstraint @OptIn(ExperimentalSerializationApi::class) const
         @SerialName(">")
         Greater_Than(">"),
         @SerialName("<")
-        Less_Than("<");
+        Less_Than("<"),
+        @SerialName("<=")
+        Less_Than_Equal("<="),
+        @SerialName(">=")
+        Greater_Than_Equal(">=");
+
     }
 }
 
