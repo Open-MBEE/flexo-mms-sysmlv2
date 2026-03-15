@@ -1,0 +1,15 @@
+meta {
+  name: getbranches
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/branches
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

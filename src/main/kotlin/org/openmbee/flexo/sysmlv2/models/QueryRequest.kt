@@ -18,8 +18,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 
-import org.openmbee.flexo.sysmlv2.models.ConstraintRequest
-
 /**
  *
  * @param atType
@@ -31,7 +29,7 @@ data class QueryRequest(
     @SerialName("@type")
     val atType: QueryRequest.AtType? = null,
     val select: kotlin.collections.List<kotlin.String>? = null,
-    val `where`: ConstraintRequest? = null
+    val where: Constraint? = null
 )
 {
     /**

@@ -1,0 +1,60 @@
+meta {
+  name: getcommits
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/commits
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "change": [
+      {
+        "@type": "DataVersion",
+        "identity": {"@id":"payload_system_element_id"},
+        "payload": {
+          "@type": "PartDefinition",
+          "name":"Spacecraft System",
+          "connectionEnd": [{
+            "@id": "ConnectionDefinition1"
+            },
+            {
+            "@id": "ConnectionDefinition2"
+            }]
+        }
+      },
+          {
+        "@type": "DataVersion",
+        "identity": {"@id":"ConnectionDefinition1"},
+        "payload": {
+          "@type": "ConnectionDefinition",
+          "name":"ConnectionDefinition...1"
+        }
+      },
+      {
+        "@type": "DataVersion",
+        "identity": {"@id":"ConnectionDefinition2"},
+        "payload": {
+          "@type": "ConnectionDefinition",
+          "name":"ConnectionDefinition...2"
+        }
+      },
+      {
+        "@type": "DataVersion",
+        "identity": {"@id":"part_definition_id_1"},
+        "payload": {
+          "@type": "PartDefinition",
+          "name":"Payload System"
+        }
+      }
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+}

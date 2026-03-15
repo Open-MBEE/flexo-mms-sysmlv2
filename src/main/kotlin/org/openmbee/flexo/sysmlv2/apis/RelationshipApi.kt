@@ -11,136 +11,67 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.response.*
 import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
 import io.ktor.server.resources.get
-import io.ktor.server.resources.post
-import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
+import org.openmbee.flexo.sysmlv2.flexoRequestPost
+import org.openmbee.flexo.sysmlv2.forward
 
 fun Route.RelationshipApi() {
 
     get<Paths.getRelationshipsByProjectCommitRelatedElement> {
-        val exampleContentString = """[ {
-          "@type" : "Relationship",
-          "ownedRelatedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "source" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImplied" : true,
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "target" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "relatedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ]
-        }, {
-          "@type" : "Relationship",
-          "ownedRelatedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "source" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImplied" : true,
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "target" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "relatedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ]
-        } ]"""
-        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
-    }
+        val direction = it.direction?: "both"
+        val inQuery = """
+            ?rel sysml:target elmt:${it.relatedElementId} ;
+                 ?rel_p ?rel_o .
+        """
+        val outQuery = """
+            ?rel sysml:source elmt:${it.relatedElementId} ;
+                 ?rel_p ?rel_o .
+        """
+        val where = when (direction) {
+            "in" -> inQuery
+            "out" -> outQuery
+            else -> """
+                {
+                    $inQuery
+                } union {
+                    $outQuery
+                }
+            """
+        }
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${it.projectId}/locks/Commit.${it.commitId}/query")
+            sparqlQuery {
+                """
+                prefix sysml: <https://www.omg.org/spec/SysML#>
+                prefix elmt: <urn:sysmlv2:element:>
+                construct {
+                  ?rel ?rel_p ?rel_o .
+                }
+                where {
+                  $where
+                }
+                """.trimIndent()
+            }
+        }
 
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+        // parse the response model, extract the elements to JSON, and reply to client
+        val result = buildJsonArray {
+            flexoResponse.parseModel {
+                for(subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        }
+        call.respond(result)
+    }
 }

@@ -189,7 +189,7 @@ class FlexoRequestBuilder(
             setBody(this@FlexoRequestBuilder.body)
 
             timeout {
-                requestTimeoutMillis = this@FlexoRequestBuilder.timeout
+                requestTimeoutMillis = this@FlexoRequestBuilder.timeout * 1000
             }
         }
     }
@@ -242,10 +242,7 @@ class FlexoResponse(
 
 suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     // prepare client
-    val client = HttpClient() {
-        install(HttpTimeout)
-    }
-
+    val client = FlexoHttpClient
     // create request builder
     val builder = FlexoRequestBuilder(method)
     val auth = call.request.headers["Authorization"]?: GlobalFlexoConfig.auth
@@ -277,6 +274,10 @@ suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPost(setup: FlexoReq
     return flexoRequest(HttpMethod.Post, setup)
 }
 
+suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPatch(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+    return flexoRequest(HttpMethod.Patch, setup)
+}
+
 open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
     fun indexOut(iri: String?): Map<Property, Set<RDFNode>> {
         val outgoingProperties: MutableMap<Property, MutableSet<RDFNode>> = mutableMapOf()
@@ -301,7 +302,7 @@ open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
     }
 
     var String.uriSuffix: String
-        get() = substringAfterLast('/')
+        get() = if(startsWith(SYSMLV2.VOCABULARY)) substringAfterLast('#') else substringAfterLast('/')
         set(v) {}
 
     var String.urnSuffix: String

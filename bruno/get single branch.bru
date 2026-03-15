@@ -1,0 +1,15 @@
+meta {
+  name: get single branch
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/branches/{{defaultBranchId}}
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

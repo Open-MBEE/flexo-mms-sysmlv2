@@ -9,50 +9,44 @@ val ROOT_CONTEXT = "http://layer1-service"
 
 object SYSMLV2 {
     val BASE = "urn:sysmlv2:"
-    val VOCABULARY = "https://www.omg.org/spec/SysML/"
+    val VOCABULARY = "https://www.omg.org/spec/SysML#"
     val ELEMENT = "${BASE}element:"
-    val TYPE = "${BASE}type:"
-    val PROPERTY = "${BASE}property:"
-    val RELATION = "${BASE}relation:"
+    val QUERY = "${BASE}query:"
     val ANNOTATION_JSON = "${BASE}annotation:json:"
+    val DEFAULT_BRANCH_ID = ResourceFactory.createProperty("${BASE}defaultBranchId")
+    val DELETED = ResourceFactory.createProperty("${BASE}deleted")
 
     fun element(uuid: String): Resource {
         return ResourceFactory.createResource("$ELEMENT$uuid")
     }
-
     fun type(type: String): Resource {
-        return ResourceFactory.createResource("$TYPE$type")
+        return ResourceFactory.createResource("$VOCABULARY$type")
     }
-
+    fun query(id: String): Resource {
+        return ResourceFactory.createResource("$QUERY$id")
+    }
     fun prop(id: String): Property {
-//        return ResourceFactory.createProperty(VOCABULARY, id)
-        return ResourceFactory.createProperty("$PROPERTY$id")
+        return ResourceFactory.createProperty("$VOCABULARY$id")
     }
-
     fun annotationJson(key: String): Property {
         return ResourceFactory.createProperty("$ANNOTATION_JSON$key")
     }
-
-    fun relation(key: String): Property {
-        return ResourceFactory.createProperty("$RELATION$key")
-    }
 }
-
-val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
+val SYSMLV2_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
     val prefixes = mutableMapOf(
         "rdf" to "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
         "rdfs" to "http://www.w3.org/2000/01/rdf-schema#",
         "owl" to "http://www.w3.org/2002/07/owl#",
         "xsd" to "http://www.w3.org/2001/XMLSchema#",
         "dct" to "http://purl.org/dc/terms/",
-        "sysmlv2" to SYSMLV2.BASE,
-        "type" to SYSMLV2.TYPE,
+        "sysml" to SYSMLV2.VOCABULARY,
         "elmt" to SYSMLV2.ELEMENT,
-        "prop" to SYSMLV2.PROPERTY,
-        "rltn" to SYSMLV2.RELATION,
         "json" to SYSMLV2.ANNOTATION_JSON,
     )
-
+    setNsPrefixes(prefixes)
+}
+val DEFAULT_PREFIX_MAPPING = PrefixMapping.Factory.create().apply {
+    val prefixes = SYSMLV2_PREFIX_MAPPING.nsPrefixMap.toMutableMap()
     with("https://mms.openmbee.org/rdf") {
         prefixes.putAll(mapOf(
             "mms" to "$this/ontology/",
@@ -161,6 +155,8 @@ object MMS {
     val delete = prop("delete")
     val insert = prop("insert")
     val where = prop("where")
+
+    val nil = ResourceFactory.createResource("${DEFAULT_PREFIX_MAPPING.getNsPrefixURI("rdf")}nil")
 
     val contentType = prop("contentType")
 

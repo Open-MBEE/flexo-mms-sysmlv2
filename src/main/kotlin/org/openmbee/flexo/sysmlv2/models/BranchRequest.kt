@@ -22,12 +22,15 @@ import kotlinx.serialization.UseSerializers
  *
  * @param head
  * @param name
+ * @param atId Optional branch ID. If not provided, a random UUID will be generated.
  * @param atType
  */
 @Serializable
 data class BranchRequest(
     val head: Identified,
     val name: kotlin.String,
+    @SerialName("@id")
+    val atId: java.util.UUID? = null,
     @SerialName("@type")
     val atType: BranchRequest.AtType? = null
 )

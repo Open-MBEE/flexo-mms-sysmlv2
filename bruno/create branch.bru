@@ -1,0 +1,28 @@
+meta {
+  name: create branch
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{host}}/projects/{{projectId}}/branches
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "head": {
+          "@id": "{{commitId}}"
+      },
+      "name": "testing branch"
+  }
+}
+
+vars:post-response {
+  newBranchId: res('@id')
+}
+
+settings {
+  encodeUrl: true
+}

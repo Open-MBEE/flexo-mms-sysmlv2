@@ -15,14 +15,12 @@ import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.*
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.vocabulary.RDF
 import org.apache.jena.vocabulary.XSD
 import org.openmbee.flexo.sysmlv2.*
-import org.openmbee.flexo.sysmlv2.models.ProjectUsage
 
 fun modelElementConstructQuery(elementTarget: String="?__element"): String {
     return """
@@ -33,6 +31,31 @@ fun modelElementConstructQuery(elementTarget: String="?__element"): String {
         where {
             $elementTarget a ?element_type ;
                 ?element_p ?element_o .
+        }
+    """.trimIndent()
+}
+
+fun listElementsConstructQuery(limit: Int?=null, offset: Int?=null): String {
+    if (limit == null && offset == null) return """
+        construct {
+            ?s ?p ?o .
+        } where {
+            ?s ?o ?o .
+        }
+    """.trimIndent()
+    return """
+        prefix sysml: <https://www.omg.org/spec/SysML#>
+        construct {
+            ?e ?element_p ?element_o .
+        }
+        where {
+            {
+                 select ?e
+                 where {
+                     ?e sysml:elementId ?id .
+                 } order by ?id limit $limit offset $offset
+            }
+            ?e ?element_p ?element_o .
         }
     """.trimIndent()
 }
@@ -67,31 +90,17 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
             // reference the first value
             val obj = values.elementAt(0)
 
-            // relations
-            if(predicate.uri.startsWith(SYSMLV2.RELATION)) {
+            if(predicate.uri.startsWith(SYSMLV2.VOCABULARY)) {
                 // multiple values means it's an array, skip and prefer JSON annotation
                 // if we've already seen a JSON annotation with the same property key then ignore
                 if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
-
-                // object is a resource
-                if (obj.isResource) {
+                if (obj == RDF.nil) {
+                    put(propertyKey, JsonNull)
+                } else if (obj.isResource) {
                     put(propertyKey, buildJsonObject {
                         put("@id", obj.asResource().uri.autoSuffix)
                     })
-                }
-                // invalid
-                else {
-                    throw InvalidTripleError("Relation cannot be literal", elementIri, predicate, obj)
-                }
-            }
-            // properties
-            else if(predicate.uri.startsWith(SYSMLV2.PROPERTY)) {
-                // multiple values means it's an array, skip and prefer JSON annotation
-                // if we've already seen a JSON annotation with the same property key then ignore
-                if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
-
-                // object is a Literal
-                if (obj.isLiteral) {
+                } else if (obj.isLiteral) {
                     val lit = obj.asLiteral()
 
                     // depending on its datatype
@@ -102,9 +111,9 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
                         else -> put(propertyKey, lit.string)
                     }
                 }
-                // object is a Resource
+                // invalid
                 else {
-                    throw InvalidTripleError("Property cannot be resource", elementIri, predicate, obj)
+                    throw InvalidTripleError("Don't know what this is", elementIri, predicate, obj)
                 }
             }
             // annotations
@@ -153,10 +162,9 @@ fun Route.ElementApi() {
 
         // submit POST request to query model
         val flexoResponse = flexoRequestPost {
-            orgPath("/repos/${getElement.projectId}/commits/${getElement.commitId}/query")
-
+            orgPath("/repos/${getElement.projectId}/locks/Commit.${getElement.commitId}/query")
             sparqlQuery {
-                modelElementConstructQuery(elementIri)
+                modelElementConstructQuery("<$elementIri>")
             }
         }
 
@@ -176,114 +184,97 @@ fun Route.ElementApi() {
     get<Paths.getElementsByProjectCommit> { getElements ->
         // submit POST request to query model
         val flexoResponse = flexoRequestGet {
-            orgPath("/repos/${getElements.projectId}/branches/master/graph")
+            orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
         }
 
         // forward failures to client
         if(flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
         }
+        // parse the response model, extract the elements to JSON, and reply to client
         val result = buildJsonArray {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
-                    if (subject.uri != "urn:this") {
-                        add(extractModelElementToJson(subject.uri))
-                    }
+                    add(extractModelElementToJson(subject.uri))
                 }
             }
         }
-
-        // parse the response model, extract the elements to JSON, and reply to client
         call.respond(result)
     }
 
     get<Paths.getProjectUsageByProjectCommitElement> {
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${it.projectId}/locks/Commit.${it.commitId}/query")
+            sparqlQuery {
+                """
+                prefix sysml: <https://www.omg.org/spec/SysML#>
+                construct {
+                  ?element a sysml:ProjectUsage ;
+                         ?element_p ?element_o .
+                }
+                where {
+                  ?element a sysml:ProjectUsage ;
+                        ?element_p ?element_o .
+                }
+                """.trimIndent()
+            }
+        }
 
-        val exampleContentString = """{
-          "@type" : "ProjectUsage",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91",
-          "usedCommit" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "usedProject" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }
-        }"""
-        call.respond(Json.decodeFromString<ProjectUsage>(exampleContentString))
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+        // parse the response model, extract the elements to JSON, and reply to client
+        val result = buildJsonArray {
+            flexoResponse.parseModel {
+                for(subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        }
+        call.respond(result)
     }
 
     get<Paths.getRootsByProjectCommit> {
-        val exampleContentString = """[ {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "owner" : {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "textualRepresentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedAnnotation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "ownedElement" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "aliasIds" : [ "aliasIds", "aliasIds" ],
-          "@type" : "Element",
-          "ownedRelationship" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "documentation" : [ {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          }, {
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          } ],
-          "isImpliedIncluded" : true,
-          "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
+        // submit POST request to query model
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${it.projectId}/locks/Commit.${it.commitId}/query")
+            sparqlQuery {
+                """
+                prefix sysml: <https://www.omg.org/spec/SysML#>
+                prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                construct {
+                  ?element a ?element_type ;
+                         ?element_p ?element_o .
+                }
+                where {
+                  ?element a ?element_type ;
+                        ?element_p ?element_o .
+                  
+                  optional { ?element sysml:owner ?owner . }
+                  optional { ?element sysml:owningRelatedElement ?related . }
 
-        call.respond(Json.decodeFromString<List<JsonObject>>(exampleContentString))
+                  filter ((!bound(?owner) || ?owner = rdf:nil) && (!bound(?related) || ?related = rdf:nil))
+                }
+                """.trimIndent()
+            }
+        }
+
+        // forward failures to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
+
+        // parse the response model, extract the elements to JSON, and reply to client
+        val result = buildJsonArray {
+            flexoResponse.parseModel {
+                for(subject in model.listSubjects()) {
+                    add(extractModelElementToJson(subject.uri))
+                }
+            }
+        }
+        call.respond(result)
     }
 
 }

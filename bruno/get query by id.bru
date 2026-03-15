@@ -1,0 +1,19 @@
+meta {
+  name: get query by id
+  type: http
+  seq: 29
+}
+
+get {
+  url: {{host}}/projects/{{projectId}}/queries/{{queryId}}
+  body: text
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+settings {
+  encodeUrl: true
+}

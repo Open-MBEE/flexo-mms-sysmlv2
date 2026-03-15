@@ -1,0 +1,36 @@
+meta {
+  name: post query
+  type: http
+  seq: 25
+}
+
+post {
+  url: {{host}}/projects/{{projectId}}/query-results
+  body: text
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:text {
+  {
+      "select" : [ "@id", "@type" ],
+      "@type" : "Query",
+      "where" : {
+          "@type" : "CompositeConstraint",
+          "constraint" : [ 
+              {"@type": "PrimitiveConstraint", "inverse": false, "operator": "=", "property": "owningRelatedElement", "value": [{
+                      "@id": "c2387c83-5774-4342-921a-729064d959ab"
+              }]}, 
+              {"@type": "PrimitiveConstraint", "inverse": false, "operator": "=", "property": "@type", "value": ["NamespaceImport"]}
+          ],
+          "operator" : "or"
+      }
+  }
+}
+
+settings {
+  encodeUrl: true
+}

@@ -37,7 +37,7 @@ data class Query(
     val atType: Query.AtType,
     val owningProject: Identified,
     val select: kotlin.collections.List<kotlin.String>,
-    val `where`: Constraint
+    val where: Constraint
 )
 {
     /**

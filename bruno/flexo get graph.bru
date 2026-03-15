@@ -1,0 +1,19 @@
+meta {
+  name: flexo get graph
+  type: http
+  seq: 33
+}
+
+get {
+  url: {{flexoHost}}/orgs/sysmlv2/repos/{{projectId}}/locks/Commit.{{commitId}}/graph
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJmbGV4by1tbXMtYXVkaWVuY2UiLCJpc3MiOiJodHRwOi8vZmxleG8tbW1zLXNlcnZpY2VzIiwidXNlcm5hbWUiOiJ1c2VyMDEiLCJncm91cHMiOlsic3VwZXJfYWRtaW5zIl0sImV4cCI6MTc2OTY3MzYwMH0.UqU5KOPSCbYyqbj3BBZs4u7lWbpHyDHPEd7Tbd4wWsM
+}
+
+settings {
+  encodeUrl: true
+}

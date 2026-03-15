@@ -11,14 +11,14 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
-import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.pipeline.*
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
+import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import org.openmbee.flexo.sysmlv2.*
@@ -28,21 +28,10 @@ import org.openmbee.flexo.sysmlv2.models.ProjectRequest
 import java.time.OffsetDateTime
 import java.util.*
 
-
-//    val exampleContentString = """{
-//      "@type" : "Project",
-//      "created" : "2000-01-23T04:56:07.000+00:00",
-//      "defaultBranch" : {
-//        "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//      },
-//      "name" : "name",
-//      "description" : "description",
-//      "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-//    }"""
 fun projectFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
     projectUuid: UUID = UUID.fromString(outgoing[MMS.id]?.literal()),
-    branchUuid: UUID = UUID.randomUUID()//UUID.fromString(outgoing[MMS.defaultBranchId]?.literal())
+    branchUuid: UUID = UUID.fromString(outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal())
 ): Project {
     return Project(
         atId = projectUuid,
@@ -56,12 +45,80 @@ fun projectFromResponse(
     )
 }
 
-fun Route.ProjectApi() {
-    // delete a project
-    delete<Paths.deleteProjectById> { deleteProject ->
-        call.application.log.debug("${deleteProject.projectId}")
+suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateProject(
+    projectUuid: UUID, projectRequest: ProjectRequest, post: Boolean): FlexoResponse {
+    // generate a UUID for the default branch if not provided
+    val branchUuid = projectRequest.defaultBranch?.atId ?: UUID.randomUUID()
+    // submit POST request to create new repo or update repo
+    val flexoResponse = flexoRequestPut {
+        orgPath("/repos/${projectUuid}")
+        // construct body payload
+        turtle {
+            thisSubject(
+                DCTerms.title to projectRequest.name.en,
+                DCTerms.description to projectRequest.description?.en,
+                SYSMLV2.DEFAULT_BRANCH_ID to branchUuid.toString().en
+            )
+        }
+    }
 
-        notImplemented()
+    // forward failures to client
+    if(flexoResponse.isFailure()) {
+        return flexoResponse
+    }
+    if (post) { //creating new project
+        //create default branch
+        val defaultBranchResponse = flexoRequestPut {
+            orgPath("/repos/${projectUuid}/branches/${branchUuid}")
+            turtle {
+                thisSubject(
+                    MMS.ref to ResourceFactory.createResource("./master"),
+                    DCTerms.title to "Initial".en
+                )
+            }
+        }
+        // forward failures to client
+        if(defaultBranchResponse.isFailure()) {
+            return defaultBranchResponse
+        }
+        val queryResponse = flexoRequestPut {
+            orgPath("/repos/${projectUuid}/scratches/queries")
+            turtle {
+                thisSubject(
+                    DCTerms.title to "queries".en
+                )
+            }
+        }
+        // forward failures to client
+        if(queryResponse.isFailure()) {
+            return queryResponse
+        }
+    }
+    return flexoResponse
+}
+
+fun Route.ProjectApi() {
+    //delete a project (soft delete)
+    delete<Paths.deleteProjectById> { deleteProject ->
+        // add annotation to indicate it's deleted
+        val patchResponse = flexoRequestPatch {
+            orgPath("/repos/${deleteProject.projectId}")
+            sparqlUpdate {
+                """
+                    insert data {
+                        <> <${SYSMLV2.DELETED.uri}> true .
+                    }
+                """.trimIndent()
+            }
+        }
+        if (patchResponse.isFailure()) {
+            return@delete forward(patchResponse)
+        }
+        call.respond(patchResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
+        })
     }
 
     // get a project by its ID
@@ -70,25 +127,31 @@ fun Route.ProjectApi() {
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getProject.projectId}")
         }
-
-        // parse the response model, convert it JSON, and reply to client
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
         call.respond(flexoResponse.parseModel {
-            val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/${getProject.projectId}")
-            projectFromResponse(outgoing)
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 
     // get all projects
-    get<Paths.getProjects> { getProjects ->
-        // submit GET request for all repos
+    get<Paths.getProjects> {
         val flexoResponse = flexoRequestGet {
             orgPath("/repos")
         }
-
+        if(flexoResponse.isFailure()) {
+            return@get forward(flexoResponse)
+        }
         // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
             // find all repos and transform each one into a project by its outgoing triples
-            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+            // filter out deleted = true
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).filterDrop {
+                it.hasProperty(SYSMLV2.DELETED)
+            }.mapWith {
                 projectFromResponse(it.outgoing())
             }.toList()
         })
@@ -96,96 +159,54 @@ fun Route.ProjectApi() {
 
     // create new project via POST
     post<ProjectRequest>("/projects") { projectRequest ->
-        //just always make sure org is there
-        flexoRequestPut {
-            orgPath("")
-            turtle {"""
-               <> dct:title "sysmlv2"@en .
-            """
-            }
-        }
-        // generate a UUID for the repo
-        val repoUuid = UUID.randomUUID()
-
-        // generate a UUID for the default branch
-        val branchUuid = UUID.randomUUID()
-
-        // submit POST request to create new repo
-        val flexoResponse = flexoRequestPost {
-            orgPath("/repos")
-
-            // set project ID slug
-            addHeaders(
-                "Slug" to repoUuid.toString()
-            )
-
-            // build query parameters; set default branch ID
-            addQueryParams(
-                "defaultBranchId" to branchUuid.toString()
-            )
-
-            // construct body payload
-            turtle {
-                thisSubject(
-                    DCTerms.title to projectRequest.name.en,
-                    DCTerms.description to projectRequest.description?.en,
-                )
-            }
-        }
-
-        // forward failures to client
-        if(flexoResponse.isFailure()) {
+        // use provided project ID or generate a UUID if not provided
+        val projectId = projectRequest.atId ?: UUID.randomUUID()
+        val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
+        if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
-
-        // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseLdp {
-            projectFromResponse(focalOutgoing)
+        call.respond(flexoResponse.parseModel {
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 
-    // create new project via PUT
+    // update project via PUT
     put<ProjectRequest>("/projects/{projectId}") { projectRequest ->
-        //just always make sure org is there
-        flexoRequestPut {
-            orgPath("")
-            turtle {"""
-               <> dct:title "sysmlv2"@en .
-            """
-            }
-        }
         val projectId = "${call.parameters["projectId"]}"
-
-        // generate a UUID for the default branch
-        val branchUuid = UUID.randomUUID()
-
-        // submit PUT request to create new repo
-        val flexoResponse = flexoRequestPut {
-            orgPath("/repos/$projectId")
-
-            // build query parameters; set default branch ID
-            addQueryParams(
-                "defaultBranchId" to branchUuid.toString()
-            )
-
-            // construct body payload
-            turtle {
-                thisSubject(
-                    DCTerms.title to projectRequest.name.en,
-                    DCTerms.description to projectRequest.description?.en,
-                )
+        var request = projectRequest
+        // fill in existing info if not included
+        if (projectRequest.defaultBranch == null || projectRequest.description == null) {
+            val projectResponse = flexoRequestGet {
+                orgPath("/repos/${projectId}")
             }
+            if (projectResponse.isFailure()) {
+                return@put forward(projectResponse)
+            }
+            var existingBranch: Identified? = null
+            var existingDesc: String? = null
+            projectResponse.parseModel {
+                val repo = model.listSubjectsWithProperty(RDF.type, MMS.Repo).nextResource()!!
+                existingBranch = Identified(UUID.fromString(repo.outgoing()[SYSMLV2.DEFAULT_BRANCH_ID].literal()))
+                existingDesc = repo.outgoing()[DCTerms.description]?.literal()
+            }
+            request = ProjectRequest(
+                name = projectRequest.name,
+                atId = null,
+                atType = null,
+                defaultBranch = projectRequest.defaultBranch ?: existingBranch,
+                description = projectRequest.description ?: existingDesc
+            )
         }
-
-        // forward failures to client
-        if(flexoResponse.isFailure()) {
+        val flexoResponse = createOrUpdateProject(UUID.fromString(projectId), request, false)
+        if (flexoResponse.isFailure()) {
             return@put forward(flexoResponse)
         }
-
-        // parse the response model, convert it to JSON, and reply to client
         call.respond(flexoResponse.parseModel {
-            val outgoing = indexOut("$ROOT_CONTEXT/orgs/${GlobalFlexoConfig.org}/repos/$projectId")
-            projectFromResponse(outgoing)
+            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
+                projectFromResponse(indexOut(it.uri))
+            }.toList()[0]
         })
     }
 }

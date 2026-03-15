@@ -2068,6 +2068,11 @@
         "title": "ProjectRequest",
         "type": "object",
         "properties": {
+          "@id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional project ID. If not provided, a random UUID will be generated."
+          },
           "@type": {
             "type": "string",
             "const": "Project"
@@ -2151,6 +2156,11 @@
         "title": "BranchRequest",
         "type": "object",
         "properties": {
+          "@id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional branch ID. If not provided, a random UUID will be generated."
+          },
           "@type": {
             "type": "string",
             "const": "Branch"
