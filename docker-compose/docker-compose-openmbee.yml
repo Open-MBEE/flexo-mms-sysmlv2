@@ -13,7 +13,7 @@ services:
       - 8080:8080
 
   sysmlv2-service:
-    image: openmbee/flexo-sysmlv2:omg
+    image: openmbee/flexo-sysmlv2:v0.1.1
     hostname: flexo-sysmlv2
     container_name: flexo-sysmlv2
     env_file:

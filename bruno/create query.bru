@@ -21,10 +21,10 @@ body:text {
       "where" : {
           "@type" : "CompositeConstraint",
           "constraint" : [ 
-              {"@type": "PrimitiveConstraint", "inverse": false, "operator": "=", "property": "owningRelatedElement", "value": {
+              {"@type": "PrimitiveConstraint", "inverse": false, "operator": "=", "property": "owningRelatedElement", "value": [{
                       "@id": "c2387c83-5774-4342-921a-729064d959ab"
-              }}, 
-              {"@type": "PrimitiveConstraint", "inverse": false, "operator": "=", "property": "@type", "value": "NamespaceImport"}
+              }]}, 
+              {"@type": "PrimitiveConstraint", "inverse": false, "operator": "=", "property": "@type", "value": ["NamespaceImport"]}
           ],
           "operator" : "or"
       }

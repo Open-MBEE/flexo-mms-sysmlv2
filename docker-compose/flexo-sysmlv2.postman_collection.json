@@ -758,7 +758,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\" : \"CompositeConstraint\",\n        \"constraint\" : [ \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"owningRelatedElement\", \"value\": {\n                    \"@id\": \"c2387c83-5774-4342-921a-729064d959ab\"\n            }}, \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"@type\", \"value\": \"NamespaceImport\"}\n        ],\n        \"operator\" : \"or\"\n    }\n}",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\" : \"CompositeConstraint\",\n        \"constraint\" : [ \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"owningRelatedElement\", \"value\": [{\n                    \"@id\": \"c2387c83-5774-4342-921a-729064d959ab\"\n            }]}, \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"@type\", \"value\": [\"NamespaceImport\"]}\n        ],\n        \"operator\" : \"or\"\n    }\n}",
 					"options": {
 						"raw": {
 							"language": "text"
@@ -792,7 +792,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\": \"PrimitiveConstraint\", \n        \"inverse\": true, \n        \"operator\": \"=\", \n        \"property\": \"name\", \n        \"value\": \"1c-Parts Tree Redefinition\"\n    }\n}",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\": \"PrimitiveConstraint\", \n        \"inverse\": true, \n        \"operator\": \"=\", \n        \"property\": \"name\", \n        \"value\": [\"1c-Parts Tree Redefinition\"]\n    }\n}",
 					"options": {
 						"raw": {
 							"language": "text"
@@ -841,7 +841,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\" : \"CompositeConstraint\",\n        \"constraint\" : [ \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"owningRelatedElement\", \"value\": {\n                    \"@id\": \"c2387c83-5774-4342-921a-729064d959ab\"\n            }}, \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"@type\", \"value\": \"NamespaceImport\"}\n        ],\n        \"operator\" : \"or\"\n    }\n}",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\" : \"CompositeConstraint\",\n        \"constraint\" : [ \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"owningRelatedElement\", \"value\": [{\n                    \"@id\": \"c2387c83-5774-4342-921a-729064d959ab\"\n            }]}, \n            {\"@type\": \"PrimitiveConstraint\", \"inverse\": false, \"operator\": \"=\", \"property\": \"@type\", \"value\": [\"NamespaceImport\"]}\n        ],\n        \"operator\" : \"or\"\n    }\n}",
 					"options": {
 						"raw": {
 							"language": "text"
@@ -1040,7 +1040,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\": \"PrimitiveConstraint\", \n        \"inverse\": false, \n        \"operator\": \"=\", \n        \"property\": \"name\", \n        \"value\": \"1c-Parts Tree Redefinition\"\n    }\n}",
+					"raw": "{\n    \"select\" : [ \"@id\", \"@type\" ],\n    \"@type\" : \"Query\",\n    \"where\" : {\n        \"@type\": \"PrimitiveConstraint\", \n        \"inverse\": false, \n        \"operator\": \"=\", \n        \"property\": \"name\", \n        \"value\": [\"1c-Parts Tree Redefinition\"]\n    }\n}",
 					"options": {
 						"raw": {
 							"language": "text"
