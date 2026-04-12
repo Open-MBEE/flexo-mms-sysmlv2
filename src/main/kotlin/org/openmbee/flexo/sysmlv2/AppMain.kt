@@ -11,6 +11,9 @@ import io.ktor.server.plugins.callloging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
+import io.ktor.server.response.*
+import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.resources.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
@@ -55,6 +58,20 @@ fun Application.module() {
     install(Compression, ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html
     //install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
     install(Resources)
+    install(StatusPages) {
+        exception<InvalidSysmlSerializationError> { call, cause ->
+            call.respondText(cause.message ?: "Bad Request", status = HttpStatusCode.BadRequest)
+        }
+        exception<BadRequestException> { call, cause ->
+            call.respondText(cause.message ?: "Bad Request", status = HttpStatusCode.BadRequest)
+        }
+        exception<NotImplementedError> { call, cause ->
+            call.respondText(cause.message ?: "Not Implemented", status = HttpStatusCode.NotImplemented)
+        }
+        exception<Throwable> { call, cause ->
+            call.respondText(cause.message ?: "Internal Server Error", status = HttpStatusCode.InternalServerError)
+        }
+    }
     install(Routing) {
         route(GlobalFlexoConfig.basePath) {
             BranchApi()

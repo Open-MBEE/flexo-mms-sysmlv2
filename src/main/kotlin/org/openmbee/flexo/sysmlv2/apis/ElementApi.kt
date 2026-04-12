@@ -40,7 +40,7 @@ fun listElementsConstructQuery(limit: Int?=null, offset: Int?=null): String {
         construct {
             ?s ?p ?o .
         } where {
-            ?s ?o ?o .
+            ?s ?p ?o .
         }
     """.trimIndent()
     return """

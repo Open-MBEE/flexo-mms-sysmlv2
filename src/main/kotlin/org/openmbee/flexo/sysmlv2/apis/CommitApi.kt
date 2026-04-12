@@ -25,6 +25,7 @@ import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
+import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
@@ -218,11 +219,12 @@ fun Route.CommitApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        val commit = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
                 commitFromModel(it.uri, it.outgoing(), getCommit.projectId)
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(commit)
     }
 
     get<Paths.getCommitsByProject> { getCommits ->
@@ -444,11 +446,12 @@ fun Route.CommitApi() {
             if(flexoResponseLoad.isFailure()) {
                 return@post forward(flexoResponseLoad)
             }
-            call.respond(flexoResponseLoad.parseModel {
+            val commit = flexoResponseLoad.parseModel {
                 model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
                     commitFromModel(it.uri, it.outgoing(), UUID.fromString(projectId))
-                }.toList()[0]
-            })
+                }.toList().firstOrNull()
+            } ?: return@post call.respond(HttpStatusCode.NotFound)
+            call.respond(commit)
         }
     }
 }
