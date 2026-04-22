@@ -21,6 +21,7 @@ import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
+import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Identified
 import org.openmbee.flexo.sysmlv2.models.Project
@@ -114,11 +115,12 @@ fun Route.ProjectApi() {
         if (patchResponse.isFailure()) {
             return@delete forward(patchResponse)
         }
-        call.respond(patchResponse.parseModel {
+        val project = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
                 projectFromResponse(indexOut(it.uri))
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@delete call.respond(HttpStatusCode.NotFound)
+        call.respond(project)
     }
 
     // get a project by its ID
@@ -130,11 +132,12 @@ fun Route.ProjectApi() {
         if(flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
         }
-        call.respond(flexoResponse.parseModel {
+        val project = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
                 projectFromResponse(indexOut(it.uri))
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(project)
     }
 
     // get all projects
@@ -165,11 +168,12 @@ fun Route.ProjectApi() {
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
-        call.respond(flexoResponse.parseModel {
+        val project = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
                 projectFromResponse(indexOut(it.uri))
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@post call.respond(HttpStatusCode.NotFound)
+        call.respond(project)
     }
 
     // update project via PUT
@@ -203,10 +207,11 @@ fun Route.ProjectApi() {
         if (flexoResponse.isFailure()) {
             return@put forward(flexoResponse)
         }
-        call.respond(flexoResponse.parseModel {
+        val project = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
                 projectFromResponse(indexOut(it.uri))
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@put call.respond(HttpStatusCode.NotFound)
+        call.respond(project)
     }
 }

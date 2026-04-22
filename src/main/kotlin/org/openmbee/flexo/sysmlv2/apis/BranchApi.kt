@@ -23,6 +23,7 @@ import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
+import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Branch
 import org.openmbee.flexo.sysmlv2.models.BranchRequest
@@ -66,11 +67,12 @@ fun Route.BranchApi() {
         if (patchResponse.isFailure()) {
             return@delete forward(patchResponse)
         }
-        call.respond(patchResponse.parseModel {
+        val branch = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@delete call.respond(HttpStatusCode.NotFound)
+        call.respond(branch)
     }
 
     get<Paths.getBranchesByProject> { path ->
@@ -101,11 +103,12 @@ fun Route.BranchApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        val branch = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(branch)
     }
 
     post<BranchRequest>("/projects/{projectId}/branches") { request ->

@@ -23,6 +23,7 @@ import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
+import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Identified
 import org.openmbee.flexo.sysmlv2.models.Tag
@@ -66,11 +67,12 @@ fun Route.TagApi() {
         if (patchResponse.isFailure()) {
             return@delete forward(patchResponse)
         }
-        call.respond(patchResponse.parseModel {
+        val tag = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
                 tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@delete call.respond(HttpStatusCode.NotFound)
+        call.respond(tag)
     }
 
     get<Paths.getTagByProjectAndId> { path ->
@@ -85,7 +87,8 @@ fun Route.TagApi() {
                 tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
             }.toList()
         }
-        call.respond(if (tags.isEmpty()) "" else tags[0])
+        val tag = tags.firstOrNull() ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(tag)
 
     }
 

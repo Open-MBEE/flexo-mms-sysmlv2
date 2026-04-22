@@ -5,7 +5,6 @@ import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import java.lang.Long
 import java.math.BigDecimal
 import java.net.URI
 import java.time.OffsetDateTime
@@ -48,7 +47,7 @@ object BigDecimalSerializer : KSerializer<BigDecimal> {
     override val descriptor = PrimitiveSerialDescriptor("BigDecimal", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): BigDecimal {
-        return BigDecimal.valueOf(Long.getLong(decoder.decodeString()))
+        return decoder.decodeString().toBigDecimal()
     }
 
     override fun serialize(encoder: Encoder, value: BigDecimal) {

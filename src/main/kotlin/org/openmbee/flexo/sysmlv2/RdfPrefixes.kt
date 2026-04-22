@@ -21,7 +21,7 @@ class PrefixedRdfPropertiesMap(
         return PropertyImpl(if(key.first() == '>') {
             key.substring(1)
         } else if(key.first() == '<' && key.last() == '>') {
-            key.substring(1, -1)
+            key.substring(1, key.length - 1)
         } else {
             prefixes.expandPrefix(key)
         })

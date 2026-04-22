@@ -11,6 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.resources.*
@@ -184,11 +185,12 @@ suspend fun PipelineContext<*, ApplicationCall>.getQuery(projectId: UUID, queryI
         return Pair(flexoResponse, null)
     }
     // parse the response model, convert it to JSON, and reply to client
-    return Pair(flexoResponse, (flexoResponse.parseModel {
+    val query = flexoResponse.parseModel {
         model.listSubjects().mapWith { it2 ->
             queryFromResponse(it2.outgoing())
-        }.toList()[0]
-    }))
+        }.toList().firstOrNull()
+    }
+    return Pair(flexoResponse, query)
 }
 
 fun queryFromResponse(
@@ -223,7 +225,7 @@ fun Route.QueryApi() {
         if(flexoResponse.isFailure()) {
             return@delete forward(flexoResponse)
         }
-        call.respond<Query>(query.second!!)
+        call.respond<Query>(query.second ?: return@delete call.respond(HttpStatusCode.NotFound))
     }
 
     get<Paths.getQueriesByProject> {
@@ -250,7 +252,7 @@ fun Route.QueryApi() {
             return@get forward(res.first)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond<Query>(res.second!!)
+        call.respond<Query>(res.second ?: return@get call.respond(HttpStatusCode.NotFound))
     }
 
     get<Paths.getQueryResultsByProjectIdQuery> {
@@ -266,7 +268,7 @@ fun Route.QueryApi() {
         if (res.first.isFailure()) {
             return@get forward(res.first)
         }
-        val query = res.second!!
+        val query = res.second ?: return@get call.respond(HttpStatusCode.NotFound)
         val flexoResponse = runQuery(QueryRequest(where = query.where), projectId.toString(), commitId?.toString())
         // forward failures to client
         if (flexoResponse.isFailure()) {
