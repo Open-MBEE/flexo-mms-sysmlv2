@@ -222,7 +222,7 @@ class FlexoResponse(
         val language = RDFLanguages.contentTypeToLang(contentType.withoutParameters().toString())
 
         // create memory model
-        val model = ModelCom(GraphMemFactory.createGraphMem())
+        val model = ModelCom(GraphMemFactory.createDefaultGraph())
 
         // parse input document into model
         RDFParser.create().apply {

@@ -68,7 +68,7 @@ fun JsonPrimitive.toRdfLiteralNode(): Node {
     }
 
     // create typed literal
-    return NodeFactory.createLiteral(content, datatype)
+    return NodeFactory.createLiteralDT(content, datatype)
 }
 
 fun Route.CommitApi() {
@@ -331,7 +331,7 @@ fun Route.CommitApi() {
                                 // array
                                 is JsonArray -> {
                                     // store entire array as serialized JSON
-                                    add(SYSMLV2.annotationJson(key) to setOf(NodeFactory.createLiteral(Json.encodeToString(value))))
+                                    add(SYSMLV2.annotationJson(key) to setOf(NodeFactory.createLiteralString(Json.encodeToString(value))))
 
                                     // non-empty list
                                     if (value.isNotEmpty()) {

@@ -57,7 +57,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 
 
-    val jenaVersion = "4.10.0"
+    val jenaVersion = "6.0.0"
     implementation("org.apache.jena:jena-arq:${jenaVersion}")
     implementation("org.apache.jena:jena-querybuilder:${jenaVersion}")
 }
@@ -68,10 +68,10 @@ tasks.wrapper {
 }
 
 java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 tasks {
     test {
