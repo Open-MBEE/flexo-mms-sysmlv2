@@ -7,7 +7,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.autohead.*
-import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
@@ -72,7 +72,7 @@ fun Application.module() {
             call.respondText(cause.message ?: "Internal Server Error", status = HttpStatusCode.InternalServerError)
         }
     }
-    install(Routing) {
+    routing {
         route(GlobalFlexoConfig.basePath) {
             BranchApi()
             CommitApi()
