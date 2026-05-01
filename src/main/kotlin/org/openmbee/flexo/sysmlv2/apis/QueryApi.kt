@@ -17,7 +17,7 @@ import io.ktor.server.plugins.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.PipelineContext
+
 import kotlinx.serialization.json.*
 import kotlinx.serialization.encodeToString
 import org.apache.jena.arq.querybuilder.ConstructBuilder
@@ -112,7 +112,7 @@ fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
     }
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateQuery(
+suspend fun RoutingContext.createOrUpdateQuery(
     queryId: UUID, projectId: UUID, queryRequest: QueryRequest, post: Boolean): Pair<FlexoResponse, Query> {
     val query = Query(atId = queryId,
         atType = Query.AtType.Query,
@@ -135,7 +135,7 @@ suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateQuery(
     return Pair(flexoResponse, query)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.runQuery(
+suspend fun RoutingContext.runQuery(
     query: QueryRequest, projectId: String, commitId: String?): FlexoResponse {
     var branchId = "master"
     if (commitId == null) {
@@ -167,7 +167,7 @@ suspend fun PipelineContext<*, ApplicationCall>.runQuery(
     }
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.getQuery(projectId: UUID, queryId: UUID): Pair<FlexoResponse, Query?> {
+suspend fun RoutingContext.getQuery(projectId: UUID, queryId: UUID): Pair<FlexoResponse, Query?> {
     val uri = SYSMLV2.query(queryId.toString()).uri
     val flexoResponse = flexoRequestPost {
         orgPath("/repos/$projectId/scratches/queries/query")

@@ -15,7 +15,6 @@ import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.rdf.model.ResourceFactory
@@ -46,7 +45,7 @@ fun projectFromResponse(
     )
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateProject(
+suspend fun RoutingContext.createOrUpdateProject(
     projectUuid: UUID, projectRequest: ProjectRequest, post: Boolean): FlexoResponse {
     // generate a UUID for the default branch if not provided
     val branchUuid = projectRequest.defaultBranch?.atId ?: UUID.randomUUID()

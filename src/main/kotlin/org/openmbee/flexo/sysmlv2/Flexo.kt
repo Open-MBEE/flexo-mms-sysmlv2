@@ -7,7 +7,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
+import io.ktor.server.routing.*
 import org.apache.commons.io.IOUtils
 import org.apache.jena.datatypes.xsd.XSDDatatype
 import org.apache.jena.graph.GraphMemFactory
@@ -240,7 +240,7 @@ class FlexoResponse(
     }
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     // prepare client
     val client = FlexoHttpClient
     // create request builder
@@ -262,19 +262,19 @@ suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod,
     return FlexoResponse(response)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Get, setup)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Put, setup)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Post, setup)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPatch(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestPatch(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Patch, setup)
 }
 
@@ -323,7 +323,7 @@ class FlexoModelHandlerWithFocalNode(
     val focalIncoming = indexInv(focalIri)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.forward(flexoResponse: FlexoResponse) {
+suspend fun RoutingContext.forward(flexoResponse: FlexoResponse) {
     val response = flexoResponse.response
 
     call.respondText(response.bodyAsText(), response.contentType(), response.status) {
