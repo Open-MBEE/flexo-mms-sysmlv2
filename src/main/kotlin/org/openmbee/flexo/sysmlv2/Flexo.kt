@@ -26,9 +26,8 @@ fun String.reindent(width: Int): String {
 }
 
 open class RdfBuilder {
-    var String.en: Literal
+    val String.en: Literal
         get() = ResourceFactory.createLangLiteral(this, "en")
-        set(v) {}
 }
 
 fun escapeRdfDoubleQuotedLiteralContents(contents: String): String {
@@ -38,8 +37,10 @@ fun escapeRdfDoubleQuotedLiteralContents(contents: String): String {
         .replace("\n", "\\n")
 }
 
+private val RDF_IRI_ESCAPE_REGEX = "([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()
+
 fun escapeRdfIri(iri: String): String {
-    return iri.replace("([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()) {
+    return iri.replace(RDF_IRI_ESCAPE_REGEX) {
         // hex-encode the offending character
         val hex = it.value[0].code.toString(16)
 
@@ -238,6 +239,17 @@ class FlexoResponse(
 
         return setup(handler)
     }
+
+    suspend fun <T> findFirstByType(
+        type: org.apache.jena.rdf.model.Resource,
+        transform: FlexoModelHandler.(Map<org.apache.jena.rdf.model.Property, Set<org.apache.jena.rdf.model.RDFNode>>) -> T
+    ): T? {
+        return parseModel {
+            model.listSubjectsWithProperty(org.apache.jena.vocabulary.RDF.type, type).mapWith {
+                transform(indexOut(it.uri))
+            }.toList().firstOrNull()
+        }
+    }
 }
 
 suspend fun RoutingContext.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
@@ -301,17 +313,14 @@ open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
         return PrefixedRdfPropertiesMap(incomingProperties, prefixes)
     }
 
-    var String.uriSuffix: String
+    val String.uriSuffix: String
         get() = if(startsWith(SYSMLV2.VOCABULARY)) substringAfterLast('#') else substringAfterLast('/')
-        set(v) {}
 
-    var String.urnSuffix: String
+    val String.urnSuffix: String
         get() = substringAfterLast(':')
-        set(v) {}
 
-    var String.autoSuffix: String
+    val String.autoSuffix: String
         get() = if(startsWith(SYSMLV2.BASE)) urnSuffix else uriSuffix
-        set(v) {}
 }
 
 class FlexoModelHandlerWithFocalNode(

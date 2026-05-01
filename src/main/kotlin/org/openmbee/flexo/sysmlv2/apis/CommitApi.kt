@@ -15,7 +15,7 @@ import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.decodeFromString
+
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.apache.jena.datatypes.xsd.XSDDatatype
@@ -243,7 +243,7 @@ fun Route.CommitApi() {
             model.listResourcesWithProperty(RDF.type, MMS.Commit).forEach { commit ->
                 val outs = indexOut(commit.uri)
                 //skip root commit since it's automatically added by flexo
-                if (outs[MMS.parent].resource()!! == MMS.nil) return@forEach
+                if (outs[MMS.parent]?.resource() == MMS.nil) return@forEach
                 commits.add(commitFromModel(commit.uri, outs, getCommits.projectId))
             }
         }

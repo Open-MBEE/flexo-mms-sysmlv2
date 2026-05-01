@@ -46,7 +46,6 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
 
     implementation("ch.qos.logback:logback-classic:1.5.18")
-    implementation("io.dropwizard.metrics:metrics-core:4.1.18")
 
     val junitVersion = "5.10.1"
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")

@@ -114,10 +114,8 @@ fun Route.ProjectApi() {
         if (patchResponse.isFailure()) {
             return@delete forward(patchResponse)
         }
-        val project = patchResponse.parseModel {
-            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
-                projectFromResponse(indexOut(it.uri))
-            }.toList().firstOrNull()
+        val project = patchResponse.findFirstByType(MMS.Repo) {
+            projectFromResponse(it)
         } ?: return@delete call.respond(HttpStatusCode.NotFound)
         call.respond(project)
     }
@@ -131,10 +129,8 @@ fun Route.ProjectApi() {
         if(flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
         }
-        val project = flexoResponse.parseModel {
-            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
-                projectFromResponse(indexOut(it.uri))
-            }.toList().firstOrNull()
+        val project = flexoResponse.findFirstByType(MMS.Repo) {
+            projectFromResponse(it)
         } ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(project)
     }
@@ -167,10 +163,8 @@ fun Route.ProjectApi() {
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
-        val project = flexoResponse.parseModel {
-            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
-                projectFromResponse(indexOut(it.uri))
-            }.toList().firstOrNull()
+        val project = flexoResponse.findFirstByType(MMS.Repo) {
+            projectFromResponse(it)
         } ?: return@post call.respond(HttpStatusCode.NotFound)
         call.respond(project)
     }
@@ -206,10 +200,8 @@ fun Route.ProjectApi() {
         if (flexoResponse.isFailure()) {
             return@put forward(flexoResponse)
         }
-        val project = flexoResponse.parseModel {
-            model.listSubjectsWithProperty(RDF.type, MMS.Repo).mapWith {
-                projectFromResponse(indexOut(it.uri))
-            }.toList().firstOrNull()
+        val project = flexoResponse.findFirstByType(MMS.Repo) {
+            projectFromResponse(it)
         } ?: return@put call.respond(HttpStatusCode.NotFound)
         call.respond(project)
     }

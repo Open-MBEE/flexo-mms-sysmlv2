@@ -39,29 +39,32 @@ import java.util.UUID
 fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
     val p: Node
     var pvar: String = property
-    val v: Node
     when(property) {
         "@id" -> { p = SYSMLV2.prop("elementId").asNode(); pvar = "id" }
         "@type" -> { p = RDF.type.asNode(); pvar = "Metatype" }
         else -> { p = SYSMLV2.prop(property).asNode() }
     }
-    val firstVal = value.get(0) //TODO what if value is empty list??? or > 1 value
-    when(firstVal) {
+    if (value.isEmpty()) {
+        throw BadRequestException("PrimitiveConstraint value must not be empty")
+    }
+    val firstVal = value[0]
+    val v: Node = when(firstVal) {
         is JsonObject -> {
             if (firstVal.containsKey("@id")) {
-                v = SYSMLV2.element(firstVal.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+                SYSMLV2.element(firstVal.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
             } else {
                 throw BadRequestException("PrimitiveConstraint value object must contain @id")
             }
         }
         is JsonPrimitive -> {
             if (firstVal == JsonNull) {
-                v = RDF.nil.asNode()
+                RDF.nil.asNode()
             } else {
-                v = if (property == "@type") SYSMLV2.type(firstVal.content).asNode() else firstVal.toRdfLiteralNode()
+                if (property == "@type") SYSMLV2.type(firstVal.content).asNode() else firstVal.toRdfLiteralNode()
             }
         }
-        is JsonArray -> {throw BadRequestException("PrimitiveConstraint value cannot be array")}
+        is JsonArray -> throw BadRequestException("PrimitiveConstraint value cannot be array")
+        else -> throw BadRequestException("Unexpected JSON element type in PrimitiveConstraint value")
     }
     if (firstVal == JsonNull) {
         cb.addOptional("?e", p, "?$pvar")
