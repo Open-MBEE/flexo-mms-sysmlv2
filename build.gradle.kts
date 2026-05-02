@@ -10,10 +10,25 @@ repositories {
     gradlePluginPortal()
 }
 
+jacoco {
+    toolVersion = "0.8.12"
+}
+
 plugins {
     application
     kotlin("jvm") version "2.3.21"
     kotlin("plugin.serialization") version "2.3.21"
+    jacoco
+    id("org.sonarqube") version "6.2.0.5505"
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "Open-MBEE_flexo-mms-sysmlv2")
+        property("sonar.organization", "openmbee")
+        property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
+    }
 }
 
 dependencies {
@@ -103,5 +118,14 @@ tasks {
         environment("JWT_AUDIENCE", System.getenv("JWT_AUDIENCE") ?: "flexo-mms-audience")
         environment("JWT_REALM", System.getenv("JWT_REALM") ?: "flexo-mms")
         environment("JWT_SECRET", System.getenv("JWT_SECRET") ?: "thisissomethingreallylong1234567801234567890")
+    }
+}
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
+}
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
     }
 }

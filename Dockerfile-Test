@@ -1,0 +1,11 @@
+FROM eclipse-temurin:21-jdk as build
+WORKDIR application
+ENV FLEXO_PROTOCOL http
+ENV FLEXO_HOST layer1-service
+ENV FLEXO_PORT 8080
+ENV FLEXO_MMS_QUERY_URL http://quad-server:3030/ds/sparql
+ENV FLEXO_MMS_UPDATE_URL http://quad-server:3030/ds/update
+ENV FLEXO_MMS_GRAPH_STORE_PROTOCOL_URL http://quad-server:3030/ds/data
+COPY . .
+RUN apt-get update && apt-get install -y procps
+ENTRYPOINT ["/application/gradlew", "test"]
