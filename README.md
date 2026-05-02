@@ -32,6 +32,14 @@ docker run -p 127.0.0.1:8083:8080 openmbee/flexo-sysmlv2:temp
 ```
 You should then be able to access the `http://localhost:8083/projects` endpoint, for example.
 
+## Running tests
+
+```
+docker-compose -f src/test/resources/docker-compose.yml up -d
+
+./gradlew test
+```
+
 ## Documentation for API Endpoints
 
 All URIs are relative to *http://localhost*
