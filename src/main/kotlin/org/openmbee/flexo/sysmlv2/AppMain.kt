@@ -17,6 +17,7 @@ import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.resources.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import io.ktor.server.application.ApplicationStopped
 import org.openmbee.flexo.sysmlv2.apis.*
 
 lateinit var GlobalFlexoConfig: FlexoConfig
@@ -30,6 +31,9 @@ fun Application.module() {
         install(HttpTimeout) {
             requestTimeoutMillis = GlobalFlexoConfig.defaultTimeout * 1000
         }
+    }
+    environment.monitor.subscribe(ApplicationStopped) {
+        FlexoHttpClient.close()
     }
     install(DefaultHeaders)
     install(CallLogging)
@@ -117,7 +121,7 @@ val Application.flexoConfig: FlexoConfig
         val host = property("flexo.host")?.getString() ?: "localhost"
         val port = property("flexo.port")?.getString()?.toInt() ?: 8080
         val org = property("flexo.org")?.getString() ?: "sysmlv2"
-        val defaultTimeout = property("flexo.defaultTimeout")?.getString()?.toLong() ?: 60_000L
+        val defaultTimeout = property("flexo.defaultTimeout")?.getString()?.toLong() ?: 60L
         val auth = property("flexo.auth")?.getString() ?: ""
         val basePath = property("flexo.basePath")?.getString() ?: ""
         return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath)

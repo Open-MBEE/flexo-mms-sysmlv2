@@ -17,7 +17,7 @@ import io.ktor.server.resources.get
 import io.ktor.server.resources.delete
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
+
 import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.rdf.model.ResourceFactory

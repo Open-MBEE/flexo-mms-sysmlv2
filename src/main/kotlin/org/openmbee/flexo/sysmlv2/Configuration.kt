@@ -1,11 +1,6 @@
 package org.openmbee.flexo.sysmlv2
 
 // Use this file to hold package-level internal functions that return receiver object passed to the `install` method.
-import io.ktor.http.*
-import io.ktor.server.auth.*
-import io.ktor.server.config.*
-import io.ktor.util.*
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.hsts.*
@@ -49,15 +44,3 @@ internal fun ApplicationCompressionConfiguration(): CompressionConfig.() -> Unit
         }
     }
 }
-
-// Defines authentication mechanisms used throughout the application.
-fun applicationAuthProvider(config: ApplicationConfig): OAuthServerSettings =
-    OAuthServerSettings.OAuth2ServerSettings(
-        name = "petstore_auth",
-        authorizeUrl = "http://petstore.swagger.io/api/oauth/dialog",
-        accessTokenUrl = "",
-        requestMethod = HttpMethod.Get,
-        clientId = config.property("auth.oauth.petstore_auth.clientId").getString(),
-        clientSecret = config.property("auth.oauth.petstore_auth.clientSecret").getString(),
-        defaultScopes = listOf("write:pets", "read:pets")
-    )

@@ -5,7 +5,7 @@ import org.apache.jena.rdf.model.Resource
 import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.shared.PrefixMapping
 
-val ROOT_CONTEXT = "http://layer1-service"
+val ROOT_CONTEXT = System.getenv("ROOT_CONTEXT") ?: "http://layer1-service"
 
 object SYSMLV2 {
     val BASE = "urn:sysmlv2:"
