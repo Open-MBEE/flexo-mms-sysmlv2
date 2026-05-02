@@ -39,7 +39,6 @@ jobs:
           name: Fetch full git history for SonarCloud blame
           command: |
             git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
-            git fetch --unshallow
       - sonarcloud/scan
   deploy_snapshot:
     executor:
