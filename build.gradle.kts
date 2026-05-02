@@ -58,10 +58,15 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
+    // sign JWTs locally in tests with the same shared secret as the
+    // layer1-service container (see src/test/resources/test.env)
+    testImplementation("com.auth0:java-jwt:4.5.0")
 
     val jenaVersion = "6.0.0"
     implementation("org.apache.jena:jena-arq:${jenaVersion}")
     implementation("org.apache.jena:jena-querybuilder:${jenaVersion}")
+    // CommonSpec.beforeEach uses RDFConnection to reload cluster.trig via GSP
+    testImplementation("org.apache.jena:jena-rdfconnection:${jenaVersion}")
 }
 
 tasks.wrapper {
@@ -81,14 +86,22 @@ tasks {
         this.testLogging {
             this.showStandardStreams = true
         }
-        // sysmlv2 service URL (the service under test)
-        environment("SYSMLV2_BASE_URL", System.getenv("SYSMLV2_BASE_URL") ?: "http://localhost:8083")
-        // layer1 service URL (for setup operations)
-        environment("FLEXO_LAYER1_BASE_URL", System.getenv("FLEXO_LAYER1_BASE_URL") ?: "http://localhost:8080")
-        // login service URL
-        environment("FLEXO_LOGIN_URL", System.getenv("FLEXO_LOGIN_URL") ?: "http://localhost:8082/login")
-        // credentials
-        environment("FLEXO_TEST_USER", System.getenv("FLEXO_TEST_USER") ?: "user01")
-        environment("FLEXO_TEST_PASSWORD", System.getenv("FLEXO_TEST_PASSWORD") ?: "password1")
+        // layer1-service running locally (started via
+        // src/test/resources/docker-compose.yml). The in-process sysmlv2
+        // module under test forwards calls to it.
+        environment("FLEXO_PROTOCOL", System.getenv("FLEXO_PROTOCOL") ?: "http")
+        environment("FLEXO_HOST", System.getenv("FLEXO_HOST") ?: "localhost")
+        environment("FLEXO_PORT", System.getenv("FLEXO_PORT") ?: "8080")
+        environment("FLEXO_SYSMLV2_ORG", System.getenv("FLEXO_SYSMLV2_ORG") ?: "sysmlv2")
+        // triplestore endpoints used by CommonSpec.beforeEach to drop +
+        // reload the seed cluster.trig before each test.
+        environment("FLEXO_MMS_QUERY_URL", System.getenv("FLEXO_MMS_QUERY_URL") ?: "http://localhost:3030/ds/sparql")
+        environment("FLEXO_MMS_UPDATE_URL", System.getenv("FLEXO_MMS_UPDATE_URL") ?: "http://localhost:3030/ds/update")
+        environment("FLEXO_MMS_GRAPH_STORE_PROTOCOL_URL", System.getenv("FLEXO_MMS_GRAPH_STORE_PROTOCOL_URL") ?: "http://localhost:3030/ds/data")
+        // JWT shared with layer1 (must match src/test/resources/test.env)
+        environment("JWT_DOMAIN", System.getenv("JWT_DOMAIN") ?: "http://flexo-mms-services")
+        environment("JWT_AUDIENCE", System.getenv("JWT_AUDIENCE") ?: "flexo-mms-audience")
+        environment("JWT_REALM", System.getenv("JWT_REALM") ?: "flexo-mms")
+        environment("JWT_SECRET", System.getenv("JWT_SECRET") ?: "thisissomethingreallylong1234567801234567890")
     }
 }

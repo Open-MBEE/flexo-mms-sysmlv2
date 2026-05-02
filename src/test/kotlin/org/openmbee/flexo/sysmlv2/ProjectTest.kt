@@ -25,10 +25,14 @@ class ProjectTest : CommonSpec() {
             }
         }
 
-        "PUT /projects/{id} - create a project with a specific id" {
+        "PUT /projects/{id} - update an existing project" {
             testApplication {
+                // PUT requires the project to already exist (the handler
+                // does a GET to backfill missing fields), so create it
+                // via POST first.
                 val projectId = UUID.randomUUID()
-                putProject(projectId, "Specific Id Project", "via PUT").apply {
+                createProject(projectId, "Original Name", "original")
+                putProject(projectId, "Updated Name", "updated").apply {
                     this shouldHaveStatus HttpStatusCode.OK
                 }
             }
@@ -46,7 +50,7 @@ class ProjectTest : CommonSpec() {
         "GET /projects/{id} - get project by ID" {
             testApplication {
                 val id = UUID.randomUUID()
-                putProject(id, "Get Test")
+                createProject(id, "Get Test")
                 getProject(id).apply {
                     this shouldHaveStatus HttpStatusCode.OK
                     bodyAsText().shouldContainJsonKey("@id")
@@ -57,7 +61,7 @@ class ProjectTest : CommonSpec() {
         "DELETE /projects/{id} - soft delete project" {
             testApplication {
                 val id = UUID.randomUUID()
-                putProject(id, "Delete Test")
+                createProject(id, "Delete Test")
                 deleteProject(id).apply {
                     this shouldHaveStatus HttpStatusCode.OK
                 }
