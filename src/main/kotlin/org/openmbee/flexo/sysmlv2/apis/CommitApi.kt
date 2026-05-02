@@ -29,7 +29,7 @@ import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
-import org.openmbee.flexo.sysmlv2.models.DataVersion
+
 import org.openmbee.flexo.sysmlv2.models.Identified
 import java.time.OffsetDateTime
 import java.util.*
@@ -73,139 +73,11 @@ fun JsonPrimitive.toRdfLiteralNode(): Node {
 
 fun Route.CommitApi() {
     get<Paths.getChangeByProjectCommitId> {
-        val exampleContentString = """{
-          "payload" : {
-            "owner" : {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            },
-            "textualRepresentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedAnnotation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedElement" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "aliasIds" : [ "aliasIds", "aliasIds" ],
-            "@type" : "Element",
-            "ownedRelationship" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "documentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "isImpliedIncluded" : true,
-            "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "DataVersion",
-          "identity" : {
-            "@type" : "DataIdentity",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }"""
-        call.respond(Json.decodeFromString<DataVersion>(exampleContentString))
+        throw NotImplementedError()
     }
 
     get<Paths.getChangesByProjectCommit> {
-        val exampleContentString = """[ {
-          "payload" : {
-            "owner" : {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            },
-            "textualRepresentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedAnnotation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedElement" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "aliasIds" : [ "aliasIds", "aliasIds" ],
-            "@type" : "Element",
-            "ownedRelationship" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "documentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "isImpliedIncluded" : true,
-            "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "DataVersion",
-          "identity" : {
-            "@type" : "DataIdentity",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "payload" : {
-            "owner" : {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            },
-            "textualRepresentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedAnnotation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedElement" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "aliasIds" : [ "aliasIds", "aliasIds" ],
-            "@type" : "Element",
-            "ownedRelationship" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "documentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "isImpliedIncluded" : true,
-            "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "DataVersion",
-          "identity" : {
-            "@type" : "DataIdentity",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-        call.respond(Json.decodeFromString<List<DataVersion>>(exampleContentString))
+        throw NotImplementedError()
     }
 
     get<Paths.getCommitByProjectAndId> { getCommit ->
