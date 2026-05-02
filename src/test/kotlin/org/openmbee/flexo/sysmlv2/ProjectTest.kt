@@ -1,75 +1,124 @@
 package org.openmbee.flexo.sysmlv2
 
 import io.kotest.assertions.ktor.client.shouldHaveStatus
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.maps.shouldContainKey
+import io.kotest.matchers.shouldBe
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.openmbee.flexo.sysmlv2.util.*
 import java.util.*
 
 class ProjectTest : CommonSpec() {
     init {
-        "POST /projects - create a new project" {
+        "POST /projects - create a new project returns the created Project" {
             testApplication {
                 val projectId = UUID.randomUUID()
-                httpPost("/projects") {
+                val response = httpPost("/projects") {
                     setJsonBody(
-                        """{"@type":"Project","@id":"$projectId","name":"New Project","description":"desc"}"""
+                        """
+                        {
+                            "@type": "Project",
+                            "@id": "$projectId",
+                            "name": "New Project",
+                            "description": "desc"
+                        }
+                        """.trimIndent()
                     )
-                }.apply {
-                    this shouldHaveStatus HttpStatusCode.OK
-                    // shouldContainJsonKey uses JSON-path syntax where '@' is reserved,
-                    // so parse the body and assert on the resulting object map instead.
-                    val parsed = Json.parseToJsonElement(bodyAsText()).jsonObject
-                    parsed shouldContainKey "@id"
-                    parsed shouldContainKey "name"
                 }
+                response shouldHaveStatus HttpStatusCode.OK
+                // shouldContainJsonKey uses JSON-path syntax where '@' is reserved,
+                // so parse the body and assert on the resulting object map instead.
+                val parsed = response.bodyAsJsonObject()
+                parsed shouldContainKey "@id"
+                parsed shouldContainKey "@type"
+                parsed shouldContainKey "name"
+                parsed shouldContainKey "description"
+                parsed shouldContainKey "defaultBranch"
+                parsed["@id"]!!.jsonPrimitive.content shouldBe projectId.toString()
+                parsed["@type"]!!.jsonPrimitive.content shouldBe "Project"
+                parsed["name"]!!.jsonPrimitive.content shouldBe "New Project"
+                parsed["description"]!!.jsonPrimitive.content shouldBe "desc"
+                // server-assigned default branch UUID must parse (nestedAtId
+                // throws if the response shape is wrong)
+                parsed.nestedAtId("defaultBranch")
             }
         }
 
-        "PUT /projects/{id} - update an existing project" {
+        "PUT /projects/{id} - update an existing project returns updated values" {
             testApplication {
-                // PUT requires the project to already exist (the handler
-                // does a GET to backfill missing fields), so create it
-                // via POST first.
+                // PUT requires the project to already exist (the handler does a
+                // GET first to backfill missing fields), so create it via POST.
                 val projectId = UUID.randomUUID()
                 createProject(projectId, "Original Name", "original")
-                putProject(projectId, "Updated Name", "updated").apply {
-                    this shouldHaveStatus HttpStatusCode.OK
-                }
+
+                val updated = putProject(projectId, "Updated Name", "updated")
+                val parsed = updated.bodyAsJsonObject()
+                parsed["@id"]!!.jsonPrimitive.content shouldBe projectId.toString()
+                parsed["name"]!!.jsonPrimitive.content shouldBe "Updated Name"
+                parsed["description"]!!.jsonPrimitive.content shouldBe "updated"
+
+                // and a follow-up GET confirms the change is persisted
+                val fetched = getProject(projectId).bodyAsJsonObject()
+                fetched["name"]!!.jsonPrimitive.content shouldBe "Updated Name"
+                fetched["description"]!!.jsonPrimitive.content shouldBe "updated"
             }
         }
 
-        "GET /projects - list all projects" {
+        "GET /projects - list includes the just-created project" {
             testApplication {
-                createProject(name = "Listed Project")
-                getProjects().apply {
-                    this shouldHaveStatus HttpStatusCode.OK
-                }
+                val createdId = UUID.randomUUID()
+                createProject(createdId, "Listed Project", "listed-desc")
+
+                val list = getProjects()
+                list shouldHaveStatus HttpStatusCode.OK
+                val items = Json.parseToJsonElement(list.bodyAsText()).jsonArray
+                val ids = items.map { it.jsonObject["@id"]!!.jsonPrimitive.content }
+                ids shouldContain createdId.toString()
+                val match = items.first { it.jsonObject["@id"]!!.jsonPrimitive.content == createdId.toString() }
+                match.jsonObject["name"]!!.jsonPrimitive.content shouldBe "Listed Project"
+                match.jsonObject["@type"]!!.jsonPrimitive.content shouldBe "Project"
             }
         }
 
-        "GET /projects/{id} - get project by ID" {
+        "GET /projects/{id} - returns matching @id, name, defaultBranch" {
             testApplication {
                 val id = UUID.randomUUID()
-                createProject(id, "Get Test")
-                getProject(id).apply {
-                    this shouldHaveStatus HttpStatusCode.OK
-                    val parsed = Json.parseToJsonElement(bodyAsText()).jsonObject
-                    parsed shouldContainKey "@id"
-                }
+                val createResponse = createProject(id, "Get Test", "get-desc")
+                val createdDefaultBranch = createResponse.bodyAsJsonObject().nestedAtId("defaultBranch")
+
+                val parsed = getProject(id).bodyAsJsonObject()
+                parsed["@id"]!!.jsonPrimitive.content shouldBe id.toString()
+                parsed["name"]!!.jsonPrimitive.content shouldBe "Get Test"
+                parsed["description"]!!.jsonPrimitive.content shouldBe "get-desc"
+                // GET should report the same default branch as POST returned
+                parsed.nestedAtId("defaultBranch") shouldBe createdDefaultBranch
             }
         }
 
-        "DELETE /projects/{id} - soft delete project" {
+        "DELETE /projects/{id} - soft-deleted projects do not appear in list" {
             testApplication {
                 val id = UUID.randomUUID()
-                createProject(id, "Delete Test")
-                deleteProject(id).apply {
-                    this shouldHaveStatus HttpStatusCode.OK
-                }
+                createProject(id, "Delete Test", "del-desc")
+                deleteProject(id) shouldHaveStatus HttpStatusCode.OK
+
+                // soft-deleted projects are filtered out of GET /projects
+                val list = getProjects()
+                val ids = Json.parseToJsonElement(list.bodyAsText()).jsonArray
+                    .map { it.jsonObject["@id"]!!.jsonPrimitive.content }
+                ids shouldNotContain id.toString()
+            }
+        }
+
+        "GET /projects/{id} - returns 404 for unknown project" {
+            testApplication {
+                val unknown = UUID.randomUUID()
+                getProject(unknown) shouldHaveStatus HttpStatusCode.NotFound
             }
         }
     }
