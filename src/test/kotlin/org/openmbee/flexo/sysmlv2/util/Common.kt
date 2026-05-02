@@ -6,7 +6,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.core.test.TestCase
-import kotlinx.coroutines.runBlocking
 import org.apache.jena.rdfconnection.RDFConnection
 import org.apache.jena.sparql.exec.http.UpdateExecutionHTTP
 import java.io.File
@@ -60,16 +59,14 @@ open class CommonSpec : StringSpec() {
 
         // 3. (re)create the sysmlv2 org on layer1 so the in-process
         //    sysmlv2 service has a parent org to attach project repos to
-        runBlocking {
-            HttpClient().use { client ->
-                val response = client.put("$layer1BaseUrl/orgs/$sysmlv2Org") {
-                    header(HttpHeaders.Authorization, authorization())
-                    header(HttpHeaders.ContentType, "text/turtle")
-                    setBody("""<> <http://purl.org/dc/terms/title> "$sysmlv2Org"@en .""")
-                }
-                require(response.status.isSuccess()) {
-                    "failed to create sysmlv2 org on layer1: ${response.status} ${response.bodyAsText()}"
-                }
+        HttpClient().use { client ->
+            val response = client.put("$layer1BaseUrl/orgs/$sysmlv2Org") {
+                header(HttpHeaders.Authorization, authorization())
+                header(HttpHeaders.ContentType, "text/turtle")
+                setBody("""<> <http://purl.org/dc/terms/title> "$sysmlv2Org"@en .""")
+            }
+            require(response.status.isSuccess()) {
+                "failed to create sysmlv2 org on layer1: ${response.status} ${response.bodyAsText()}"
             }
         }
     }

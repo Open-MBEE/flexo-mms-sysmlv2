@@ -11,12 +11,17 @@ import java.util.Date
  * `application.test.conf`). No login service is involved.
  */
 data class AuthStruct(
-    val username: String = "user01",
+    val username: String = "ldap/user/user01",
     val groups: List<String> = listOf("super_admins")
 )
 
+// Usernames must match `mms:id` literals defined in src/test/resources/cluster.trig
+// — layer1 resolves the user IRI from the JWT `username` claim as
+// `<http://layer1-service/users/{username}>`. cluster.trig defines the test
+// user with `mms:id "ldap/user/user01"`, so the JWT claim must use the same
+// fully-qualified value.
 val rootAuth = AuthStruct("root", listOf())
-val superAdminAuth = AuthStruct("user01", listOf("super_admins"))
+val superAdminAuth = AuthStruct("ldap/user/user01", listOf("super_admins"))
 val anonAuth = AuthStruct("anon", listOf())
 
 /**
