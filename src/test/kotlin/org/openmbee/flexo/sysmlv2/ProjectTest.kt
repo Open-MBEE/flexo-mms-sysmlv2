@@ -1,9 +1,11 @@
 package org.openmbee.flexo.sysmlv2
 
-import io.kotest.assertions.json.shouldContainJsonKey
 import io.kotest.assertions.ktor.client.shouldHaveStatus
+import io.kotest.matchers.maps.shouldContainKey
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.openmbee.flexo.sysmlv2.util.*
 import java.util.*
 
@@ -18,9 +20,11 @@ class ProjectTest : CommonSpec() {
                     )
                 }.apply {
                     this shouldHaveStatus HttpStatusCode.OK
-                    val body = bodyAsText()
-                    body.shouldContainJsonKey("@id")
-                    body.shouldContainJsonKey("name")
+                    // shouldContainJsonKey uses JSON-path syntax where '@' is reserved,
+                    // so parse the body and assert on the resulting object map instead.
+                    val parsed = Json.parseToJsonElement(bodyAsText()).jsonObject
+                    parsed shouldContainKey "@id"
+                    parsed shouldContainKey "name"
                 }
             }
         }
@@ -53,7 +57,8 @@ class ProjectTest : CommonSpec() {
                 createProject(id, "Get Test")
                 getProject(id).apply {
                     this shouldHaveStatus HttpStatusCode.OK
-                    bodyAsText().shouldContainJsonKey("@id")
+                    val parsed = Json.parseToJsonElement(bodyAsText()).jsonObject
+                    parsed shouldContainKey "@id"
                 }
             }
         }
