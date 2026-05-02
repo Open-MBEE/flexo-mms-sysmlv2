@@ -43,13 +43,19 @@ dependencies {
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-resources:$ktorVersion")
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
+    val kotestVersion = "6.1.11"
+    testImplementation("io.kotest:kotest-runner-junit5:$kotestVersion")
+    testImplementation("io.kotest:kotest-assertions-core:$kotestVersion")
+    testImplementation("io.kotest:kotest-assertions-json-jvm:$kotestVersion")
+    testImplementation("io.kotest:kotest-assertions-ktor:$kotestVersion")
+    testImplementation("io.kotest:kotest-property:$kotestVersion")
+
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
 
     implementation("ch.qos.logback:logback-classic:1.5.18")
 
-    val junitVersion = "5.10.1"
+    val junitVersion = "5.13.1"
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-    testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
 
@@ -72,5 +78,17 @@ kotlin {
 tasks {
     test {
         useJUnitPlatform()
+        this.testLogging {
+            this.showStandardStreams = true
+        }
+        // sysmlv2 service URL (the service under test)
+        environment("SYSMLV2_BASE_URL", System.getenv("SYSMLV2_BASE_URL") ?: "http://localhost:8083")
+        // layer1 service URL (for setup operations)
+        environment("FLEXO_LAYER1_BASE_URL", System.getenv("FLEXO_LAYER1_BASE_URL") ?: "http://localhost:8080")
+        // login service URL
+        environment("FLEXO_LOGIN_URL", System.getenv("FLEXO_LOGIN_URL") ?: "http://localhost:8082/login")
+        // credentials
+        environment("FLEXO_TEST_USER", System.getenv("FLEXO_TEST_USER") ?: "user01")
+        environment("FLEXO_TEST_PASSWORD", System.getenv("FLEXO_TEST_PASSWORD") ?: "password1")
     }
 }
