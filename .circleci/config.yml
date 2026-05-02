@@ -56,37 +56,13 @@ jobs:
           name: Build docker image
           command: |
             cp src/main/resources/application.conf.example ./src/main/resources/application.conf
-            docker build -t openmbee/flexo-mms-sysmlv2:latest .
+            docker build -t openmbee/flexo-sysmlv2:latest .
       - run:
           name: Tag docker image
-          command: docker tag openmbee/flexo-mms-sysmlv2:latest openmbee/flexo-mms-sysmlv2:${CIRCLE_BRANCH#*/}-SNAPSHOT
+          command: docker tag openmbee/flexo-sysmlv2:latest openmbee/flexo-sysmlv2:${CIRCLE_BRANCH#*/}-SNAPSHOT
       - run:
           name: Deploy snapshot to Dockerhub
-          command: docker push openmbee/flexo-mms-sysmlv2:${CIRCLE_BRANCH#*/}-SNAPSHOT
-  deploy_nightly:
-    executor:
-      name: docker/docker
-    working_directory: /home/circleci/flexo-mms-sysmlv2
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - attach_workspace:
-          at: ~/
-      - checkout
-      - run:
-          name: Login to Dockerhub
-          command: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-      - run:
-          name: Build docker image
-          command: |
-            cp src/main/resources/application.conf.example ./src/main/resources/application.conf
-            docker build -t openmbee/flexo-mms-sysmlv2:latest .
-      - run:
-          name: Tag docker image
-          command: docker tag openmbee/flexo-mms-sysmlv2:latest openmbee/flexo-mms-sysmlv2:NIGHTLY-SNAPSHOT
-      - run:
-          name: Deploy snapshot to Dockerhub
-          command: docker push openmbee/flexo-mms-sysmlv2:NIGHTLY-SNAPSHOT
+          command: docker push openmbee/flexo-sysmlv2:${CIRCLE_BRANCH#*/}-SNAPSHOT
   deploy_release:
     executor:
       name: docker/docker
@@ -103,16 +79,16 @@ jobs:
           name: Build docker image
           command: |
             cp src/main/resources/application.conf.example ./src/main/resources/application.conf
-            docker build -t openmbee/flexo-mms-sysmlv2:latest .
+            docker build -t openmbee/flexo-sysmlv2:latest .
       - run:
           name: Tag docker image
-          command: docker tag openmbee/flexo-mms-sysmlv2:latest openmbee/flexo-mms-sysmlv2:${CIRCLE_TAG}
+          command: docker tag openmbee/flexo-sysmlv2:latest openmbee/flexo-sysmlv2:${CIRCLE_TAG}
       - run:
           name: Deploy release to dockerhub
-          command: docker push openmbee/flexo-mms-sysmlv2:${CIRCLE_TAG}
+          command: docker push openmbee/flexo-sysmlv2:${CIRCLE_TAG}
       - run:
           name: Deploy release as latest to dockerhub
-          command: docker push openmbee/flexo-mms-sysmlv2:latest
+          command: docker push openmbee/flexo-sysmlv2:latest
 
 workflows:
   version: 2
