@@ -1,7 +1,7 @@
 version: 2.1
 orbs:
   docker: circleci/docker@2.1.1
-  sonarcloud: sonarsource/sonarcloud@2.0.0
+  sonarcloud: sonarsource/sonarcloud@4.0.0
 jobs:
   build_and_test:
     machine:
@@ -39,6 +39,7 @@ jobs:
           name: Fetch full git history for SonarCloud blame
           command: |
             git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+            git fetch
       - sonarcloud/scan
   deploy_snapshot:
     executor:

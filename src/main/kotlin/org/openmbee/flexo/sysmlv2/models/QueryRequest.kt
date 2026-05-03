@@ -9,23 +9,22 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
-@file:UseSerializers(UUIDSerializer::class)
-
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseSerializers
 
 /**
  *
+ * @param atId Optional query ID. If not provided, a random UUID will be generated.
  * @param atType
  * @param select
  * @param `where`
  */
 @Serializable
 data class QueryRequest(
+    @SerialName("@id")
+    val atId: String? = null,
     @SerialName("@type")
     val atType: QueryRequest.AtType? = null,
     val select: kotlin.collections.List<kotlin.String>? = null,
@@ -40,4 +39,3 @@ data class QueryRequest(
         Query("Query");
     }
 }
-

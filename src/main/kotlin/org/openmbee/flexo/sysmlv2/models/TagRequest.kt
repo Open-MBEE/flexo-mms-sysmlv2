@@ -9,14 +9,10 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
-@file:UseSerializers(UUIDSerializer::class)
-
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.Identified
 
@@ -24,12 +20,15 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  *
  * @param name
  * @param taggedCommit
+ * @param atId Optional tag ID. If not provided, a random UUID will be generated.
  * @param atType
  */
 @Serializable
 data class TagRequest(
     val name: kotlin.String,
     val taggedCommit: Identified,
+    @SerialName("@id")
+    val atId: String? = null,
     @SerialName("@type")
     val atType: TagRequest.AtType? = null
 )
@@ -42,4 +41,3 @@ data class TagRequest(
         Tag("Tag");
     }
 }
-

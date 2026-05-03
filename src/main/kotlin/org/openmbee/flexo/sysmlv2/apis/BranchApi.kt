@@ -25,26 +25,27 @@ import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 import org.openmbee.flexo.sysmlv2.models.Branch
 import org.openmbee.flexo.sysmlv2.models.BranchRequest
 import org.openmbee.flexo.sysmlv2.models.Identified
 import java.time.OffsetDateTime
-import java.util.*
 
 fun FlexoModelHandler.branchFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
-    projectUuid: UUID,
-    branchUuid: UUID
+    projectId: String,
+    branchId: String
 ): Branch {
-    val commit = Identified(UUID.fromString(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix))
+    val commit = Identified(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix)
     return Branch(
-        atId = branchUuid,
+        atId = branchId,
         atType = Branch.AtType.Branch,
         created = OffsetDateTime.parse(
             outgoing[MMS.created]?.literal()
                 ?: OffsetDateTime.now().toString()
         ),
-        owningProject = Identified(projectUuid),
+        owningProject = Identified(projectId),
         referencedCommit = commit,
         name = outgoing [DCTerms.title]?.literal() ?: "",
         head = commit
@@ -53,6 +54,8 @@ fun FlexoModelHandler.branchFromResponse(
 fun Route.BranchApi() {
 
     delete<Paths.deleteBranchByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.branchId, "branchId")
         // add annotation to indicate it's deleted
         val patchResponse = flexoRequestPatch {
             orgPath("/repos/${path.projectId}/branches/${path.branchId}")
@@ -69,13 +72,14 @@ fun Route.BranchApi() {
         }
         val branch = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
-                branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().firstOrNull()
         } ?: return@delete call.respond(HttpStatusCode.NotFound)
         call.respond(branch)
     }
 
     get<Paths.getBranchesByProject> { path ->
+        requireValidId(path.projectId, "projectId")
         // submit GET request for all branches
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/branches")
@@ -89,12 +93,14 @@ fun Route.BranchApi() {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).filterDrop {
                 (it.hasProperty(SYSMLV2.DELETED) || it.uri.uriSuffix == "master")
             }.mapWith {
-                branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList()
         })
     }
 
     get<Paths.getBranchesByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.branchId, "branchId")
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/branches/${path.branchId}")
         }
@@ -105,21 +111,24 @@ fun Route.BranchApi() {
         // parse the response model, convert it to JSON, and reply to client
         val branch = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
-                branchFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().firstOrNull()
         } ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(branch)
     }
 
     post<BranchRequest>("/projects/{projectId}/branches") { request ->
-        val projectId = call.parameters["projectId"]
-        // use provided branch ID or generate a UUID if not provided
-        val branchId = request.atId ?: UUID.randomUUID()
+        val projectId = call.parameters["projectId"]!!
+        requireValidId(projectId, "projectId")
+        request.atId?.let { requireValidId(it, "@id") }
+        requireValidId(request.head.atId, "head.@id")
+        // use provided branch ID or generate one if not provided
+        val branchId = request.atId ?: generateId()
         val createBranchResponse = flexoRequestPost {
             orgPath("/repos/${projectId}/branches")
             // set branch ID slug
             addHeaders(
-                "Slug" to branchId.toString()
+                "Slug" to branchId
             )
             turtle {
                 thisSubject(
@@ -133,7 +142,7 @@ fun Route.BranchApi() {
             return@post forward(createBranchResponse)
         }
         call.respond(createBranchResponse.parseLdp {
-            branchFromResponse(focalOutgoing, UUID.fromString(projectId), branchId)
+            branchFromResponse(focalOutgoing, projectId, branchId)
         })
     }
 }

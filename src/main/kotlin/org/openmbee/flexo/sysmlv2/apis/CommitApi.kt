@@ -30,24 +30,25 @@ import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
 
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 import org.openmbee.flexo.sysmlv2.models.Identified
 import java.time.OffsetDateTime
-import java.util.*
 
 class InvalidSysmlSerializationError(message: String): Error(message)
 
 fun FlexoModelHandler.commitFromModel(
     commitIri: String,
     properties: Map<Property, Set<RDFNode>?>,
-    projectUuid: UUID
+    projectId: String
 ): Commit {
     // generate commit object
     return Commit(
-        atId = UUID.fromString(commitIri.uriSuffix),
+        atId = commitIri.uriSuffix,
         atType = Commit.AtType.Commit,
         created = OffsetDateTime.parse(properties[MMS.submitted]!!.literal()!!),
         description = properties[DCTerms.description]?.literal()?: "",
-        owningProject = Identified(atId = projectUuid),
+        owningProject = Identified(atId = projectId),
         //previousCommit = properties[MMS.parent]?.map {
         //    Identified(atId = UUID.fromString(it.asResource().uri.uriSuffix))
         //}?: emptyList()
@@ -81,6 +82,8 @@ fun Route.CommitApi() {
     }
 
     get<Paths.getCommitByProjectAndId> { getCommit ->
+        requireValidId(getCommit.projectId, "projectId")
+        requireValidId(getCommit.commitId, "commitId")
         // submit GET request to retrieve project metadata
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getCommit.projectId}/commits/${getCommit.commitId}")
@@ -100,6 +103,7 @@ fun Route.CommitApi() {
     }
 
     get<Paths.getCommitsByProject> { getCommits ->
+        requireValidId(getCommits.projectId, "projectId")
         // submit GET request to retrieve project metadata
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getCommits.projectId}/commits")
@@ -124,8 +128,10 @@ fun Route.CommitApi() {
     }
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
-        val projectId = call.parameters["projectId"]
+        val projectId = call.parameters["projectId"]!!
+        requireValidId(projectId, "projectId")
         var branchId = call.parameters["branchId"]
+        branchId?.let { requireValidId(it, "branchId") }
         val replace = call.parameters["replace"]
         val inserts = mutableListOf<String>()
         val deleteIncoming = mutableListOf<String>()
@@ -158,7 +164,7 @@ fun Route.CommitApi() {
                 continue
             }
             if (identityId == null && payloadId == null && payload != null) {
-                payloadId = UUID.randomUUID().toString() // generate an id
+                payloadId = generateId() // generate an id
             }
 
             // subject node, target element
@@ -296,7 +302,7 @@ fun Route.CommitApi() {
             }
             // parse the response model, convert it to JSON, and reply to client
             call.respond(flexoResponseUpdate.parseLdp {
-                commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
+                commitFromModel(focalIri!!, focalOutgoing, projectId)
             })
         } else { //model load - replaces model
             val turtleLoad = """
@@ -320,7 +326,7 @@ fun Route.CommitApi() {
             }
             val commit = flexoResponseLoad.parseModel {
                 model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
-                    commitFromModel(it.uri, it.outgoing(), UUID.fromString(projectId))
+                    commitFromModel(it.uri, it.outgoing(), projectId)
                 }.toList().firstOrNull()
             } ?: return@post call.respond(HttpStatusCode.NotFound)
             call.respond(commit)

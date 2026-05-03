@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.util.*
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
 
 /**
  * Parse a response body as a JSON object. Convenience for the common
@@ -18,27 +18,25 @@ suspend fun HttpResponse.bodyAsJsonObject(): kotlinx.serialization.json.JsonObje
     Json.parseToJsonElement(bodyAsText()).jsonObject
 
 /**
- * Extract the `@id` field from a JSON response body and parse it as a UUID.
+ * Extract the `@id` field from a JSON response body.
  * Throws if the response body is not a JSON object or has no `@id` field.
  */
-suspend fun HttpResponse.atIdAsUuid(): UUID {
+suspend fun HttpResponse.atId(): String {
     val body = bodyAsText()
-    val id = Json.parseToJsonElement(body).jsonObject["@id"]?.jsonPrimitive?.content
+    return Json.parseToJsonElement(body).jsonObject["@id"]?.jsonPrimitive?.content
         ?: error("response body missing '@id' field: $body")
-    return UUID.fromString(id)
 }
 
 /**
  * Look up the `@id` of a nested object field — e.g. a `Project` response has
  * `defaultBranch: { "@id": "..." }`, and `getDefaultBranchId(...)` returns
- * that nested UUID directly.
+ * that nested ID directly.
  */
-fun JsonElement.nestedAtId(field: String): UUID {
+fun JsonElement.nestedAtId(field: String): String {
     val nested = jsonObject[field]?.jsonObject
         ?: error("response body missing nested object field '$field': $this")
-    val id = nested["@id"]?.jsonPrimitive?.content
+    return nested["@id"]?.jsonPrimitive?.content
         ?: error("nested field '$field' missing '@id': $nested")
-    return UUID.fromString(id)
 }
 
 /**
@@ -48,7 +46,7 @@ fun JsonElement.nestedAtId(field: String): UUID {
  */
 
 suspend fun ApplicationTestBuilder.createProject(
-    projectId: UUID = UUID.randomUUID(),
+    projectId: String = generateId(),
     name: String = "Test Project",
     description: String = "Test project description"
 ): HttpResponse {
@@ -69,7 +67,7 @@ suspend fun ApplicationTestBuilder.createProject(
 }
 
 suspend fun ApplicationTestBuilder.putProject(
-    projectId: UUID,
+    projectId: String,
     name: String = "Test Project",
     description: String = "Test project description"
 ): HttpResponse {
@@ -89,17 +87,17 @@ suspend fun ApplicationTestBuilder.putProject(
     return response
 }
 
-suspend fun ApplicationTestBuilder.getProject(projectId: UUID): HttpResponse =
+suspend fun ApplicationTestBuilder.getProject(projectId: String): HttpResponse =
     httpGet("/projects/$projectId")
 
 suspend fun ApplicationTestBuilder.getProjects(): HttpResponse =
     httpGet("/projects")
 
-suspend fun ApplicationTestBuilder.deleteProject(projectId: UUID): HttpResponse =
+suspend fun ApplicationTestBuilder.deleteProject(projectId: String): HttpResponse =
     httpDelete("/projects/$projectId")
 
 suspend fun ApplicationTestBuilder.commitChanges(
-    projectId: UUID,
+    projectId: String,
     changeJson: String
 ): HttpResponse {
     return httpPost("/projects/$projectId/commits") {
@@ -107,53 +105,53 @@ suspend fun ApplicationTestBuilder.commitChanges(
     }
 }
 
-suspend fun ApplicationTestBuilder.getCommits(projectId: UUID): HttpResponse =
+suspend fun ApplicationTestBuilder.getCommits(projectId: String): HttpResponse =
     httpGet("/projects/$projectId/commits")
 
 suspend fun ApplicationTestBuilder.getCommit(
-    projectId: UUID,
-    commitId: UUID
+    projectId: String,
+    commitId: String
 ): HttpResponse = httpGet("/projects/$projectId/commits/$commitId")
 
 suspend fun ApplicationTestBuilder.getChanges(
-    projectId: UUID,
-    commitId: UUID
+    projectId: String,
+    commitId: String
 ): HttpResponse = httpGet("/projects/$projectId/commits/$commitId/changes")
 
 suspend fun ApplicationTestBuilder.getElements(
-    projectId: UUID,
-    commitId: UUID
+    projectId: String,
+    commitId: String
 ): HttpResponse = httpGet("/projects/$projectId/commits/$commitId/elements")
 
 suspend fun ApplicationTestBuilder.getElement(
-    projectId: UUID,
-    commitId: UUID,
-    elementId: UUID
+    projectId: String,
+    commitId: String,
+    elementId: String
 ): HttpResponse = httpGet("/projects/$projectId/commits/$commitId/elements/$elementId")
 
 suspend fun ApplicationTestBuilder.getRoots(
-    projectId: UUID,
-    commitId: UUID
+    projectId: String,
+    commitId: String
 ): HttpResponse = httpGet("/projects/$projectId/commits/$commitId/roots")
 
-suspend fun ApplicationTestBuilder.getBranches(projectId: UUID): HttpResponse =
+suspend fun ApplicationTestBuilder.getBranches(projectId: String): HttpResponse =
     httpGet("/projects/$projectId/branches")
 
 suspend fun ApplicationTestBuilder.getBranch(
-    projectId: UUID,
-    branchId: UUID
+    projectId: String,
+    branchId: String
 ): HttpResponse = httpGet("/projects/$projectId/branches/$branchId")
 
 suspend fun ApplicationTestBuilder.deleteBranch(
-    projectId: UUID,
-    branchId: UUID
+    projectId: String,
+    branchId: String
 ): HttpResponse = httpDelete("/projects/$projectId/branches/$branchId")
 
 suspend fun ApplicationTestBuilder.createBranch(
-    projectId: UUID,
-    headCommitId: UUID,
+    projectId: String,
+    headCommitId: String,
     name: String = "feature-branch",
-    branchId: UUID? = null
+    branchId: String? = null
 ): HttpResponse {
     val idClause = branchId?.let { """"@id": "$it",""" } ?: ""
     return httpPost("/projects/$projectId/branches") {
@@ -170,22 +168,22 @@ suspend fun ApplicationTestBuilder.createBranch(
     }
 }
 
-suspend fun ApplicationTestBuilder.getTags(projectId: UUID): HttpResponse =
+suspend fun ApplicationTestBuilder.getTags(projectId: String): HttpResponse =
     httpGet("/projects/$projectId/tags")
 
 suspend fun ApplicationTestBuilder.getTag(
-    projectId: UUID,
-    tagId: UUID
+    projectId: String,
+    tagId: String
 ): HttpResponse = httpGet("/projects/$projectId/tags/$tagId")
 
 suspend fun ApplicationTestBuilder.deleteTag(
-    projectId: UUID,
-    tagId: UUID
+    projectId: String,
+    tagId: String
 ): HttpResponse = httpDelete("/projects/$projectId/tags/$tagId")
 
 suspend fun ApplicationTestBuilder.createTag(
-    projectId: UUID,
-    taggedCommitId: UUID,
+    projectId: String,
+    taggedCommitId: String,
     name: String = "v1.0"
 ): HttpResponse {
     return httpPost("/projects/$projectId/tags") {
@@ -201,17 +199,17 @@ suspend fun ApplicationTestBuilder.createTag(
     }
 }
 
-suspend fun ApplicationTestBuilder.getQueries(projectId: UUID): HttpResponse =
+suspend fun ApplicationTestBuilder.getQueries(projectId: String): HttpResponse =
     httpGet("/projects/$projectId/queries")
 
 suspend fun ApplicationTestBuilder.getQuery(
-    projectId: UUID,
-    queryId: UUID
+    projectId: String,
+    queryId: String
 ): HttpResponse = httpGet("/projects/$projectId/queries/$queryId")
 
 suspend fun ApplicationTestBuilder.deleteQuery(
-    projectId: UUID,
-    queryId: UUID
+    projectId: String,
+    queryId: String
 ): HttpResponse = httpDelete("/projects/$projectId/queries/$queryId")
 
 /**
@@ -221,7 +219,7 @@ suspend fun ApplicationTestBuilder.deleteQuery(
  * sealed-class members must use `"@type"` rather than the default `"type"`.
  */
 suspend fun ApplicationTestBuilder.createQuery(
-    projectId: UUID,
+    projectId: String,
     propertyName: String = "name",
     propertyValue: String = "Test Part"
 ): HttpResponse {

@@ -11,14 +11,14 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
 import org.openmbee.flexo.sysmlv2.util.*
-import java.util.*
 
 class ProjectTest : CommonSpec() {
     init {
         "POST /projects - create a new project returns the created Project" {
             testApplication {
-                val projectId = UUID.randomUUID()
+                val projectId = generateId()
                 val response = httpPost("/projects") {
                     setJsonBody(
                         """
@@ -40,11 +40,11 @@ class ProjectTest : CommonSpec() {
                 parsed shouldContainKey "name"
                 parsed shouldContainKey "description"
                 parsed shouldContainKey "defaultBranch"
-                parsed["@id"]!!.jsonPrimitive.content shouldBe projectId.toString()
+                parsed["@id"]!!.jsonPrimitive.content shouldBe projectId
                 parsed["@type"]!!.jsonPrimitive.content shouldBe "Project"
                 parsed["name"]!!.jsonPrimitive.content shouldBe "New Project"
                 parsed["description"]!!.jsonPrimitive.content shouldBe "desc"
-                // server-assigned default branch UUID must parse (nestedAtId
+                // server-assigned default branch id must be present (nestedAtId
                 // throws if the response shape is wrong)
                 parsed.nestedAtId("defaultBranch")
             }
@@ -54,12 +54,12 @@ class ProjectTest : CommonSpec() {
             testApplication {
                 // PUT requires the project to already exist (the handler does a
                 // GET first to backfill missing fields), so create it via POST.
-                val projectId = UUID.randomUUID()
+                val projectId = generateId()
                 createProject(projectId, "Original Name", "original")
 
                 val updated = putProject(projectId, "Updated Name", "updated")
                 val parsed = updated.bodyAsJsonObject()
-                parsed["@id"]!!.jsonPrimitive.content shouldBe projectId.toString()
+                parsed["@id"]!!.jsonPrimitive.content shouldBe projectId
                 parsed["name"]!!.jsonPrimitive.content shouldBe "Updated Name"
                 parsed["description"]!!.jsonPrimitive.content shouldBe "updated"
 
@@ -72,15 +72,15 @@ class ProjectTest : CommonSpec() {
 
         "GET /projects - list includes the just-created project" {
             testApplication {
-                val createdId = UUID.randomUUID()
+                val createdId = generateId()
                 createProject(createdId, "Listed Project", "listed-desc")
 
                 val list = getProjects()
                 list shouldHaveStatus HttpStatusCode.OK
                 val items = Json.parseToJsonElement(list.bodyAsText()).jsonArray
                 val ids = items.map { it.jsonObject["@id"]!!.jsonPrimitive.content }
-                ids shouldContain createdId.toString()
-                val match = items.first { it.jsonObject["@id"]!!.jsonPrimitive.content == createdId.toString() }
+                ids shouldContain createdId
+                val match = items.first { it.jsonObject["@id"]!!.jsonPrimitive.content == createdId }
                 match.jsonObject["name"]!!.jsonPrimitive.content shouldBe "Listed Project"
                 match.jsonObject["@type"]!!.jsonPrimitive.content shouldBe "Project"
             }
@@ -88,12 +88,12 @@ class ProjectTest : CommonSpec() {
 
         "GET /projects/{id} - returns matching @id, name, defaultBranch" {
             testApplication {
-                val id = UUID.randomUUID()
+                val id = generateId()
                 val createResponse = createProject(id, "Get Test", "get-desc")
                 val createdDefaultBranch = createResponse.bodyAsJsonObject().nestedAtId("defaultBranch")
 
                 val parsed = getProject(id).bodyAsJsonObject()
-                parsed["@id"]!!.jsonPrimitive.content shouldBe id.toString()
+                parsed["@id"]!!.jsonPrimitive.content shouldBe id
                 parsed["name"]!!.jsonPrimitive.content shouldBe "Get Test"
                 parsed["description"]!!.jsonPrimitive.content shouldBe "get-desc"
                 // GET should report the same default branch as POST returned
@@ -103,7 +103,7 @@ class ProjectTest : CommonSpec() {
 
         "DELETE /projects/{id} - soft-deleted projects do not appear in list" {
             testApplication {
-                val id = UUID.randomUUID()
+                val id = generateId()
                 createProject(id, "Delete Test", "del-desc")
                 deleteProject(id) shouldHaveStatus HttpStatusCode.OK
 
@@ -111,13 +111,13 @@ class ProjectTest : CommonSpec() {
                 val list = getProjects()
                 val ids = Json.parseToJsonElement(list.bodyAsText()).jsonArray
                     .map { it.jsonObject["@id"]!!.jsonPrimitive.content }
-                ids shouldNotContain id.toString()
+                ids shouldNotContain id
             }
         }
 
         "GET /projects/{id} - returns 404 for unknown project" {
             testApplication {
-                val unknown = UUID.randomUUID()
+                val unknown = generateId()
                 getProject(unknown) shouldHaveStatus HttpStatusCode.NotFound
             }
         }

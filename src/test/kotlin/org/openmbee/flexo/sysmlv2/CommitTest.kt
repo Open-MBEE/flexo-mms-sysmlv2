@@ -35,39 +35,39 @@ class CommitTest : ProjectAny() {
                 val commit = response.bodyAsJsonObject()
                 commit["@type"]!!.jsonPrimitive.content shouldBe "Commit"
                 commit.nestedAtId("owningProject") shouldBe demoProjectId
-                // server should mint a UUID @id
-                response.atIdAsUuid()
+                // server should mint an @id
+                response.atId()
             }
         }
 
         "GET /projects/{id}/commits - list contains the just-created commit (newest first)" {
             testApplication {
-                val firstCommitId = commitChanges(demoProjectId, seedChange).atIdAsUuid()
+                val firstCommitId = commitChanges(demoProjectId, seedChange).atId()
                 val secondCommitId = commitChanges(
                     demoProjectId,
                     seedChange.replace("Test Part", "Renamed Part")
-                ).atIdAsUuid()
+                ).atId()
 
                 val list = getCommits(demoProjectId)
                 list shouldHaveStatus HttpStatusCode.OK
                 val items = Json.parseToJsonElement(list.bodyAsText()).jsonArray
                 val ids = items.map { it.jsonObject["@id"]!!.jsonPrimitive.content }
-                ids shouldContain firstCommitId.toString()
-                ids shouldContain secondCommitId.toString()
+                ids shouldContain firstCommitId
+                ids shouldContain secondCommitId
                 // the API sorts commits descending by `created` timestamp, so
                 // the most recent commit should appear first
-                ids.first() shouldBe secondCommitId.toString()
+                ids.first() shouldBe secondCommitId
             }
         }
 
         "GET /projects/{id}/commits/{commitId} - returns the same commit object" {
             testApplication {
-                val commitId = commitChanges(demoProjectId, seedChange).atIdAsUuid()
+                val commitId = commitChanges(demoProjectId, seedChange).atId()
 
                 val response = getCommit(demoProjectId, commitId)
                 response shouldHaveStatus HttpStatusCode.OK
                 val commit = response.bodyAsJsonObject()
-                commit["@id"]!!.jsonPrimitive.content shouldBe commitId.toString()
+                commit["@id"]!!.jsonPrimitive.content shouldBe commitId
                 commit["@type"]!!.jsonPrimitive.content shouldBe "Commit"
                 commit.nestedAtId("owningProject") shouldBe demoProjectId
             }

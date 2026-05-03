@@ -25,26 +25,27 @@ import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 import org.openmbee.flexo.sysmlv2.models.Identified
 import org.openmbee.flexo.sysmlv2.models.Tag
 import org.openmbee.flexo.sysmlv2.models.TagRequest
 import java.time.OffsetDateTime
-import java.util.*
 
 fun FlexoModelHandler.tagFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
-    projectUuid: UUID,
-    tagUuid: UUID
+    projectId: String,
+    tagId: String
 ): Tag {
-    val commit = Identified(UUID.fromString(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix))
+    val commit = Identified(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix)
     return Tag(
-        atId = tagUuid,
+        atId = tagId,
         atType = Tag.AtType.Tag,
         created = OffsetDateTime.parse(
             outgoing[MMS.created]?.literal()
                 ?: OffsetDateTime.now().toString()
         ),
-        owningProject = Identified(projectUuid),
+        owningProject = Identified(projectId),
         referencedCommit = commit,
         taggedCommit = commit,
         name = outgoing[DCTerms.title]?.literal() ?: "",
@@ -53,6 +54,8 @@ fun FlexoModelHandler.tagFromResponse(
 fun Route.TagApi() {
 
     delete<Paths.deleteTagByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.tagId, "tagId")
         // add annotation to indicate it's deleted
         val patchResponse = flexoRequestPatch {
             orgPath("/repos/${path.projectId}/locks/${path.tagId}")
@@ -69,13 +72,15 @@ fun Route.TagApi() {
         }
         val tag = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
-                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().firstOrNull()
         } ?: return@delete call.respond(HttpStatusCode.NotFound)
         call.respond(tag)
     }
 
     get<Paths.getTagByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.tagId, "tagId")
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/locks/${path.tagId}")
         }
@@ -84,7 +89,7 @@ fun Route.TagApi() {
         }
         val tags = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
-                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList()
         }
         val tag = tags.firstOrNull() ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -93,6 +98,7 @@ fun Route.TagApi() {
     }
 
     get<Paths.getTagsByProject> { path ->
+        requireValidId(path.projectId, "projectId")
         // submit GET request for all tags
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/locks")
@@ -107,18 +113,22 @@ fun Route.TagApi() {
                 // ignore flexo created locks and deleted
                 (it.uri.uriSuffix.startsWith("Commit.") || it.hasProperty(SYSMLV2.DELETED))
             }.mapWith {
-                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList()
         })
     }
 
     post<TagRequest>("/projects/{projectId}/tags") { request ->
-        val projectId = call.parameters["projectId"]
-        val tagId = UUID.randomUUID()
+        val projectId = call.parameters["projectId"]!!
+        requireValidId(projectId, "projectId")
+        request.atId?.let { requireValidId(it, "@id") }
+        requireValidId(request.taggedCommit.atId, "taggedCommit.@id")
+        // use provided tag ID or generate one if not provided
+        val tagId = request.atId ?: generateId()
         val createTagResponse = flexoRequestPost {
             orgPath("/repos/${projectId}/locks")
             addHeaders(
-                "Slug" to tagId.toString()
+                "Slug" to tagId
             )
             turtle {
                 thisSubject(
@@ -132,7 +142,7 @@ fun Route.TagApi() {
             return@post forward(createTagResponse)
         }
         call.respond(createTagResponse.parseLdp {
-            tagFromResponse(focalOutgoing, UUID.fromString(projectId), tagId)
+            tagFromResponse(focalOutgoing, projectId, tagId)
         })
     }
 }

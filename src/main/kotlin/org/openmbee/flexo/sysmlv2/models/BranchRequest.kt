@@ -9,14 +9,10 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
-@file:UseSerializers(UUIDSerializer::class)
-
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseSerializers
 
 /**
  *
@@ -30,7 +26,7 @@ data class BranchRequest(
     val head: Identified,
     val name: kotlin.String,
     @SerialName("@id")
-    val atId: java.util.UUID? = null,
+    val atId: String? = null,
     @SerialName("@type")
     val atType: BranchRequest.AtType? = null
 )
@@ -43,4 +39,3 @@ data class BranchRequest(
         Branch("Branch");
     }
 }
-

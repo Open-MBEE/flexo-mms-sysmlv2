@@ -9,11 +9,10 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
-@file:UseSerializers(UUIDSerializer::class, OffsetDateTimeSerializer::class)
+@file:UseSerializers(OffsetDateTimeSerializer::class)
 
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -34,7 +33,7 @@ import org.openmbee.flexo.sysmlv2.models.Identified
 @Serializable
 data class Branch(
     @SerialName("@id")
-    val atId: java.util.UUID,
+    val atId: String,
     @SerialName("@type")
     val atType: Branch.AtType,
     val created: java.time.OffsetDateTime,
@@ -52,4 +51,3 @@ data class Branch(
         Branch("Branch");
     }
 }
-
