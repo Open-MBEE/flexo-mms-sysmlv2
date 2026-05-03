@@ -16,12 +16,15 @@ import kotlinx.serialization.Serializable
 
 /**
  *
+ * @param atId Optional query ID. If not provided, a random UUID will be generated.
  * @param atType
  * @param select
  * @param `where`
  */
 @Serializable
 data class QueryRequest(
+    @SerialName("@id")
+    val atId: String? = null,
     @SerialName("@type")
     val atType: QueryRequest.AtType? = null,
     val select: kotlin.collections.List<kotlin.String>? = null,

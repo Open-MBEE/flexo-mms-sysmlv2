@@ -320,7 +320,9 @@ fun Route.QueryApi() {
     post<QueryRequest>("/projects/{projectId}/queries") {
         val projectId = call.parameters["projectId"]!!
         requireValidId(projectId, "projectId")
-        val queryId = generateId()
+        it.atId?.let { id -> requireValidId(id, "@id") }
+        // use provided query ID or generate one if not provided
+        val queryId = it.atId ?: generateId()
         val response = createOrUpdateQuery(queryId, projectId, it, true)
         if (response.first.isFailure()) {
             return@post forward(response.first)

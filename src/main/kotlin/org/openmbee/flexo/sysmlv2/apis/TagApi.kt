@@ -121,8 +121,10 @@ fun Route.TagApi() {
     post<TagRequest>("/projects/{projectId}/tags") { request ->
         val projectId = call.parameters["projectId"]!!
         requireValidId(projectId, "projectId")
+        request.atId?.let { requireValidId(it, "@id") }
         requireValidId(request.taggedCommit.atId, "taggedCommit.@id")
-        val tagId = generateId()
+        // use provided tag ID or generate one if not provided
+        val tagId = request.atId ?: generateId()
         val createTagResponse = flexoRequestPost {
             orgPath("/repos/${projectId}/locks")
             addHeaders(

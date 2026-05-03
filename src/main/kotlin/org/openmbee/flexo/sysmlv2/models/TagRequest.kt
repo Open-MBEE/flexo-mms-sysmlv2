@@ -20,12 +20,15 @@ import org.openmbee.flexo.sysmlv2.models.Identified
  *
  * @param name
  * @param taggedCommit
+ * @param atId Optional tag ID. If not provided, a random UUID will be generated.
  * @param atType
  */
 @Serializable
 data class TagRequest(
     val name: kotlin.String,
     val taggedCommit: Identified,
+    @SerialName("@id")
+    val atId: String? = null,
     @SerialName("@type")
     val atType: TagRequest.AtType? = null
 )
