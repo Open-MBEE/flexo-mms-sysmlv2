@@ -180,7 +180,7 @@ paths:
 
   /projects/{projectId}/branches/{branchId}:
     get:
-      operationId: getBranchesByProjectAndId
+      operationId: getBranchByProjectAndId
       tags: [Branch]
       summary: Get branch by project and ID
       parameters:
@@ -475,7 +475,7 @@ paths:
     get:
       operationId: getProjectUsageByProjectCommitElement
       tags: [Element]
-      summary: Get ProjectUsage elements that originate the provided element
+      summary: Get ProjectUsage that originate the provided element
       parameters:
         - $ref: '#/components/parameters/projectId'
         - $ref: '#/components/parameters/commitId'

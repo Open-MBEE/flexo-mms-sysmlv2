@@ -98,7 +98,7 @@ fun Route.BranchApi() {
         })
     }
 
-    get<Paths.getBranchesByProjectAndId> { path ->
+    get<Paths.getBranchByProjectAndId> { path ->
         requireValidId(path.projectId, "projectId")
         requireValidId(path.branchId, "branchId")
         val flexoResponse = flexoRequestGet {
