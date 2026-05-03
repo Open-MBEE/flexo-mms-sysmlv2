@@ -1245,7 +1245,7 @@ components:
 
     PrimitiveConstraint:
       type: object
-      required: [operator, property, value]
+      required: ['@type', operator, property, value]
       properties:
         '@type':
           type: string
@@ -1266,7 +1266,7 @@ components:
 
     CompositeConstraint:
       type: object
-      required: [constraint, operator]
+      required: ['@type', constraint, operator]
       properties:
         '@type':
           type: string
