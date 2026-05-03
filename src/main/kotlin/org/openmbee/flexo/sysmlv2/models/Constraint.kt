@@ -9,15 +9,10 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
-@file:UseSerializers(UUIDSerializer::class)
-
 package org.openmbee.flexo.sysmlv2.models
 
 import kotlinx.serialization.Serializable
-import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
-import kotlinx.serialization.UseSerializers
 
 // see https://stackoverflow.com/questions/66690712/kotlinx-serialization-polymorphic-serializer-was-not-found-for-missing-class-di
 @Serializable
 sealed class Constraint
-

@@ -25,26 +25,27 @@ import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 import org.openmbee.flexo.sysmlv2.models.Identified
 import org.openmbee.flexo.sysmlv2.models.Tag
 import org.openmbee.flexo.sysmlv2.models.TagRequest
 import java.time.OffsetDateTime
-import java.util.*
 
 fun FlexoModelHandler.tagFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
-    projectUuid: UUID,
-    tagUuid: UUID
+    projectId: String,
+    tagId: String
 ): Tag {
-    val commit = Identified(UUID.fromString(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix))
+    val commit = Identified(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix)
     return Tag(
-        atId = tagUuid,
+        atId = tagId,
         atType = Tag.AtType.Tag,
         created = OffsetDateTime.parse(
             outgoing[MMS.created]?.literal()
                 ?: OffsetDateTime.now().toString()
         ),
-        owningProject = Identified(projectUuid),
+        owningProject = Identified(projectId),
         referencedCommit = commit,
         taggedCommit = commit,
         name = outgoing[DCTerms.title]?.literal() ?: "",
@@ -69,7 +70,7 @@ fun Route.TagApi() {
         }
         val tag = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
-                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().firstOrNull()
         } ?: return@delete call.respond(HttpStatusCode.NotFound)
         call.respond(tag)
@@ -84,7 +85,7 @@ fun Route.TagApi() {
         }
         val tags = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
-                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList()
         }
         val tag = tags.firstOrNull() ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -107,18 +108,23 @@ fun Route.TagApi() {
                 // ignore flexo created locks and deleted
                 (it.uri.uriSuffix.startsWith("Commit.") || it.hasProperty(SYSMLV2.DELETED))
             }.mapWith {
-                tagFromResponse(it.outgoing(), path.projectId, UUID.fromString(it.uri.uriSuffix))
+                tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList()
         })
     }
 
     post<TagRequest>("/projects/{projectId}/tags") { request ->
-        val projectId = call.parameters["projectId"]
-        val tagId = UUID.randomUUID()
+        val projectId = call.parameters["projectId"]!!
+        try {
+            requireValidId(projectId, "projectId")
+        } catch (e: IllegalArgumentException) {
+            return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
+        }
+        val tagId = generateId()
         val createTagResponse = flexoRequestPost {
             orgPath("/repos/${projectId}/locks")
             addHeaders(
-                "Slug" to tagId.toString()
+                "Slug" to tagId
             )
             turtle {
                 thisSubject(
@@ -132,7 +138,7 @@ fun Route.TagApi() {
             return@post forward(createTagResponse)
         }
         call.respond(createTagResponse.parseLdp {
-            tagFromResponse(focalOutgoing, UUID.fromString(projectId), tagId)
+            tagFromResponse(focalOutgoing, projectId, tagId)
         })
     }
 }

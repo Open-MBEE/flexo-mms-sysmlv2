@@ -11,7 +11,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.openmbee.flexo.sysmlv2.util.*
-import java.util.*
 
 class ElementTest : ProjectAny() {
     init {
@@ -33,7 +32,7 @@ class ElementTest : ProjectAny() {
 
         "GET /projects/{id}/commits/{commitId}/elements - includes the committed element" {
             testApplication {
-                val commitId = commitChanges(demoProjectId, singleElementChange).atIdAsUuid()
+                val commitId = commitChanges(demoProjectId, singleElementChange).atId()
 
                 val response = getElements(demoProjectId, commitId)
                 response shouldHaveStatus HttpStatusCode.OK
@@ -48,9 +47,9 @@ class ElementTest : ProjectAny() {
 
         "GET /projects/{id}/commits/{commitId}/elements/{elementId} - returns the single element" {
             testApplication {
-                val commitId = commitChanges(demoProjectId, singleElementChange).atIdAsUuid()
+                val commitId = commitChanges(demoProjectId, singleElementChange).atId()
 
-                val response = getElement(demoProjectId, commitId, UUID.fromString(rootElementId))
+                val response = getElement(demoProjectId, commitId, rootElementId)
                 response shouldHaveStatus HttpStatusCode.OK
                 val element = response.bodyAsJsonObject()
                 element["@id"]!!.jsonPrimitive.content shouldBe rootElementId
@@ -60,7 +59,7 @@ class ElementTest : ProjectAny() {
 
         "GET /projects/{id}/commits/{commitId}/roots - returns elements without an owner" {
             testApplication {
-                val commitId = commitChanges(demoProjectId, singleElementChange).atIdAsUuid()
+                val commitId = commitChanges(demoProjectId, singleElementChange).atId()
 
                 val response = getRoots(demoProjectId, commitId)
                 response shouldHaveStatus HttpStatusCode.OK
@@ -75,7 +74,7 @@ class ElementTest : ProjectAny() {
             testApplication {
                 val payload = javaClass.classLoader.getResource("PartsTreeRedefinition.json")?.readText()
                 requireNotNull(payload) { "PartsTreeRedefinition.json fixture not found on classpath" }
-                val commitId = commitChanges(demoProjectId, payload).atIdAsUuid()
+                val commitId = commitChanges(demoProjectId, payload).atId()
 
                 val response = getElements(demoProjectId, commitId)
                 response shouldHaveStatus HttpStatusCode.OK

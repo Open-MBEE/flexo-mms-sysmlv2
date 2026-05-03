@@ -37,37 +37,37 @@ class QueryTest : ProjectAny() {
                 where["property"]!!.jsonPrimitive.content shouldBe "name"
                 where["value"]!!.jsonArray[0].jsonPrimitive.content shouldBe "Test Part"
                 // server should mint an @id
-                response.atIdAsUuid()
+                response.atId()
             }
         }
 
         "GET /projects/{id}/queries/{queryId} - returns the matching query" {
             testApplication {
-                val queryId = createQuery(demoProjectId, "name", "Test Part").atIdAsUuid()
+                val queryId = createQuery(demoProjectId, "name", "Test Part").atId()
 
                 val response = getQuery(demoProjectId, queryId)
                 response shouldHaveStatus HttpStatusCode.OK
                 val query = response.bodyAsJsonObject()
-                query["@id"]!!.jsonPrimitive.content shouldBe queryId.toString()
+                query["@id"]!!.jsonPrimitive.content shouldBe queryId
                 query["where"]!!.jsonObject["property"]!!.jsonPrimitive.content shouldBe "name"
             }
         }
 
         "GET /projects/{id}/queries - lists the just-created query" {
             testApplication {
-                val queryId = createQuery(demoProjectId, "name", "Listed Part").atIdAsUuid()
+                val queryId = createQuery(demoProjectId, "name", "Listed Part").atId()
 
                 val list = getQueries(demoProjectId)
                 list shouldHaveStatus HttpStatusCode.OK
                 val items = Json.parseToJsonElement(list.bodyAsText()).jsonArray
                 val ids = items.map { it.jsonObject["@id"]!!.jsonPrimitive.content }
-                ids shouldContain queryId.toString()
+                ids shouldContain queryId
             }
         }
 
         "PUT /projects/{id}/queries/{queryId} - updates an existing query" {
             testApplication {
-                val queryId = createQuery(demoProjectId, "name", "before").atIdAsUuid()
+                val queryId = createQuery(demoProjectId, "name", "before").atId()
 
                 // PUT with a new where-clause
                 val response = httpPut("/projects/$demoProjectId/queries/$queryId") {
@@ -96,13 +96,13 @@ class QueryTest : ProjectAny() {
 
         "DELETE /projects/{id}/queries/{queryId} - removes the query from the list" {
             testApplication {
-                val queryId = createQuery(demoProjectId, "name", "to-delete").atIdAsUuid()
+                val queryId = createQuery(demoProjectId, "name", "to-delete").atId()
                 deleteQuery(demoProjectId, queryId) shouldHaveStatus HttpStatusCode.OK
 
                 val list = getQueries(demoProjectId)
                 val ids = Json.parseToJsonElement(list.bodyAsText()).jsonArray
                     .map { it.jsonObject["@id"]!!.jsonPrimitive.content }
-                ids shouldNotContain queryId.toString()
+                ids shouldNotContain queryId
             }
         }
     }

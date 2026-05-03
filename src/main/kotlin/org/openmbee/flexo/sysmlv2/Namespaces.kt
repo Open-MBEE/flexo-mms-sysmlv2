@@ -16,8 +16,8 @@ object SYSMLV2 {
     val DEFAULT_BRANCH_ID = ResourceFactory.createProperty("${BASE}defaultBranchId")
     val DELETED = ResourceFactory.createProperty("${BASE}deleted")
 
-    fun element(uuid: String): Resource {
-        return ResourceFactory.createResource("$ELEMENT$uuid")
+    fun element(id: String): Resource {
+        return ResourceFactory.createResource("$ELEMENT$id")
     }
     fun type(type: String): Resource {
         return ResourceFactory.createResource("$VOCABULARY$type")

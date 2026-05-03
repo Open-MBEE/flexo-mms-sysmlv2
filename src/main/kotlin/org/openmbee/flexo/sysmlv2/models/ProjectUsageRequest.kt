@@ -9,14 +9,10 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
-@file:UseSerializers(UUIDSerializer::class)
-
 package org.openmbee.flexo.sysmlv2.models
 
-import org.openmbee.flexo.sysmlv2.infrastructure.UUIDSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.UseSerializers
 
 import org.openmbee.flexo.sysmlv2.models.Identified
 
@@ -32,7 +28,7 @@ data class ProjectUsageRequest(
     @SerialName("@type")
     val atType: ProjectUsageRequest.AtType,
     @SerialName("@id")
-    val atId: java.util.UUID? = null,
+    val atId: String? = null,
     val usedCommit: Identified? = null,
     val usedProject: Identified? = null
 )
@@ -45,4 +41,3 @@ data class ProjectUsageRequest(
         ProjectUsage("ProjectUsage");
     }
 }
-

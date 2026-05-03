@@ -10,8 +10,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
 import org.openmbee.flexo.sysmlv2.util.*
-import java.util.*
 
 class BranchTest : ProjectAny() {
     init {
@@ -44,9 +44,9 @@ class BranchTest : ProjectAny() {
                 val ids = branches.map { it.jsonObject["@id"]!!.jsonPrimitive.content }
                 // the auto-created flexo "master" branch is filtered out, so
                 // the only entry should be the project's default branch
-                ids shouldContain defaultBranchId.toString()
+                ids shouldContain defaultBranchId
                 val match = branches.first {
-                    it.jsonObject["@id"]!!.jsonPrimitive.content == defaultBranchId.toString()
+                    it.jsonObject["@id"]!!.jsonPrimitive.content == defaultBranchId
                 }
                 match.jsonObject["@type"]!!.jsonPrimitive.content shouldBe "Branch"
                 match.jsonObject.nestedAtId("owningProject") shouldBe demoProjectId
@@ -61,7 +61,7 @@ class BranchTest : ProjectAny() {
                 val response = getBranch(demoProjectId, defaultBranchId)
                 response shouldHaveStatus HttpStatusCode.OK
                 val branch = response.bodyAsJsonObject()
-                branch["@id"]!!.jsonPrimitive.content shouldBe defaultBranchId.toString()
+                branch["@id"]!!.jsonPrimitive.content shouldBe defaultBranchId
                 branch["@type"]!!.jsonPrimitive.content shouldBe "Branch"
                 branch.nestedAtId("owningProject") shouldBe demoProjectId
                 // every branch references a head commit
@@ -72,28 +72,28 @@ class BranchTest : ProjectAny() {
         "POST /projects/{id}/branches - creates a new branch from a head commit" {
             testApplication {
                 // need a real commit ID to point the new branch at
-                val commitId = commitChanges(demoProjectId, seedChange).atIdAsUuid()
+                val commitId = commitChanges(demoProjectId, seedChange).atId()
 
-                val branchId = UUID.randomUUID()
+                val branchId = generateId()
                 val created = createBranch(demoProjectId, commitId, "feature-x", branchId)
                 created shouldHaveStatus HttpStatusCode.OK
                 val parsed = created.bodyAsJsonObject()
-                parsed["@id"]!!.jsonPrimitive.content shouldBe branchId.toString()
+                parsed["@id"]!!.jsonPrimitive.content shouldBe branchId
                 parsed["@type"]!!.jsonPrimitive.content shouldBe "Branch"
                 parsed["name"]!!.jsonPrimitive.content shouldBe "feature-x"
                 parsed.nestedAtId("owningProject") shouldBe demoProjectId
 
                 // and a follow-up GET confirms it persisted
                 val fetched = getBranch(demoProjectId, branchId).bodyAsJsonObject()
-                fetched["@id"]!!.jsonPrimitive.content shouldBe branchId.toString()
+                fetched["@id"]!!.jsonPrimitive.content shouldBe branchId
                 fetched["name"]!!.jsonPrimitive.content shouldBe "feature-x"
             }
         }
 
         "DELETE /projects/{id}/branches/{branchId} - removes the branch from the list" {
             testApplication {
-                val commitId = commitChanges(demoProjectId, seedChange).atIdAsUuid()
-                val branchId = UUID.randomUUID()
+                val commitId = commitChanges(demoProjectId, seedChange).atId()
+                val branchId = generateId()
                 createBranch(demoProjectId, commitId, "to-delete", branchId)
                 deleteBranch(demoProjectId, branchId) shouldHaveStatus HttpStatusCode.OK
 
@@ -101,7 +101,7 @@ class BranchTest : ProjectAny() {
                 val list = getBranches(demoProjectId)
                 val ids = Json.parseToJsonElement(list.bodyAsText()).jsonArray
                     .map { it.jsonObject["@id"]!!.jsonPrimitive.content }
-                ids shouldNotContain branchId.toString()
+                ids shouldNotContain branchId
             }
         }
     }
