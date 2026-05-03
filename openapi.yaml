@@ -1235,7 +1235,7 @@ components:
     # ── Constraint hierarchy ───────────────────────────────
     Constraint:
       discriminator:
-        propertyName: type
+        propertyName: '@type'
         mapping:
           PrimitiveConstraint: '#/components/schemas/PrimitiveConstraint'
           CompositeConstraint: '#/components/schemas/CompositeConstraint'
@@ -1247,7 +1247,7 @@ components:
       type: object
       required: [operator, property, value]
       properties:
-        type:
+        '@type':
           type: string
           enum: [PrimitiveConstraint]
         inverse:
@@ -1268,7 +1268,7 @@ components:
       type: object
       required: [constraint, operator]
       properties:
-        type:
+        '@type':
           type: string
           enum: [CompositeConstraint]
         constraint:
