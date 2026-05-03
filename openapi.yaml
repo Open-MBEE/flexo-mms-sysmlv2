@@ -372,7 +372,8 @@ paths:
     get:
       operationId: getChangesByProjectCommit
       tags: [Commit]
-      summary: Get changes (DataVersions) for a commit
+      summary: Get changes (DataVersions) for a commit (stub)
+      description: Not yet implemented; returns 501 Not Implemented.
       parameters:
         - $ref: '#/components/parameters/projectId'
         - $ref: '#/components/parameters/commitId'
@@ -395,7 +396,8 @@ paths:
     get:
       operationId: getChangeByProjectCommitId
       tags: [Commit]
-      summary: Get a specific change (DataVersion) by ID
+      summary: Get a specific change (DataVersion) by ID (stub)
+      description: Not yet implemented; returns 501 Not Implemented.
       parameters:
         - $ref: '#/components/parameters/projectId'
         - $ref: '#/components/parameters/commitId'
@@ -473,7 +475,7 @@ paths:
     get:
       operationId: getProjectUsageByProjectCommitElement
       tags: [Element]
-      summary: Get ProjectUsage that originates the provided element
+      summary: Get ProjectUsage elements that originate the provided element
       parameters:
         - $ref: '#/components/parameters/projectId'
         - $ref: '#/components/parameters/commitId'
@@ -485,11 +487,13 @@ paths:
             type: string
       responses:
         '200':
-          description: A single element (JSON object representing the project usage root)
+          description: List of ProjectUsage elements (JSON objects)
           content:
             application/json:
               schema:
-                type: object
+                type: array
+                items:
+                  type: object
         '404':
           $ref: '#/components/responses/Error'
         default:
@@ -664,7 +668,10 @@ paths:
     get:
       operationId: getQueryResultsByProjectIdQuery
       tags: [Query]
-      summary: Execute an ad-hoc query (via GET with body)
+      summary: Execute an ad-hoc query via GET with body (stub)
+      description: >-
+        Not yet implemented; returns 501 Not Implemented. Use the POST variant
+        on the same path for a working implementation.
       parameters:
         - $ref: '#/components/parameters/projectId'
         - name: commitId
@@ -1135,7 +1142,9 @@ components:
         owningProject:
           $ref: '#/components/schemas/Identified'
         previousCommit:
-          $ref: '#/components/schemas/Identified'
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Identified'
 
     CommitRequest:
       type: object
@@ -1218,6 +1227,7 @@ components:
 
     QueryRequest:
       type: object
+      required: [select, where]
       properties:
         '@id':
           type: string
