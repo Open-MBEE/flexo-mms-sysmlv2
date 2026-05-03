@@ -43,7 +43,7 @@ object Paths {
      * @param projectId ID of the project
      * @param branchId ID of the branch
      */
-    @Serializable @Resource("/projects/{projectId}/branches/{branchId}") class getBranchesByProjectAndId(val projectId: kotlin.String, val branchId: kotlin.String)
+    @Serializable @Resource("/projects/{projectId}/branches/{branchId}") class getBranchByProjectAndId(val projectId: kotlin.String, val branchId: kotlin.String)
 
     /**
      * Create branch by project
