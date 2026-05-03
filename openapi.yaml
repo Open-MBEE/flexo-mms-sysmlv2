@@ -180,7 +180,7 @@ paths:
 
   /projects/{projectId}/branches/{branchId}:
     get:
-      operationId: getBranchByProjectAndId
+      operationId: getBranchesByProjectAndId
       tags: [Branch]
       summary: Get branch by project and ID
       parameters:
@@ -658,7 +658,11 @@ paths:
         - $ref: '#/components/parameters/queryId'
       responses:
         '200':
-          description: Query deleted
+          description: Query deleted; returns the deleted query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
         '404':
           $ref: '#/components/responses/Error'
         default:
