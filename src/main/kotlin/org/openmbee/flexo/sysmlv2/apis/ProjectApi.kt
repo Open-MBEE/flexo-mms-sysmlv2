@@ -158,9 +158,10 @@ fun Route.ProjectApi() {
 
     // create new project via POST
     post<ProjectRequest>("/projects") { projectRequest ->
-        // validate user-provided id
+        // validate user-provided ids
         try {
             projectRequest.atId?.let { requireValidId(it, "@id") }
+            projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         } catch (e: IllegalArgumentException) {
             return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
         }
@@ -181,6 +182,7 @@ fun Route.ProjectApi() {
         val projectId = "${call.parameters["projectId"]}"
         try {
             requireValidId(projectId, "projectId")
+            projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         } catch (e: IllegalArgumentException) {
             return@put call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
         }

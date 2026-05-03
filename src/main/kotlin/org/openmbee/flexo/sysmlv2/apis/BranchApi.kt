@@ -117,6 +117,7 @@ fun Route.BranchApi() {
         try {
             requireValidId(projectId, "projectId")
             request.atId?.let { requireValidId(it, "@id") }
+            requireValidId(request.head.atId, "head.@id")
         } catch (e: IllegalArgumentException) {
             return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
         }

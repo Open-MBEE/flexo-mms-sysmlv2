@@ -117,6 +117,7 @@ fun Route.TagApi() {
         val projectId = call.parameters["projectId"]!!
         try {
             requireValidId(projectId, "projectId")
+            requireValidId(request.taggedCommit.atId, "taggedCommit.@id")
         } catch (e: IllegalArgumentException) {
             return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
         }
