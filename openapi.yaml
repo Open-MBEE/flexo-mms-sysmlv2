@@ -1289,6 +1289,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Constraint'
+          minItems: 2
         operator:
           type: string
           enum: [and, or]
