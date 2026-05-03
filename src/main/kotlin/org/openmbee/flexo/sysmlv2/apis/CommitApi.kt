@@ -82,6 +82,8 @@ fun Route.CommitApi() {
     }
 
     get<Paths.getCommitByProjectAndId> { getCommit ->
+        requireValidId(getCommit.projectId, "projectId")
+        requireValidId(getCommit.commitId, "commitId")
         // submit GET request to retrieve project metadata
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getCommit.projectId}/commits/${getCommit.commitId}")
@@ -101,6 +103,7 @@ fun Route.CommitApi() {
     }
 
     get<Paths.getCommitsByProject> { getCommits ->
+        requireValidId(getCommits.projectId, "projectId")
         // submit GET request to retrieve project metadata
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getCommits.projectId}/commits")
@@ -126,12 +129,9 @@ fun Route.CommitApi() {
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
         val projectId = call.parameters["projectId"]!!
-        try {
-            requireValidId(projectId, "projectId")
-        } catch (e: IllegalArgumentException) {
-            return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
-        }
+        requireValidId(projectId, "projectId")
         var branchId = call.parameters["branchId"]
+        branchId?.let { requireValidId(it, "branchId") }
         val replace = call.parameters["replace"]
         val inserts = mutableListOf<String>()
         val deleteIncoming = mutableListOf<String>()

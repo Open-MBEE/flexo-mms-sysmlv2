@@ -19,10 +19,14 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.buildJsonArray
 import org.openmbee.flexo.sysmlv2.flexoRequestPost
 import org.openmbee.flexo.sysmlv2.forward
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 
 fun Route.RelationshipApi() {
 
     get<Paths.getRelationshipsByProjectCommitRelatedElement> {
+        requireValidId(it.projectId, "projectId")
+        requireValidId(it.commitId, "commitId")
+        requireValidId(it.relatedElementId, "relatedElementId")
         val direction = it.direction?: "both"
         val inQuery = """
             ?rel sysml:target elmt:${it.relatedElementId} ;

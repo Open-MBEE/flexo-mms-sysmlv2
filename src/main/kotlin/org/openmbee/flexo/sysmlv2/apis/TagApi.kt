@@ -54,6 +54,8 @@ fun FlexoModelHandler.tagFromResponse(
 fun Route.TagApi() {
 
     delete<Paths.deleteTagByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.tagId, "tagId")
         // add annotation to indicate it's deleted
         val patchResponse = flexoRequestPatch {
             orgPath("/repos/${path.projectId}/locks/${path.tagId}")
@@ -77,6 +79,8 @@ fun Route.TagApi() {
     }
 
     get<Paths.getTagByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.tagId, "tagId")
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/locks/${path.tagId}")
         }
@@ -94,6 +98,7 @@ fun Route.TagApi() {
     }
 
     get<Paths.getTagsByProject> { path ->
+        requireValidId(path.projectId, "projectId")
         // submit GET request for all tags
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/locks")
@@ -115,12 +120,8 @@ fun Route.TagApi() {
 
     post<TagRequest>("/projects/{projectId}/tags") { request ->
         val projectId = call.parameters["projectId"]!!
-        try {
-            requireValidId(projectId, "projectId")
-            requireValidId(request.taggedCommit.atId, "taggedCommit.@id")
-        } catch (e: IllegalArgumentException) {
-            return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
-        }
+        requireValidId(projectId, "projectId")
+        requireValidId(request.taggedCommit.atId, "taggedCommit.@id")
         val tagId = generateId()
         val createTagResponse = flexoRequestPost {
             orgPath("/repos/${projectId}/locks")

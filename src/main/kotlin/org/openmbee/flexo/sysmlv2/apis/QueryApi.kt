@@ -209,6 +209,8 @@ fun Route.QueryApi() {
     delete<Paths.deleteQueryByProjectAndId> {
         val projectId = it.projectId
         val queryId = it.queryId
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
         val query = getQuery(projectId, queryId)
         if (query.first.isFailure()) {
             return@delete forward(query.first)
@@ -234,6 +236,7 @@ fun Route.QueryApi() {
 
     get<Paths.getQueriesByProject> {
         val projectId = it.projectId
+        requireValidId(projectId, "projectId")
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/$projectId/scratches/queries/graph")
         }
@@ -251,6 +254,8 @@ fun Route.QueryApi() {
     get<Paths.getQueryByProjectAndId> {
         val projectId = it.projectId
         val queryId = it.queryId
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
         val res = getQuery(projectId, queryId)
         if (res.first.isFailure()) {
             return@get forward(res.first)
@@ -267,6 +272,9 @@ fun Route.QueryApi() {
         val projectId = it.projectId
         val queryId = it.queryId
         val commitId = it.commitId
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
+        commitId?.let { id -> requireValidId(id, "commitId") }
         // get query
         val res = getQuery(projectId, queryId)
         if (res.first.isFailure()) {
@@ -292,6 +300,8 @@ fun Route.QueryApi() {
     post<QueryRequest>("/projects/{projectId}/query-results") {
         val projectId = call.parameters["projectId"]!!
         val commitId = call.parameters["commitId"]
+        requireValidId(projectId, "projectId")
+        commitId?.let { id -> requireValidId(id, "commitId") }
         val flexoResponse = runQuery(it, projectId, commitId)
         // forward failures to client
         if (flexoResponse.isFailure()) {
@@ -309,11 +319,7 @@ fun Route.QueryApi() {
 
     post<QueryRequest>("/projects/{projectId}/queries") {
         val projectId = call.parameters["projectId"]!!
-        try {
-            requireValidId(projectId, "projectId")
-        } catch (e: IllegalArgumentException) {
-            return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
-        }
+        requireValidId(projectId, "projectId")
         val queryId = generateId()
         val response = createOrUpdateQuery(queryId, projectId, it, true)
         if (response.first.isFailure()) {
@@ -325,12 +331,8 @@ fun Route.QueryApi() {
     put<QueryRequest>("/projects/{projectId}/queries/{queryId}") {
         val projectId = call.parameters["projectId"]!!
         val queryId = call.parameters["queryId"]!!
-        try {
-            requireValidId(projectId, "projectId")
-            requireValidId(queryId, "queryId")
-        } catch (e: IllegalArgumentException) {
-            return@put call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
-        }
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
         val response = createOrUpdateQuery(queryId, projectId, it, false)
         if (response.first.isFailure()) {
             return@put forward(response.first)

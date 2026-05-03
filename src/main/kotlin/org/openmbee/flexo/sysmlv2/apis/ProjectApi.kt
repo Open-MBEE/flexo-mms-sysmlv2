@@ -101,6 +101,7 @@ suspend fun RoutingContext.createOrUpdateProject(
 fun Route.ProjectApi() {
     //delete a project (soft delete)
     delete<Paths.deleteProjectById> { deleteProject ->
+        requireValidId(deleteProject.projectId, "projectId")
         // add annotation to indicate it's deleted
         val patchResponse = flexoRequestPatch {
             orgPath("/repos/${deleteProject.projectId}")
@@ -123,6 +124,7 @@ fun Route.ProjectApi() {
 
     // get a project by its ID
     get<Paths.getProjectById> { getProject ->
+        requireValidId(getProject.projectId, "projectId")
         // fetch the project by the given project ID
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getProject.projectId}")
@@ -159,12 +161,8 @@ fun Route.ProjectApi() {
     // create new project via POST
     post<ProjectRequest>("/projects") { projectRequest ->
         // validate user-provided ids
-        try {
-            projectRequest.atId?.let { requireValidId(it, "@id") }
-            projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
-        } catch (e: IllegalArgumentException) {
-            return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
-        }
+        projectRequest.atId?.let { requireValidId(it, "@id") }
+        projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         // use provided project ID or generate one if not provided
         val projectId = projectRequest.atId ?: generateId()
         val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
@@ -180,12 +178,8 @@ fun Route.ProjectApi() {
     // update project via PUT
     put<ProjectRequest>("/projects/{projectId}") { projectRequest ->
         val projectId = "${call.parameters["projectId"]}"
-        try {
-            requireValidId(projectId, "projectId")
-            projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
-        } catch (e: IllegalArgumentException) {
-            return@put call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
-        }
+        requireValidId(projectId, "projectId")
+        projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         var request = projectRequest
         // fill in existing info if not included
         if (projectRequest.defaultBranch == null || projectRequest.description == null) {

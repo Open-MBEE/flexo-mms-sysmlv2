@@ -54,6 +54,8 @@ fun FlexoModelHandler.branchFromResponse(
 fun Route.BranchApi() {
 
     delete<Paths.deleteBranchByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.branchId, "branchId")
         // add annotation to indicate it's deleted
         val patchResponse = flexoRequestPatch {
             orgPath("/repos/${path.projectId}/branches/${path.branchId}")
@@ -77,6 +79,7 @@ fun Route.BranchApi() {
     }
 
     get<Paths.getBranchesByProject> { path ->
+        requireValidId(path.projectId, "projectId")
         // submit GET request for all branches
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/branches")
@@ -96,6 +99,8 @@ fun Route.BranchApi() {
     }
 
     get<Paths.getBranchesByProjectAndId> { path ->
+        requireValidId(path.projectId, "projectId")
+        requireValidId(path.branchId, "branchId")
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${path.projectId}/branches/${path.branchId}")
         }
@@ -114,13 +119,9 @@ fun Route.BranchApi() {
 
     post<BranchRequest>("/projects/{projectId}/branches") { request ->
         val projectId = call.parameters["projectId"]!!
-        try {
-            requireValidId(projectId, "projectId")
-            request.atId?.let { requireValidId(it, "@id") }
-            requireValidId(request.head.atId, "head.@id")
-        } catch (e: IllegalArgumentException) {
-            return@post call.respond(HttpStatusCode.BadRequest, e.message ?: "Invalid ID")
-        }
+        requireValidId(projectId, "projectId")
+        request.atId?.let { requireValidId(it, "@id") }
+        requireValidId(request.head.atId, "head.@id")
         // use provided branch ID or generate one if not provided
         val branchId = request.atId ?: generateId()
         val createBranchResponse = flexoRequestPost {

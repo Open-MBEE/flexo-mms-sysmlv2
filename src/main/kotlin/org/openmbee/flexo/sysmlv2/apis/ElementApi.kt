@@ -21,6 +21,7 @@ import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.vocabulary.RDF
 import org.apache.jena.vocabulary.XSD
 import org.openmbee.flexo.sysmlv2.*
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 
 fun modelElementConstructQuery(elementTarget: String="?__element"): String {
     return """
@@ -158,7 +159,10 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
 fun Route.ElementApi() {
     // get an element
     get<Paths.getElementByProjectCommitId> { getElement ->
-        val elementIri = SYSMLV2.element(getElement.elementId.toString()).uri
+        requireValidId(getElement.projectId, "projectId")
+        requireValidId(getElement.commitId, "commitId")
+        requireValidId(getElement.elementId, "elementId")
+        val elementIri = SYSMLV2.element(getElement.elementId).uri
 
         // submit POST request to query model
         val flexoResponse = flexoRequestPost {
@@ -182,6 +186,8 @@ fun Route.ElementApi() {
 
     // get multiple elements
     get<Paths.getElementsByProjectCommit> { getElements ->
+        requireValidId(getElements.projectId, "projectId")
+        requireValidId(getElements.commitId, "commitId")
         // submit POST request to query model
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
@@ -203,6 +209,9 @@ fun Route.ElementApi() {
     }
 
     get<Paths.getProjectUsageByProjectCommitElement> {
+        requireValidId(it.projectId, "projectId")
+        requireValidId(it.commitId, "commitId")
+        requireValidId(it.elementId, "elementId")
         val flexoResponse = flexoRequestPost {
             orgPath("/repos/${it.projectId}/locks/Commit.${it.commitId}/query")
             sparqlQuery {
@@ -237,6 +246,8 @@ fun Route.ElementApi() {
     }
 
     get<Paths.getRootsByProjectCommit> {
+        requireValidId(it.projectId, "projectId")
+        requireValidId(it.commitId, "commitId")
         // submit POST request to query model
         val flexoResponse = flexoRequestPost {
             orgPath("/repos/${it.projectId}/locks/Commit.${it.commitId}/query")
