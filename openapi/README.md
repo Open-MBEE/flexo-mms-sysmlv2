@@ -1,0 +1,1 @@
+openapi-generator generate -g python -i openapi.yaml -o flexo-sysmlv2 -c python.yaml

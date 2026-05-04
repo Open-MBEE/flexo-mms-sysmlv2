@@ -4,7 +4,7 @@ info:
   description: >-
     REST/HTTP Platform Specific Model (PSM) for the Systems Modeling API and Services.
     Implemented by the Flexo MMS SysML v2 Microservice.
-  version: "1.0"
+  version: "0.2.0"
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
@@ -12,7 +12,8 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development server
-
+security:
+  - bearerAuth: []
 tags:
   - name: Project
     description: CRUD operations for SysML v2 projects
@@ -329,6 +330,12 @@ paths:
         - name: branchId
           in: query
           description: ID of the branch (project default branch if unspecified)
+          required: false
+          schema:
+            type: string
+        - name: replace
+          in: query
+          description: Whether the posted data replaces the model
           required: false
           schema:
             type: string
@@ -923,6 +930,11 @@ paths:
 # ════════════════════════════════════════════════════════════
 components:
   # ── Reusable Parameters ──────────────────────────────────
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   parameters:
     projectId:
       name: projectId

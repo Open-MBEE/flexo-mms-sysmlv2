@@ -1,0 +1,5 @@
+additionalProperties:
+  packageName: flexo_sysmlv2
+  packageVersion: 0.2.0
+  projectName: flexo-sysmlv2
+  disallowAdditionalPropertiesIfNotPresent: "false"
