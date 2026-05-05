@@ -1,11 +1,10 @@
 package org.openmbee.flexo.sysmlv2
 
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
+import io.ktor.server.routing.*
 
 
-suspend fun PipelineContext<*, ApplicationCall>.notImplemented() {
+suspend fun RoutingContext.notImplemented() {
     call.respondText("Not implemented", status= HttpStatusCode.NotImplemented)
 }

@@ -1,0 +1,5 @@
+additionalProperties:
+  packageName: flexo_sysml
+  packageVersion: 0.2.0
+  projectName: flexo-sysml
+  disallowAdditionalPropertiesIfNotPresent: "false"

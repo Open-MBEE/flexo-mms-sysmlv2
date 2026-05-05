@@ -5,7 +5,7 @@ import org.apache.jena.rdf.model.Resource
 import org.apache.jena.rdf.model.ResourceFactory
 import org.apache.jena.shared.PrefixMapping
 
-val ROOT_CONTEXT = "http://layer1-service"
+val ROOT_CONTEXT = System.getenv("ROOT_CONTEXT") ?: "http://layer1-service"
 
 object SYSMLV2 {
     val BASE = "urn:sysmlv2:"
@@ -16,8 +16,8 @@ object SYSMLV2 {
     val DEFAULT_BRANCH_ID = ResourceFactory.createProperty("${BASE}defaultBranchId")
     val DELETED = ResourceFactory.createProperty("${BASE}deleted")
 
-    fun element(uuid: String): Resource {
-        return ResourceFactory.createResource("$ELEMENT$uuid")
+    fun element(id: String): Resource {
+        return ResourceFactory.createResource("$ELEMENT$id")
     }
     fun type(type: String): Resource {
         return ResourceFactory.createResource("$VOCABULARY$type")

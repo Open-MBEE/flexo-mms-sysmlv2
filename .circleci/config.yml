@@ -1,0 +1,126 @@
+version: 2.1
+orbs:
+  docker: circleci/docker@2.1.1
+  sonarcloud: sonarsource/sonarcloud@4.0.0
+jobs:
+  build_and_test:
+    machine:
+      image: default
+    working_directory: /home/circleci/flexo-mms-sysmlv2
+    steps:
+      - checkout
+      - run:
+          name: Build stack and run tests
+          shell: /bin/bash
+          command: |
+            docker-compose -f src/test/resources/docker-compose.yml up -d
+            cp src/main/resources/application.conf.example ./src/main/resources/application.conf
+            docker build -t flexo-mms-sysmlv2-test:latest -f Dockerfile-Test .
+            docker run --network=flexo-sysmlv2-test-network --name flexo-mms-sysmlv2-test-container flexo-mms-sysmlv2-test:latest
+            SIG_INT=$?
+            docker cp flexo-mms-sysmlv2-test-container:/application/build /home/circleci/flexo-mms-sysmlv2/build
+            exit "$SIG_INT"
+      - store_test_results:
+          path: build/test-results
+      - store_artifacts:
+          path: /home/circleci/flexo-mms-sysmlv2/build/reports/tests
+      - persist_to_workspace:
+          root: /home/circleci/
+          paths:
+            - flexo-mms-sysmlv2/*
+  scan:
+    executor:
+      name: docker/docker
+    working_directory: /home/circleci/flexo-mms-sysmlv2
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Fetch full git history for SonarCloud blame
+          command: |
+            git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+            git fetch
+      - sonarcloud/scan
+  deploy_snapshot:
+    executor:
+      name: docker/docker
+    working_directory: /home/circleci/flexo-mms-sysmlv2
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Login to Dockerhub
+          command: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - run:
+          name: Build docker image
+          command: |
+            cp src/main/resources/application.conf.example ./src/main/resources/application.conf
+            docker build -t openmbee/flexo-sysmlv2:latest .
+      - run:
+          name: Tag docker image
+          command: docker tag openmbee/flexo-sysmlv2:latest openmbee/flexo-sysmlv2:${CIRCLE_BRANCH#*/}-SNAPSHOT
+      - run:
+          name: Deploy snapshot to Dockerhub
+          command: docker push openmbee/flexo-sysmlv2:${CIRCLE_BRANCH#*/}-SNAPSHOT
+  deploy_release:
+    executor:
+      name: docker/docker
+    working_directory: /home/circleci/flexo-mms-sysmlv2
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Login to Dockerhub
+          command: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - run:
+          name: Build docker image
+          command: |
+            cp src/main/resources/application.conf.example ./src/main/resources/application.conf
+            docker build -t openmbee/flexo-sysmlv2:latest .
+      - run:
+          name: Tag docker image
+          command: docker tag openmbee/flexo-sysmlv2:latest openmbee/flexo-sysmlv2:${CIRCLE_TAG}
+      - run:
+          name: Deploy release to dockerhub
+          command: docker push openmbee/flexo-sysmlv2:${CIRCLE_TAG}
+      - run:
+          name: Deploy release as latest to dockerhub
+          command: docker push openmbee/flexo-sysmlv2:latest
+
+workflows:
+  version: 2
+  build-test-deploy:
+    jobs:
+      - scan:
+          requires:
+            - build_and_test
+          context:
+            - SonarCloud
+      - build_and_test:
+          filters:
+            tags:
+              only: /v[0-9.]+(-[\w-]+(\.[0-9]+)?)?/
+          context:
+            - DockerHub
+      - deploy_snapshot:
+          requires:
+            - build_and_test
+          filters:
+            branches:
+              only: /((release|hotfix|support)/[0-9.]+(-[\w-]+(\.[0-9]+)?)?|develop)/
+          context:
+            - DockerHub
+      - deploy_release:
+          requires:
+            - build_and_test
+          filters:
+            tags:
+              only: /v[0-9.]+(-[\w-]+(\.[0-9]+)?)?/
+            branches:
+              ignore: /.*/
+          context:
+            - DockerHub

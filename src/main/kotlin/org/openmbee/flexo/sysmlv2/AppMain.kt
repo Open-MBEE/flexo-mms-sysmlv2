@@ -7,13 +7,17 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.autohead.*
-import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
+import io.ktor.server.response.*
+import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.resources.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import io.ktor.server.application.ApplicationStopped
 import org.openmbee.flexo.sysmlv2.apis.*
 
 lateinit var GlobalFlexoConfig: FlexoConfig
@@ -27,6 +31,9 @@ fun Application.module() {
         install(HttpTimeout) {
             requestTimeoutMillis = GlobalFlexoConfig.defaultTimeout * 1000
         }
+    }
+    environment.monitor.subscribe(ApplicationStopped) {
+        FlexoHttpClient.close()
     }
     install(DefaultHeaders)
     install(CallLogging)
@@ -55,7 +62,21 @@ fun Application.module() {
     install(Compression, ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html
     //install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
     install(Resources)
-    install(Routing) {
+    install(StatusPages) {
+        exception<InvalidSysmlSerializationError> { call, cause ->
+            call.respondText(cause.message ?: "Bad Request", status = HttpStatusCode.BadRequest)
+        }
+        exception<BadRequestException> { call, cause ->
+            call.respondText(cause.message ?: "Bad Request", status = HttpStatusCode.BadRequest)
+        }
+        exception<NotImplementedError> { call, cause ->
+            call.respondText(cause.message ?: "Not Implemented", status = HttpStatusCode.NotImplemented)
+        }
+        exception<Throwable> { call, cause ->
+            call.respondText(cause.message ?: "Internal Server Error", status = HttpStatusCode.InternalServerError)
+        }
+    }
+    routing {
         route(GlobalFlexoConfig.basePath) {
             BranchApi()
             CommitApi()
@@ -100,7 +121,7 @@ val Application.flexoConfig: FlexoConfig
         val host = property("flexo.host")?.getString() ?: "localhost"
         val port = property("flexo.port")?.getString()?.toInt() ?: 8080
         val org = property("flexo.org")?.getString() ?: "sysmlv2"
-        val defaultTimeout = property("flexo.defaultTimeout")?.getString()?.toLong() ?: 60_000L
+        val defaultTimeout = property("flexo.defaultTimeout")?.getString()?.toLong() ?: 60L
         val auth = property("flexo.auth")?.getString() ?: ""
         val basePath = property("flexo.basePath")?.getString() ?: ""
         return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath)

@@ -1,0 +1,1335 @@
+openapi: 3.0.3
+info:
+  title: Systems Modeling API and Services
+  description: >-
+    REST/HTTP Platform Specific Model (PSM) for the Systems Modeling API and Services.
+    Implemented by the Flexo MMS SysML v2 Microservice.
+  version: "0.2.0"
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+security:
+  - bearerAuth: []
+tags:
+  - name: Project
+    description: CRUD operations for SysML v2 projects
+  - name: Branch
+    description: Branch management within a project
+  - name: Tag
+    description: Immutable tag (snapshot) management within a project
+  - name: Commit
+    description: Version history and change management
+  - name: Element
+    description: Model element retrieval
+  - name: Relationship
+    description: Relationship traversal between elements
+  - name: Query
+    description: Ad-hoc and saved query operations
+  - name: Diff/Merge
+    description: Model comparison and merge (stub)
+  - name: Meta
+    description: Schema and datatype metadata (stub)
+
+paths:
+  # ── Project ──────────────────────────────────────────────
+  /projects:
+    get:
+      operationId: getProjects
+      tags: [Project]
+      summary: Get all projects
+      parameters:
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postProject
+      tags: [Project]
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '200':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}:
+    get:
+      operationId: getProjectById
+      tags: [Project]
+      summary: Get project by ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '200':
+          description: A single project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putProjectById
+      tags: [Project]
+      summary: Update project by ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteProjectById
+      tags: [Project]
+      summary: Soft-delete project by ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '200':
+          description: Project marked as deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Branch ───────────────────────────────────────────────
+  /projects/{projectId}/branches:
+    get:
+      operationId: getBranchesByProject
+      tags: [Branch]
+      summary: Get branches for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of branches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Branch'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postBranchByProject
+      tags: [Branch]
+      summary: Create a branch for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BranchRequest'
+      responses:
+        '200':
+          description: Branch created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/branches/{branchId}:
+    get:
+      operationId: getBranchByProjectAndId
+      tags: [Branch]
+      summary: Get branch by project and ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/branchId'
+      responses:
+        '200':
+          description: A single branch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteBranchByProjectAndId
+      tags: [Branch]
+      summary: Soft-delete branch by project and ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/branchId'
+      responses:
+        '200':
+          description: Branch marked as deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Tag ──────────────────────────────────────────────────
+  /projects/{projectId}/tags:
+    get:
+      operationId: getTagsByProject
+      tags: [Tag]
+      summary: Get tags for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postTagByProject
+      tags: [Tag]
+      summary: Create a tag for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagRequest'
+      responses:
+        '200':
+          description: Tag created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/tags/{tagId}:
+    get:
+      operationId: getTagByProjectAndId
+      tags: [Tag]
+      summary: Get tag by project and ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/tagId'
+      responses:
+        '200':
+          description: A single tag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteTagByProjectAndId
+      tags: [Tag]
+      summary: Soft-delete tag by project and ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/tagId'
+      responses:
+        '200':
+          description: Tag marked as deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Commit ───────────────────────────────────────────────
+  /projects/{projectId}/commits:
+    get:
+      operationId: getCommitsByProject
+      tags: [Commit]
+      summary: Get commits for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of commits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Commit'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postCommitByProject
+      tags: [Commit]
+      summary: Create a commit for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: branchId
+          in: query
+          description: ID of the branch (project default branch if unspecified)
+          required: false
+          schema:
+            type: string
+        - name: replace
+          in: query
+          description: Whether the posted data replaces the model
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitRequest'
+      responses:
+        '200':
+          description: Commit created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commit'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/commits/{commitId}:
+    get:
+      operationId: getCommitByProjectAndId
+      tags: [Commit]
+      summary: Get commit by project and ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+      responses:
+        '200':
+          description: A single commit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commit'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/commits/{commitId}/changes:
+    get:
+      operationId: getChangesByProjectCommit
+      tags: [Commit]
+      summary: Get changes (DataVersions) for a commit (stub)
+      description: Not yet implemented; returns 501 Not Implemented.
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of data versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataVersion'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/commits/{commitId}/changes/{changeId}:
+    get:
+      operationId: getChangeByProjectCommitId
+      tags: [Commit]
+      summary: Get a specific change (DataVersion) by ID (stub)
+      description: Not yet implemented; returns 501 Not Implemented.
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+        - name: changeId
+          in: path
+          required: true
+          description: ID of the change (DataVersion)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A single data version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataVersion'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Element ──────────────────────────────────────────────
+  /projects/{projectId}/commits/{commitId}/elements:
+    get:
+      operationId: getElementsByProjectCommit
+      tags: [Element]
+      summary: Get all elements at a specific commit
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+        - $ref: '#/components/parameters/excludeUsed'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of elements (JSON objects)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/commits/{commitId}/elements/{elementId}:
+    get:
+      operationId: getElementByProjectCommitId
+      tags: [Element]
+      summary: Get a specific element by ID at a commit
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+        - name: elementId
+          in: path
+          required: true
+          description: ID of the element
+          schema:
+            type: string
+        - $ref: '#/components/parameters/excludeUsed'
+      responses:
+        '200':
+          description: A single element (JSON object)
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/commits/{commitId}/elements/{elementId}/projectUsage:
+    get:
+      operationId: getProjectUsageByProjectCommitElement
+      tags: [Element]
+      summary: Get ProjectUsage that originate the provided element
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+        - name: elementId
+          in: path
+          required: true
+          description: ID of the element
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of ProjectUsage elements (JSON objects)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/commits/{commitId}/roots:
+    get:
+      operationId: getRootsByProjectCommit
+      tags: [Element]
+      summary: Get root elements at a specific commit
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+        - $ref: '#/components/parameters/excludeUsed'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of root elements (JSON objects)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Relationship ─────────────────────────────────────────
+  /projects/{projectId}/commits/{commitId}/elements/{relatedElementId}/relationships:
+    get:
+      operationId: getRelationshipsByProjectCommitRelatedElement
+      tags: [Relationship]
+      summary: Get relationships for a related element
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/commitId'
+        - name: relatedElementId
+          in: path
+          required: true
+          description: ID of the related element
+          schema:
+            type: string
+        - name: direction
+          in: query
+          required: false
+          description: "Filter direction: in, out, or both (default: both)"
+          schema:
+            type: string
+            enum: [in, out, both]
+            default: both
+        - $ref: '#/components/parameters/excludeUsed'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of relationship elements (JSON objects)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Query ────────────────────────────────────────────────
+  /projects/{projectId}/queries:
+    get:
+      operationId: getQueriesByProject
+      tags: [Query]
+      summary: Get saved queries for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of saved queries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Query'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: postQueryByProject
+      tags: [Query]
+      summary: Create a saved query for a project
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/queries/{queryId}:
+    get:
+      operationId: getQueryByProjectAndId
+      tags: [Query]
+      summary: Get a saved query by ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/queryId'
+      responses:
+        '200':
+          description: A single query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: putQueryByProjectAndId
+      tags: [Query]
+      summary: Update a saved query by ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/queryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteQueryByProjectAndId
+      tags: [Query]
+      summary: Delete a saved query by ID
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/queryId'
+      responses:
+        '200':
+          description: Query deleted; returns the deleted query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query'
+        '404':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/query-results:
+    get:
+      operationId: getQueryResultsByProjectIdQuery
+      tags: [Query]
+      summary: Execute an ad-hoc query via GET with body (stub)
+      description: >-
+        Not yet implemented; returns 501 Not Implemented. Use the POST variant
+        on the same path for a working implementation.
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: commitId
+          in: query
+          required: false
+          description: ID of the commit (defaults to head of project)
+          schema:
+            type: string
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query results (list of elements)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: getQueryResultsByProjectIdQueryPost
+      tags: [Query]
+      summary: Execute an ad-hoc query (via POST for client compatibility)
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: commitId
+          in: query
+          required: false
+          description: ID of the commit (defaults to head of project)
+          schema:
+            type: string
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query results (list of elements)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/queries/{queryId}/results:
+    get:
+      operationId: getQueryResultsByProjectIdQueryId
+      tags: [Query]
+      summary: Execute a saved query and return results
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - $ref: '#/components/parameters/queryId'
+        - name: commitId
+          in: query
+          required: false
+          description: ID of the commit (defaults to head of project)
+          schema:
+            type: string
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: Query results (list of elements)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Diff / Merge (stubs) ────────────────────────────────
+  /projects/{projectId}/commits/{compareCommitId}/diff:
+    get:
+      operationId: diff
+      tags: [Diff/Merge]
+      summary: Diff between a base commit and a compare commit (stub)
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: compareCommitId
+          in: path
+          required: true
+          description: ID of the compare commit
+          schema:
+            type: string
+        - name: baseCommitId
+          in: query
+          required: true
+          description: ID of the base commit
+          schema:
+            type: string
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of data differences
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataDifference'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /projects/{projectId}/branches/{targetBranchId}/merge:
+    post:
+      operationId: merge
+      tags: [Diff/Merge]
+      summary: Merge source commit(s) into a target branch (stub)
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: targetBranchId
+          in: path
+          required: true
+          description: ID of the target branch
+          schema:
+            type: string
+        - name: sourceCommitId
+          in: query
+          required: true
+          description: ID(s) of the source commit(s), comma-separated
+          schema:
+            type: array
+            items:
+              type: string
+        - name: description
+          in: query
+          required: false
+          description: Description of merge commit
+          schema:
+            type: string
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+      responses:
+        '200':
+          description: Merge result commit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commit'
+        default:
+          $ref: '#/components/responses/Error'
+
+  # ── Meta (stubs) ────────────────────────────────────────
+  /meta/datatypes:
+    get:
+      operationId: getDatatypes
+      tags: [Meta]
+      summary: Get available datatypes (stub)
+      parameters:
+        - $ref: '#/components/parameters/pageAfter'
+        - $ref: '#/components/parameters/pageBefore'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: JSON Schema listing available datatypes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  $schema:
+                    type: string
+                  $defs:
+                    type: object
+                    additionalProperties: true
+        default:
+          $ref: '#/components/responses/Error'
+
+  /meta/datatypes/{datatypeId}:
+    get:
+      operationId: getDatatypeById
+      tags: [Meta]
+      summary: Get a specific datatype by ID (stub)
+      parameters:
+        - name: datatypeId
+          in: path
+          required: true
+          description: URI of the datatype
+          schema:
+            type: string
+            format: uri
+      responses:
+        '200':
+          description: JSON Schema for the requested datatype
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  $schema:
+                    type: string
+                  $id:
+                    type: string
+                    format: uri
+                  title:
+                    type: string
+                  type:
+                    type: string
+                  properties:
+                    type: object
+                    additionalProperties: true
+                  $defs:
+                    type: object
+                    additionalProperties: true
+                  required:
+                    type: array
+                    items:
+                      type: string
+                  additionalProperties:
+                    type: boolean
+        default:
+          $ref: '#/components/responses/Error'
+
+# ════════════════════════════════════════════════════════════
+components:
+  # ── Reusable Parameters ──────────────────────────────────
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    projectId:
+      name: projectId
+      in: path
+      required: true
+      description: ID of the project
+      schema:
+        type: string
+    branchId:
+      name: branchId
+      in: path
+      required: true
+      description: ID of the branch
+      schema:
+        type: string
+    tagId:
+      name: tagId
+      in: path
+      required: true
+      description: ID of the tag
+      schema:
+        type: string
+    commitId:
+      name: commitId
+      in: path
+      required: true
+      description: ID of the commit
+      schema:
+        type: string
+    queryId:
+      name: queryId
+      in: path
+      required: true
+      description: ID of the query
+      schema:
+        type: string
+    excludeUsed:
+      name: excludeUsed
+      in: query
+      required: false
+      description: Exclude data from ProjectUsages
+      schema:
+        type: boolean
+    pageAfter:
+      name: pageAfter
+      in: query
+      required: false
+      description: Cursor for forward pagination
+      schema:
+        type: string
+    pageBefore:
+      name: pageBefore
+      in: query
+      required: false
+      description: Cursor for backward pagination
+      schema:
+        type: string
+    pageSize:
+      name: pageSize
+      in: query
+      required: false
+      description: Number of items per page
+      schema:
+        type: integer
+
+  # ── Reusable Responses ───────────────────────────────────
+  responses:
+    Error:
+      description: An error occurred
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  # ── Schemas ──────────────────────────────────────────────
+  schemas:
+    Identified:
+      type: object
+      required: ['@id']
+      properties:
+        '@id':
+          type: string
+          description: UUID reference to another entity
+
+    Error:
+      type: object
+      required: ['@type', description]
+      properties:
+        '@type':
+          type: string
+          enum: [Error]
+        description:
+          type: string
+
+    # ── Project ────────────────────────────────────────────
+    Project:
+      type: object
+      required: ['@id', '@type', created, defaultBranch, description, name]
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [Project]
+        created:
+          type: string
+          format: date-time
+        defaultBranch:
+          $ref: '#/components/schemas/Identified'
+        description:
+          type: string
+        name:
+          type: string
+
+    ProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        '@id':
+          type: string
+          description: Optional project ID. Server generates a UUID if omitted.
+        '@type':
+          type: string
+          enum: [Project]
+        name:
+          type: string
+        defaultBranch:
+          $ref: '#/components/schemas/Identified'
+        description:
+          type: string
+
+    # ── Branch ─────────────────────────────────────────────
+    Branch:
+      type: object
+      required: ['@id', '@type', created, head, name, owningProject, referencedCommit]
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [Branch]
+        created:
+          type: string
+          format: date-time
+        head:
+          $ref: '#/components/schemas/Identified'
+        name:
+          type: string
+        owningProject:
+          $ref: '#/components/schemas/Identified'
+        referencedCommit:
+          $ref: '#/components/schemas/Identified'
+
+    BranchRequest:
+      type: object
+      required: [head, name]
+      properties:
+        '@id':
+          type: string
+          description: Optional branch ID. Server generates a UUID if omitted.
+        '@type':
+          type: string
+          enum: [Branch]
+        head:
+          $ref: '#/components/schemas/Identified'
+        name:
+          type: string
+
+    # ── Tag ────────────────────────────────────────────────
+    Tag:
+      type: object
+      required: ['@id', '@type', created, name, owningProject, referencedCommit, taggedCommit]
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [Tag]
+        created:
+          type: string
+          format: date-time
+        name:
+          type: string
+        owningProject:
+          $ref: '#/components/schemas/Identified'
+        referencedCommit:
+          $ref: '#/components/schemas/Identified'
+        taggedCommit:
+          $ref: '#/components/schemas/Identified'
+
+    TagRequest:
+      type: object
+      required: [name, taggedCommit]
+      properties:
+        '@id':
+          type: string
+          description: Optional tag ID. Server generates a UUID if omitted.
+        '@type':
+          type: string
+          enum: [Tag]
+        name:
+          type: string
+        taggedCommit:
+          $ref: '#/components/schemas/Identified'
+
+    # ── Commit ─────────────────────────────────────────────
+    Commit:
+      type: object
+      required: ['@id', '@type', created, description, owningProject]
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [Commit]
+        created:
+          type: string
+          format: date-time
+        description:
+          type: string
+        owningProject:
+          $ref: '#/components/schemas/Identified'
+        previousCommit:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Identified'
+
+    CommitRequest:
+      type: object
+      required: [change]
+      properties:
+        '@type':
+          type: string
+          enum: [Commit]
+        change:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataVersionRequest'
+        description:
+          type: string
+
+    # ── DataVersion / DataIdentity ─────────────────────────
+    DataVersion:
+      type: object
+      required: ['@id', '@type', identity, payload]
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [DataVersion]
+        identity:
+          $ref: '#/components/schemas/DataIdentity'
+        payload:
+          type: object
+
+    DataVersionRequest:
+      type: object
+      properties:
+        '@type':
+          type: string
+          enum: [DataVersion]
+        identity:
+          $ref: '#/components/schemas/DataIdentityRequest'
+        payload:
+          type: object
+
+    DataIdentity:
+      type: object
+      required: ['@id', '@type']
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [DataIdentity]
+
+    DataIdentityRequest:
+      type: object
+      required: ['@id']
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [DataIdentity]
+
+    # ── Query ──────────────────────────────────────────────
+    Query:
+      type: object
+      required: ['@id', '@type', owningProject, select, where]
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [Query]
+        owningProject:
+          $ref: '#/components/schemas/Identified'
+        select:
+          type: array
+          items:
+            type: string
+        where:
+          $ref: '#/components/schemas/Constraint'
+
+    QueryRequest:
+      type: object
+      required: [select, where]
+      properties:
+        '@id':
+          type: string
+          description: Optional query ID. Server generates a UUID if omitted.
+        '@type':
+          type: string
+          enum: [Query]
+        select:
+          type: array
+          items:
+            type: string
+        where:
+          $ref: '#/components/schemas/Constraint'
+
+    # ── Constraint hierarchy ───────────────────────────────
+    Constraint:
+      discriminator:
+        propertyName: '@type'
+        mapping:
+          PrimitiveConstraint: '#/components/schemas/PrimitiveConstraint'
+          CompositeConstraint: '#/components/schemas/CompositeConstraint'
+      oneOf:
+        - $ref: '#/components/schemas/PrimitiveConstraint'
+        - $ref: '#/components/schemas/CompositeConstraint'
+
+    PrimitiveConstraint:
+      type: object
+      required: ['@type', operator, property, value]
+      properties:
+        '@type':
+          type: string
+          enum: [PrimitiveConstraint]
+        inverse:
+          type: boolean
+          default: false
+        operator:
+          type: string
+          enum: ['=', '>', '<', '<=', '>=']
+        property:
+          type: string
+        value:
+          type: array
+          items: {}
+          description: >-
+            Array of values; each can be an Identified object, boolean, string, or number.
+
+    CompositeConstraint:
+      type: object
+      required: ['@type', constraint, operator]
+      properties:
+        '@type':
+          type: string
+          enum: [CompositeConstraint]
+        constraint:
+          type: array
+          items:
+            $ref: '#/components/schemas/Constraint'
+          minItems: 2
+        operator:
+          type: string
+          enum: [and, or]
+
+    # ── Diff ───────────────────────────────────────────────
+    DataDifference:
+      type: object
+      required: ['@type', baseData, compareData]
+      properties:
+        '@type':
+          type: string
+          enum: [DataDifference]
+        baseData:
+          $ref: '#/components/schemas/DataVersion'
+        compareData:
+          $ref: '#/components/schemas/DataVersion'
+
+    # ── ProjectUsage ───────────────────────────────────────
+    ProjectUsage:
+      type: object
+      required: ['@id', '@type', usedCommit, usedProject]
+      properties:
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [ProjectUsage]
+        usedCommit:
+          $ref: '#/components/schemas/Identified'
+        usedProject:
+          $ref: '#/components/schemas/Identified'

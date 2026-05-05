@@ -11,12 +11,13 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.PipelineContext
+
 import kotlinx.serialization.json.*
 import kotlinx.serialization.encodeToString
 import org.apache.jena.arq.querybuilder.ConstructBuilder
@@ -32,35 +33,39 @@ import org.openmbee.flexo.sysmlv2.models.CompositeConstraint
 import org.openmbee.flexo.sysmlv2.models.Identified
 import org.openmbee.flexo.sysmlv2.models.PrimitiveConstraint
 import org.openmbee.flexo.sysmlv2.models.Query
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 import org.openmbee.flexo.sysmlv2.models.QueryRequest
-import java.util.UUID
 
 fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
     val p: Node
     var pvar: String = property
-    val v: Node
     when(property) {
         "@id" -> { p = SYSMLV2.prop("elementId").asNode(); pvar = "id" }
         "@type" -> { p = RDF.type.asNode(); pvar = "Metatype" }
         else -> { p = SYSMLV2.prop(property).asNode() }
     }
-    val firstVal = value.get(0) //TODO what if value is empty list??? or > 1 value
-    when(firstVal) {
+    if (value.isEmpty()) {
+        throw BadRequestException("PrimitiveConstraint value must not be empty")
+    }
+    val firstVal = value[0]
+    val v: Node = when(firstVal) {
         is JsonObject -> {
             if (firstVal.containsKey("@id")) {
-                v = SYSMLV2.element(firstVal.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+                SYSMLV2.element(firstVal.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
             } else {
                 throw BadRequestException("PrimitiveConstraint value object must contain @id")
             }
         }
         is JsonPrimitive -> {
             if (firstVal == JsonNull) {
-                v = RDF.nil.asNode()
+                RDF.nil.asNode()
             } else {
-                v = if (property == "@type") SYSMLV2.type(firstVal.content).asNode() else firstVal.toRdfLiteralNode()
+                if (property == "@type") SYSMLV2.type(firstVal.content).asNode() else firstVal.toRdfLiteralNode()
             }
         }
-        is JsonArray -> {throw BadRequestException("PrimitiveConstraint value cannot be array")}
+        is JsonArray -> throw BadRequestException("PrimitiveConstraint value cannot be array")
+        else -> throw BadRequestException("Unexpected JSON element type in PrimitiveConstraint value")
     }
     if (firstVal == JsonNull) {
         cb.addOptional("?e", p, "?$pvar")
@@ -111,15 +116,15 @@ fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
     }
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateQuery(
-    queryId: UUID, projectId: UUID, queryRequest: QueryRequest, post: Boolean): Pair<FlexoResponse, Query> {
+suspend fun RoutingContext.createOrUpdateQuery(
+    queryId: String, projectId: String, queryRequest: QueryRequest, post: Boolean): Pair<FlexoResponse, Query> {
     val query = Query(atId = queryId,
         atType = Query.AtType.Query,
         owningProject = Identified(projectId),
         select = queryRequest.select!!,
         where = queryRequest.where!!)
     val queryString = Json.encodeToString<Query>(query)
-    val queryUri = SYSMLV2.query(queryId.toString())
+    val queryUri = SYSMLV2.query(queryId)
     val insertBuilder = UpdateBuilder().addInsert(queryUri, DCTerms.description, queryString)
     val flexoResponse = flexoRequestPost {
         orgPath("/repos/$projectId/scratches/queries/update")
@@ -134,7 +139,7 @@ suspend fun PipelineContext<*, ApplicationCall>.createOrUpdateQuery(
     return Pair(flexoResponse, query)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.runQuery(
+suspend fun RoutingContext.runQuery(
     query: QueryRequest, projectId: String, commitId: String?): FlexoResponse {
     var branchId = "master"
     if (commitId == null) {
@@ -166,8 +171,8 @@ suspend fun PipelineContext<*, ApplicationCall>.runQuery(
     }
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.getQuery(projectId: UUID, queryId: UUID): Pair<FlexoResponse, Query?> {
-    val uri = SYSMLV2.query(queryId.toString()).uri
+suspend fun RoutingContext.getQuery(projectId: String, queryId: String): Pair<FlexoResponse, Query?> {
+    val uri = SYSMLV2.query(queryId).uri
     val flexoResponse = flexoRequestPost {
         orgPath("/repos/$projectId/scratches/queries/query")
         sparqlQuery {
@@ -184,11 +189,12 @@ suspend fun PipelineContext<*, ApplicationCall>.getQuery(projectId: UUID, queryI
         return Pair(flexoResponse, null)
     }
     // parse the response model, convert it to JSON, and reply to client
-    return Pair(flexoResponse, (flexoResponse.parseModel {
+    val query = flexoResponse.parseModel {
         model.listSubjects().mapWith { it2 ->
             queryFromResponse(it2.outgoing())
-        }.toList()[0]
-    }))
+        }.toList().firstOrNull()
+    }
+    return Pair(flexoResponse, query)
 }
 
 fun queryFromResponse(
@@ -203,11 +209,13 @@ fun Route.QueryApi() {
     delete<Paths.deleteQueryByProjectAndId> {
         val projectId = it.projectId
         val queryId = it.queryId
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
         val query = getQuery(projectId, queryId)
         if (query.first.isFailure()) {
             return@delete forward(query.first)
         }
-        val uri = SYSMLV2.query(queryId.toString()).uri
+        val uri = SYSMLV2.query(queryId).uri
         val flexoResponse = flexoRequestPost {
             orgPath("/repos/$projectId/scratches/queries/update")
             sparqlUpdate {
@@ -223,11 +231,12 @@ fun Route.QueryApi() {
         if(flexoResponse.isFailure()) {
             return@delete forward(flexoResponse)
         }
-        call.respond<Query>(query.second!!)
+        call.respond<Query>(query.second ?: return@delete call.respond(HttpStatusCode.NotFound))
     }
 
     get<Paths.getQueriesByProject> {
         val projectId = it.projectId
+        requireValidId(projectId, "projectId")
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/$projectId/scratches/queries/graph")
         }
@@ -245,12 +254,14 @@ fun Route.QueryApi() {
     get<Paths.getQueryByProjectAndId> {
         val projectId = it.projectId
         val queryId = it.queryId
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
         val res = getQuery(projectId, queryId)
         if (res.first.isFailure()) {
             return@get forward(res.first)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond<Query>(res.second!!)
+        call.respond<Query>(res.second ?: return@get call.respond(HttpStatusCode.NotFound))
     }
 
     get<Paths.getQueryResultsByProjectIdQuery> {
@@ -261,13 +272,16 @@ fun Route.QueryApi() {
         val projectId = it.projectId
         val queryId = it.queryId
         val commitId = it.commitId
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
+        commitId?.let { id -> requireValidId(id, "commitId") }
         // get query
         val res = getQuery(projectId, queryId)
         if (res.first.isFailure()) {
             return@get forward(res.first)
         }
-        val query = res.second!!
-        val flexoResponse = runQuery(QueryRequest(where = query.where), projectId.toString(), commitId?.toString())
+        val query = res.second ?: return@get call.respond(HttpStatusCode.NotFound)
+        val flexoResponse = runQuery(QueryRequest(where = query.where), projectId, commitId)
         // forward failures to client
         if (flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
@@ -286,6 +300,8 @@ fun Route.QueryApi() {
     post<QueryRequest>("/projects/{projectId}/query-results") {
         val projectId = call.parameters["projectId"]!!
         val commitId = call.parameters["commitId"]
+        requireValidId(projectId, "projectId")
+        commitId?.let { id -> requireValidId(id, "commitId") }
         val flexoResponse = runQuery(it, projectId, commitId)
         // forward failures to client
         if (flexoResponse.isFailure()) {
@@ -302,9 +318,12 @@ fun Route.QueryApi() {
     }
 
     post<QueryRequest>("/projects/{projectId}/queries") {
-        val projectId = UUID.fromString(call.parameters["projectId"]!!)
-        val uuid = UUID.randomUUID()
-        val response = createOrUpdateQuery(uuid, projectId, it, true)
+        val projectId = call.parameters["projectId"]!!
+        requireValidId(projectId, "projectId")
+        it.atId?.let { id -> requireValidId(id, "@id") }
+        // use provided query ID or generate one if not provided
+        val queryId = it.atId ?: generateId()
+        val response = createOrUpdateQuery(queryId, projectId, it, true)
         if (response.first.isFailure()) {
             return@post forward(response.first)
         }
@@ -312,9 +331,11 @@ fun Route.QueryApi() {
     }
 
     put<QueryRequest>("/projects/{projectId}/queries/{queryId}") {
-        val projectId = UUID.fromString(call.parameters["projectId"]!!)
-        val uuid = UUID.fromString(call.parameters["queryId"]!!)
-        val response = createOrUpdateQuery(uuid, projectId, it, false)
+        val projectId = call.parameters["projectId"]!!
+        val queryId = call.parameters["queryId"]!!
+        requireValidId(projectId, "projectId")
+        requireValidId(queryId, "queryId")
+        val response = createOrUpdateQuery(queryId, projectId, it, false)
         if (response.first.isFailure()) {
             return@put forward(response.first)
         }

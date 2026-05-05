@@ -15,7 +15,7 @@ import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.decodeFromString
+
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.apache.jena.datatypes.xsd.XSDDatatype
@@ -25,28 +25,30 @@ import org.apache.jena.rdf.model.Property
 import org.apache.jena.rdf.model.RDFNode
 import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
+import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
-import org.openmbee.flexo.sysmlv2.models.DataVersion
+
+import org.openmbee.flexo.sysmlv2.infrastructure.generateId
+import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 import org.openmbee.flexo.sysmlv2.models.Identified
 import java.time.OffsetDateTime
-import java.util.*
 
 class InvalidSysmlSerializationError(message: String): Error(message)
 
 fun FlexoModelHandler.commitFromModel(
     commitIri: String,
     properties: Map<Property, Set<RDFNode>?>,
-    projectUuid: UUID
+    projectId: String
 ): Commit {
     // generate commit object
     return Commit(
-        atId = UUID.fromString(commitIri.uriSuffix),
+        atId = commitIri.uriSuffix,
         atType = Commit.AtType.Commit,
         created = OffsetDateTime.parse(properties[MMS.submitted]!!.literal()!!),
         description = properties[DCTerms.description]?.literal()?: "",
-        owningProject = Identified(atId = projectUuid),
+        owningProject = Identified(atId = projectId),
         //previousCommit = properties[MMS.parent]?.map {
         //    Identified(atId = UUID.fromString(it.asResource().uri.uriSuffix))
         //}?: emptyList()
@@ -67,147 +69,21 @@ fun JsonPrimitive.toRdfLiteralNode(): Node {
     }
 
     // create typed literal
-    return NodeFactory.createLiteral(content, datatype)
+    return NodeFactory.createLiteralDT(content, datatype)
 }
 
 fun Route.CommitApi() {
     get<Paths.getChangeByProjectCommitId> {
-        val exampleContentString = """{
-          "payload" : {
-            "owner" : {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            },
-            "textualRepresentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedAnnotation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedElement" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "aliasIds" : [ "aliasIds", "aliasIds" ],
-            "@type" : "Element",
-            "ownedRelationship" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "documentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "isImpliedIncluded" : true,
-            "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "DataVersion",
-          "identity" : {
-            "@type" : "DataIdentity",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }"""
-        call.respond(Json.decodeFromString<DataVersion>(exampleContentString))
+        throw NotImplementedError()
     }
 
     get<Paths.getChangesByProjectCommit> {
-        val exampleContentString = """[ {
-          "payload" : {
-            "owner" : {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            },
-            "textualRepresentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedAnnotation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedElement" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "aliasIds" : [ "aliasIds", "aliasIds" ],
-            "@type" : "Element",
-            "ownedRelationship" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "documentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "isImpliedIncluded" : true,
-            "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "DataVersion",
-          "identity" : {
-            "@type" : "DataIdentity",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        }, {
-          "payload" : {
-            "owner" : {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            },
-            "textualRepresentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedAnnotation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "ownedElement" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "aliasIds" : [ "aliasIds", "aliasIds" ],
-            "@type" : "Element",
-            "ownedRelationship" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "documentation" : [ {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            }, {
-              "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-            } ],
-            "isImpliedIncluded" : true,
-            "declaredName" : "ActionDefinitionRequest_anyOf_declaredShortName",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@type" : "DataVersion",
-          "identity" : {
-            "@type" : "DataIdentity",
-            "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-          },
-          "@id" : "046b6c7f-0b8a-43b9-b35d-6489e6daee91"
-        } ]"""
-        call.respond(Json.decodeFromString<List<DataVersion>>(exampleContentString))
+        throw NotImplementedError()
     }
 
     get<Paths.getCommitByProjectAndId> { getCommit ->
+        requireValidId(getCommit.projectId, "projectId")
+        requireValidId(getCommit.commitId, "commitId")
         // submit GET request to retrieve project metadata
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getCommit.projectId}/commits/${getCommit.commitId}")
@@ -218,14 +94,16 @@ fun Route.CommitApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        val commit = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
                 commitFromModel(it.uri, it.outgoing(), getCommit.projectId)
-            }.toList()[0]
-        })
+            }.toList().firstOrNull()
+        } ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(commit)
     }
 
     get<Paths.getCommitsByProject> { getCommits ->
+        requireValidId(getCommits.projectId, "projectId")
         // submit GET request to retrieve project metadata
         val flexoResponse = flexoRequestGet {
             orgPath("/repos/${getCommits.projectId}/commits")
@@ -241,7 +119,7 @@ fun Route.CommitApi() {
             model.listResourcesWithProperty(RDF.type, MMS.Commit).forEach { commit ->
                 val outs = indexOut(commit.uri)
                 //skip root commit since it's automatically added by flexo
-                if (outs[MMS.parent].resource()!! == MMS.nil) return@forEach
+                if (outs[MMS.parent]?.resource() == MMS.nil) return@forEach
                 commits.add(commitFromModel(commit.uri, outs, getCommits.projectId))
             }
         }
@@ -250,8 +128,10 @@ fun Route.CommitApi() {
     }
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
-        val projectId = call.parameters["projectId"]
+        val projectId = call.parameters["projectId"]!!
+        requireValidId(projectId, "projectId")
         var branchId = call.parameters["branchId"]
+        branchId?.let { requireValidId(it, "branchId") }
         val replace = call.parameters["replace"]
         val inserts = mutableListOf<String>()
         val deleteIncoming = mutableListOf<String>()
@@ -284,7 +164,7 @@ fun Route.CommitApi() {
                 continue
             }
             if (identityId == null && payloadId == null && payload != null) {
-                payloadId = UUID.randomUUID().toString() // generate an id
+                payloadId = generateId() // generate an id
             }
 
             // subject node, target element
@@ -329,7 +209,7 @@ fun Route.CommitApi() {
                                 // array
                                 is JsonArray -> {
                                     // store entire array as serialized JSON
-                                    add(SYSMLV2.annotationJson(key) to setOf(NodeFactory.createLiteral(Json.encodeToString(value))))
+                                    add(SYSMLV2.annotationJson(key) to setOf(NodeFactory.createLiteralString(Json.encodeToString(value))))
 
                                     // non-empty list
                                     if (value.isNotEmpty()) {
@@ -422,7 +302,7 @@ fun Route.CommitApi() {
             }
             // parse the response model, convert it to JSON, and reply to client
             call.respond(flexoResponseUpdate.parseLdp {
-                commitFromModel(focalIri!!, focalOutgoing, UUID.fromString(projectId))
+                commitFromModel(focalIri!!, focalOutgoing, projectId)
             })
         } else { //model load - replaces model
             val turtleLoad = """
@@ -444,11 +324,12 @@ fun Route.CommitApi() {
             if(flexoResponseLoad.isFailure()) {
                 return@post forward(flexoResponseLoad)
             }
-            call.respond(flexoResponseLoad.parseModel {
+            val commit = flexoResponseLoad.parseModel {
                 model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
-                    commitFromModel(it.uri, it.outgoing(), UUID.fromString(projectId))
-                }.toList()[0]
-            })
+                    commitFromModel(it.uri, it.outgoing(), projectId)
+                }.toList().firstOrNull()
+            } ?: return@post call.respond(HttpStatusCode.NotFound)
+            call.respond(commit)
         }
     }
 }

@@ -7,7 +7,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
+import io.ktor.server.routing.*
 import org.apache.commons.io.IOUtils
 import org.apache.jena.datatypes.xsd.XSDDatatype
 import org.apache.jena.graph.GraphMemFactory
@@ -26,9 +26,8 @@ fun String.reindent(width: Int): String {
 }
 
 open class RdfBuilder {
-    var String.en: Literal
+    val String.en: Literal
         get() = ResourceFactory.createLangLiteral(this, "en")
-        set(v) {}
 }
 
 fun escapeRdfDoubleQuotedLiteralContents(contents: String): String {
@@ -38,8 +37,10 @@ fun escapeRdfDoubleQuotedLiteralContents(contents: String): String {
         .replace("\n", "\\n")
 }
 
+private val RDF_IRI_ESCAPE_REGEX = "([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()
+
 fun escapeRdfIri(iri: String): String {
-    return iri.replace("([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()) {
+    return iri.replace(RDF_IRI_ESCAPE_REGEX) {
         // hex-encode the offending character
         val hex = it.value[0].code.toString(16)
 
@@ -222,7 +223,7 @@ class FlexoResponse(
         val language = RDFLanguages.contentTypeToLang(contentType.withoutParameters().toString())
 
         // create memory model
-        val model = ModelCom(GraphMemFactory.createGraphMem())
+        val model = ModelCom(GraphMemFactory.createDefaultGraph())
 
         // parse input document into model
         RDFParser.create().apply {
@@ -238,9 +239,20 @@ class FlexoResponse(
 
         return setup(handler)
     }
+
+    suspend fun <T> findFirstByType(
+        type: org.apache.jena.rdf.model.Resource,
+        transform: FlexoModelHandler.(Map<org.apache.jena.rdf.model.Property, Set<org.apache.jena.rdf.model.RDFNode>>) -> T
+    ): T? {
+        return parseModel {
+            model.listSubjectsWithProperty(org.apache.jena.vocabulary.RDF.type, type).mapWith {
+                transform(indexOut(it.uri))
+            }.toList().firstOrNull()
+        }
+    }
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     // prepare client
     val client = FlexoHttpClient
     // create request builder
@@ -262,19 +274,19 @@ suspend fun PipelineContext<*, ApplicationCall>.flexoRequest(method: HttpMethod,
     return FlexoResponse(response)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestGet(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Get, setup)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestPut(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Put, setup)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestPost(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Post, setup)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.flexoRequestPatch(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
+suspend fun RoutingContext.flexoRequestPatch(setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
     return flexoRequest(HttpMethod.Patch, setup)
 }
 
@@ -301,17 +313,14 @@ open class FlexoModelHandler(val model: Model, val prefixes: PrefixMapping) {
         return PrefixedRdfPropertiesMap(incomingProperties, prefixes)
     }
 
-    var String.uriSuffix: String
+    val String.uriSuffix: String
         get() = if(startsWith(SYSMLV2.VOCABULARY)) substringAfterLast('#') else substringAfterLast('/')
-        set(v) {}
 
-    var String.urnSuffix: String
+    val String.urnSuffix: String
         get() = substringAfterLast(':')
-        set(v) {}
 
-    var String.autoSuffix: String
+    val String.autoSuffix: String
         get() = if(startsWith(SYSMLV2.BASE)) urnSuffix else uriSuffix
-        set(v) {}
 }
 
 class FlexoModelHandlerWithFocalNode(
@@ -323,7 +332,7 @@ class FlexoModelHandlerWithFocalNode(
     val focalIncoming = indexInv(focalIri)
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.forward(flexoResponse: FlexoResponse) {
+suspend fun RoutingContext.forward(flexoResponse: FlexoResponse) {
     val response = flexoResponse.response
 
     call.respondText(response.bodyAsText(), response.contentType(), response.status) {
