@@ -1,5 +1,5 @@
 group = "org.openmbee.flexo.sysmlv2"
-version = "0.0.1-ALPHA"
+version = "0.2.0"
 
 application {
     mainClass.set("io.ktor.server.netty.EngineMain")
@@ -48,7 +48,7 @@ dependencies {
     implementation("io.ktor:ktor-server-compression:$ktorVersion")
 //    implementation("io.ktor:ktor-server-conditional-headers:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-//    implementation("io.ktor:ktor-server-cors:$ktorVersion")
+    implementation("io.ktor:ktor-server-cors:$ktorVersion")
     implementation("io.ktor:ktor-server-default-headers:$ktorVersion")
 //    implementation("io.ktor:ktor-server-forwarded-header:$ktorVersion")
 //    implementation("io.ktor:ktor-server-host-common:$ktorVersion")

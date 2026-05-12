@@ -11,6 +11,7 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
+import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.response.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.plugins.BadRequestException
@@ -57,6 +58,35 @@ fun Application.module() {
             registerTypeAdapter(LocalDateTime::class.java, LocalDateTimeAdapter)
         }*/
         //register(ContentType.Application.Json, GsonConverter())
+    }
+    install(CORS) {
+        allowCredentials = true
+
+        allowHeader(HttpHeaders.Authorization)
+        allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.ETag)
+        allowHeader(HttpHeaders.IfMatch)
+        allowHeader(HttpHeaders.IfNoneMatch)
+        allowHeader(HttpHeaders.SLUG)
+
+        allowMethod(HttpMethod.Head)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Patch)
+        allowMethod(HttpMethod.Delete)
+
+        exposeHeader("Accept-Post")
+        exposeHeader("Accept-Patch")
+        exposeHeader("Accept-Put")
+        exposeHeader(HttpHeaders.Allow)
+        exposeHeader(HttpHeaders.ETag)
+        exposeHeader(HttpHeaders.Date)
+        exposeHeader(HttpHeaders.Location)
+        exposeHeader(HttpHeaders.Link)
+        exposeHeader("Flexo-Mms-Layer-1")
+
+        anyHost() // @TODO: make configuration
     }
     install(AutoHeadResponse) // see https://ktor.io/docs/autoheadresponse.html
     install(Compression, ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html

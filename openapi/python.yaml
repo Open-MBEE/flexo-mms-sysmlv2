@@ -3,3 +3,4 @@ additionalProperties:
   packageVersion: 0.2.0
   projectName: flexo-sysml
   disallowAdditionalPropertiesIfNotPresent: "false"
+  packageUrl: https://github.com/Open-MBEE/flexo-mms-sysmlv2
