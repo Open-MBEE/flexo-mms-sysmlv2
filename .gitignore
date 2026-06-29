@@ -76,3 +76,6 @@ application.conf
 
 gen
 *-logback.xml
+
+# IDE build output
+bin/
