@@ -47,7 +47,9 @@ fun FlexoModelHandler.commitFromModel(
         atId = commitIri.uriSuffix,
         atType = Commit.AtType.Commit,
         created = OffsetDateTime.parse(properties[MMS.submitted]!!.literal()!!),
-        description = properties[DCTerms.description]?.literal()?: "",
+        // Flexo MMS stores the commit message as mms:message; fall back to
+        // dct:description for forward/backward compatibility.
+        description = properties[MMS.message]?.literal()?: properties[DCTerms.description]?.literal()?: "",
         owningProject = Identified(atId = projectId),
         //previousCommit = properties[MMS.parent]?.map {
         //    Identified(atId = UUID.fromString(it.asResource().uri.uriSuffix))
@@ -292,6 +294,9 @@ fun Route.CommitApi() {
             val flexoResponseUpdate = flexoRequestPost {
                 orgPath("/repos/$projectId/branches/$branchId/update")
 
+                // forward the commit message so layer1 records it (mms:message)
+                addQueryParams("message" to (commit.description ?: ""))
+
                 // construct body payload
                 sparqlUpdate {
                     sparqlUpdateString
@@ -316,6 +321,8 @@ fun Route.CommitApi() {
             """
             val flexoResponseLoad = flexoRequestPut {
                 orgPath("/repos/$projectId/branches/$branchId/graph")
+                // forward the commit message so layer1 records it (mms:message)
+                addQueryParams("message" to (commit.description ?: ""))
                 turtle {
                     turtleLoad
                 }

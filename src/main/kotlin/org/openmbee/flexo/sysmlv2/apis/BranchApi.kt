@@ -36,8 +36,9 @@ fun FlexoModelHandler.branchFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
     projectId: String,
     branchId: String
-): Branch {
-    val commit = Identified(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix)
+): Branch? {
+    val commitSuffix = outgoing[MMS.commit]?.resource()?.uri?.uriSuffix ?: return null
+    val commit = Identified(commitSuffix)
     return Branch(
         atId = branchId,
         atType = Branch.AtType.Branch,
@@ -73,7 +74,7 @@ fun Route.BranchApi() {
         val branch = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
-            }.toList().firstOrNull()
+            }.toList().filterNotNull().firstOrNull()
         } ?: return@delete call.respond(HttpStatusCode.NotFound)
         call.respond(branch)
     }
@@ -94,7 +95,7 @@ fun Route.BranchApi() {
                 (it.hasProperty(SYSMLV2.DELETED) || it.uri.uriSuffix == "master")
             }.mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
-            }.toList()
+            }.toList().filterNotNull()
         })
     }
 
@@ -112,7 +113,7 @@ fun Route.BranchApi() {
         val branch = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
-            }.toList().firstOrNull()
+            }.toList().filterNotNull().firstOrNull()
         } ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(branch)
     }
@@ -143,6 +144,7 @@ fun Route.BranchApi() {
         }
         call.respond(createBranchResponse.parseLdp {
             branchFromResponse(focalOutgoing, projectId, branchId)
+                ?: throw IllegalStateException("Layer1 did not return mms:commit for newly created branch $branchId")
         })
     }
 }

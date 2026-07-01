@@ -131,6 +131,7 @@ object MMS {
 
     val commitId = prop("commitId")
     val submitted = prop("submitted")
+    val message = prop("message")
     // access control properties
     val implies = prop("implies")
 

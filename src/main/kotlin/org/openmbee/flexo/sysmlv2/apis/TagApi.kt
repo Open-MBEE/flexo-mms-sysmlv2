@@ -36,8 +36,9 @@ fun FlexoModelHandler.tagFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
     projectId: String,
     tagId: String
-): Tag {
-    val commit = Identified(outgoing[MMS.commit]!!.resource()!!.uri.uriSuffix)
+): Tag? {
+    val commitSuffix = outgoing[MMS.commit]?.resource()?.uri?.uriSuffix ?: return null
+    val commit = Identified(commitSuffix)
     return Tag(
         atId = tagId,
         atType = Tag.AtType.Tag,
@@ -73,7 +74,7 @@ fun Route.TagApi() {
         val tag = patchResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
                 tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
-            }.toList().firstOrNull()
+            }.toList().filterNotNull().firstOrNull()
         } ?: return@delete call.respond(HttpStatusCode.NotFound)
         call.respond(tag)
     }
@@ -90,7 +91,7 @@ fun Route.TagApi() {
         val tags = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
                 tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
-            }.toList()
+            }.toList().filterNotNull()
         }
         val tag = tags.firstOrNull() ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(tag)
@@ -114,7 +115,7 @@ fun Route.TagApi() {
                 (it.uri.uriSuffix.startsWith("Commit.") || it.hasProperty(SYSMLV2.DELETED))
             }.mapWith {
                 tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
-            }.toList()
+            }.toList().filterNotNull()
         })
     }
 
@@ -143,6 +144,7 @@ fun Route.TagApi() {
         }
         call.respond(createTagResponse.parseLdp {
             tagFromResponse(focalOutgoing, projectId, tagId)
+                ?: throw IllegalStateException("Layer1 did not return mms:commit for newly created tag $tagId")
         })
     }
 }
