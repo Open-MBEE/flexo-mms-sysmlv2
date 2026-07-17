@@ -39,17 +39,16 @@ fun FlexoModelHandler.tagFromResponse(
 ): Tag? {
     val commitSuffix = outgoing[MMS.commit]?.resource()?.uri?.uriSuffix ?: return null
     val commit = Identified(commitSuffix)
+    // never fabricate created/name for malformed upstream data — invented
+    // values mask triplestore bugs (see issue #20)
     return Tag(
         atId = tagId,
         atType = Tag.AtType.Tag,
-        created = OffsetDateTime.parse(
-            outgoing[MMS.created]?.literal()
-                ?: OffsetDateTime.now().toString()
-        ),
+        created = OffsetDateTime.parse(outgoing[MMS.created]?.literal() ?: return null),
         owningProject = Identified(projectId),
         referencedCommit = commit,
         taggedCommit = commit,
-        name = outgoing[DCTerms.title]?.literal() ?: "",
+        name = outgoing[DCTerms.title]?.literal() ?: return null,
     )
 }
 fun Route.TagApi() {

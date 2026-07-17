@@ -39,16 +39,15 @@ fun FlexoModelHandler.branchFromResponse(
 ): Branch? {
     val commitSuffix = outgoing[MMS.commit]?.resource()?.uri?.uriSuffix ?: return null
     val commit = Identified(commitSuffix)
+    // never fabricate created/name for malformed upstream data — invented
+    // values mask triplestore bugs (see issue #20)
     return Branch(
         atId = branchId,
         atType = Branch.AtType.Branch,
-        created = OffsetDateTime.parse(
-            outgoing[MMS.created]?.literal()
-                ?: OffsetDateTime.now().toString()
-        ),
+        created = OffsetDateTime.parse(outgoing[MMS.created]?.literal() ?: return null),
         owningProject = Identified(projectId),
         referencedCommit = commit,
-        name = outgoing [DCTerms.title]?.literal() ?: "",
+        name = outgoing[DCTerms.title]?.literal() ?: return null,
         head = commit
     )
 }
