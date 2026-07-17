@@ -133,7 +133,8 @@ fun Route.ProjectApi() {
             return@get forward(flexoResponse)
         }
         val project = flexoResponse.findFirstByType(MMS.Repo) {
-            projectFromResponse(it)
+            // soft-deleted projects are invisible
+            if (it[SYSMLV2.DELETED] != null) null else projectFromResponse(it)
         } ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(project)
     }
@@ -165,6 +166,15 @@ fun Route.ProjectApi() {
         projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         // use provided project ID or generate one if not provided
         val projectId = projectRequest.atId ?: generateId()
+        // POST must not silently overwrite an existing project
+        if (projectRequest.atId != null) {
+            val existing = flexoRequestGet {
+                orgPath("/repos/${projectId}")
+            }
+            if (!existing.isFailure()) {
+                return@post call.respond(HttpStatusCode.Conflict)
+            }
+        }
         val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)

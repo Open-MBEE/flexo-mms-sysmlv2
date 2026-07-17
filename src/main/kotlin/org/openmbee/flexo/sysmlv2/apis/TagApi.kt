@@ -89,7 +89,10 @@ fun Route.TagApi() {
             return@get forward(flexoResponse)
         }
         val tags = flexoResponse.parseModel {
-            model.listSubjectsWithProperty(RDF.type, MMS.Lock).mapWith {
+            // soft-deleted tags are invisible
+            model.listSubjectsWithProperty(RDF.type, MMS.Lock).filterDrop {
+                it.hasProperty(SYSMLV2.DELETED)
+            }.mapWith {
                 tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().filterNotNull()
         }

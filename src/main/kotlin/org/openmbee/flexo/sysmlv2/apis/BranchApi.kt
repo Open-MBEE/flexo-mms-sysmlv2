@@ -111,7 +111,10 @@ fun Route.BranchApi() {
         }
         // parse the response model, convert it to JSON, and reply to client
         val branch = flexoResponse.parseModel {
-            model.listSubjectsWithProperty(RDF.type, MMS.Branch).mapWith {
+            // soft-deleted branches are invisible
+            model.listSubjectsWithProperty(RDF.type, MMS.Branch).filterDrop {
+                it.hasProperty(SYSMLV2.DELETED)
+            }.mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().filterNotNull().firstOrNull()
         } ?: return@get call.respond(HttpStatusCode.NotFound)
