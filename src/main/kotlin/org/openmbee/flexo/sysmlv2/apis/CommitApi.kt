@@ -266,6 +266,27 @@ fun Route.CommitApi() {
             }
         }
         if (replace == null || replace != "true") { //regular update
+            // deleted elements must not leave dangling references: remove
+            // incoming link triples, and the json: array annotations of the
+            // referencing property (they cannot be rewritten in SPARQL; the
+            // remaining link triples render as a best-effort array instead)
+            val deleteIncomingUpdate = if (deleteIncoming.isEmpty()) "" else """
+            delete {
+                ?ref_s ?ref_p ?deleted_n .
+                ?ref_s ?ref_ann ?ann_val .
+            } where {
+                values ?deleted_n {
+                    ${deleteIncoming.joinToString("\n").reindent(5)}
+                }
+                ?ref_s ?ref_p ?deleted_n .
+                optional {
+                    ?ref_s ?ref_ann ?ann_val .
+                    filter(strstarts(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}"))
+                    filter(strafter(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}") = strafter(str(?ref_p), "${SYSMLV2.VOCABULARY}"))
+                }
+            };
+            """
+
             // build SPARQL UPDATE string
             var sparqlUpdateString = """
             ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
@@ -279,14 +300,15 @@ fun Route.CommitApi() {
             } where {
                 values ?element_n {
                     ${values.joinToString("\n").reindent(5)}
-                } 
+                }
                 optional {
                     ?element_n ?element_p ?element_o .
                 }
             };
+            $deleteIncomingUpdate
             insert data {
                 ${inserts.joinToString("\n\n").reindent(4)}
-            }           
+            }
             """
 
             // trim indent for better inspectability
