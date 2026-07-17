@@ -162,8 +162,10 @@ fun Route.CommitApi() {
             val identityId = identity?.atId
             var payloadId = payload?.getOrDefault("@id", null)?.jsonPrimitive?.content
             if (identityId != null && payloadId != null && identityId != payloadId) {
-                //bad, log error?
-                continue
+                // silently skipping the change would report a successful
+                // commit while discarding data
+                throw InvalidSysmlSerializationError(
+                    "identity @id '$identityId' does not match payload @id '$payloadId' at .change[$index]")
             }
             if (identityId == null && payloadId == null && payload != null) {
                 payloadId = generateId() // generate an id

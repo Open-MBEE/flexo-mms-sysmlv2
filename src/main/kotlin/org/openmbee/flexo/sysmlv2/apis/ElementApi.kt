@@ -68,6 +68,30 @@ class InvalidTripleError(
     value: RDFNode
 ): Error("$message at <$subjectIri> <${predicate.uri}> ${value.stringify()}")
 
+private fun FlexoModelHandler.jsonFromRdfNode(elementIri: String, predicate: Property, obj: RDFNode): JsonElement {
+    return if (obj == RDF.nil) {
+        JsonNull
+    } else if (obj.isResource) {
+        buildJsonObject {
+            put("@id", obj.asResource().uri.autoSuffix)
+        }
+    } else if (obj.isLiteral) {
+        val lit = obj.asLiteral()
+
+        // depending on its datatype
+        when (lit.datatype.uri) {
+            XSD.xboolean.uri -> JsonPrimitive(lit.boolean)
+            XSD.integer.uri -> JsonPrimitive(lit.int)
+            XSD.decimal.uri, XSD.xdouble.uri -> JsonPrimitive(lit.float)
+            else -> JsonPrimitive(lit.string)
+        }
+    }
+    // invalid
+    else {
+        throw InvalidTripleError("Don't know what this is", elementIri, predicate, obj)
+    }
+}
+
 fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject {
     // direct outgoing properties of element
     val out = indexOut(elementIri)
@@ -76,12 +100,16 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
     val type = out[RDF.type].resource()?.uri?.autoSuffix
     val id = elementIri.urnSuffix
 
+    // properties whose authoritative (ordered) form is carried by a JSON
+    // array annotation; the plain sysml: triples for these are skipped
+    val annotatedKeys = out.keys
+        .filter { it.uri.startsWith(SYSMLV2.ANNOTATION_JSON) }
+        .map { it.uri.urnSuffix }
+        .toSet()
+
     return buildJsonObject {
         put("@type", type)
         put("@id", id)
-
-        // keeps track of json array annotations, if we already deserialized an array, ignore any triple with the same property
-        val seenArrays = mutableListOf<String>()
 
         // outgoing properties
         out.forEach { (predicate, values) ->
@@ -92,29 +120,20 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
             val obj = values.elementAt(0)
 
             if(predicate.uri.startsWith(SYSMLV2.VOCABULARY)) {
-                // multiple values means it's an array, skip and prefer JSON annotation
-                // if we've already seen a JSON annotation with the same property key then ignore
-                if (values.size > 1 || seenArrays.contains(propertyKey)) return@forEach
-                if (obj == RDF.nil) {
-                    put(propertyKey, JsonNull)
-                } else if (obj.isResource) {
-                    put(propertyKey, buildJsonObject {
-                        put("@id", obj.asResource().uri.autoSuffix)
+                // the JSON annotation carries this property's array form
+                if (annotatedKeys.contains(propertyKey)) return@forEach
+                if (values.size > 1) {
+                    // multi-valued property without an annotation (e.g. data
+                    // loaded as raw RDF rather than through this API): emit a
+                    // best-effort array rather than dropping the property.
+                    // RDF triples are unordered, so sort for determinism.
+                    put(propertyKey, buildJsonArray {
+                        values.map { jsonFromRdfNode(elementIri, predicate, it) }
+                            .sortedBy { it.toString() }
+                            .forEach { add(it) }
                     })
-                } else if (obj.isLiteral) {
-                    val lit = obj.asLiteral()
-
-                    // depending on its datatype
-                    when (lit.datatype.uri) {
-                        XSD.xboolean.uri -> put(propertyKey, lit.boolean)
-                        XSD.integer.uri -> put(propertyKey, lit.int)
-                        XSD.decimal.uri, XSD.xdouble.uri -> put(propertyKey, lit.float)
-                        else -> put(propertyKey, lit.string)
-                    }
-                }
-                // invalid
-                else {
-                    throw InvalidTripleError("Don't know what this is", elementIri, predicate, obj)
+                } else {
+                    put(propertyKey, jsonFromRdfNode(elementIri, predicate, obj))
                 }
             }
             // annotations
@@ -144,9 +163,6 @@ fun FlexoModelHandler.extractModelElementToJson(elementIri: String): JsonObject 
 
                 // add parsed element to JSON object
                 put(propertyKey, jsonElement)
-
-                // do not overwrite this property
-                seenArrays.add(propertyKey)
             }
             // something else
             else {
