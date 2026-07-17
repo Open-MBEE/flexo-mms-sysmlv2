@@ -72,6 +72,7 @@ fun Route.RelationshipApi() {
         val result = buildJsonArray {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
+                    if (subject.isAnon) continue
                     add(extractModelElementToJson(subject.uri))
                 }
             }

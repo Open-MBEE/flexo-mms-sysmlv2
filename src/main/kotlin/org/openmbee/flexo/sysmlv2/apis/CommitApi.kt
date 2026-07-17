@@ -142,9 +142,18 @@ fun Route.CommitApi() {
             val projectResponse = flexoRequestGet {
                 orgPath("/repos/$projectId")
             }
+            // nonexistent/unauthorized project: forward instead of crashing
+            // on an empty model below
+            if (projectResponse.isFailure()) {
+                return@post forward(projectResponse)
+            }
             projectResponse.parseModel {
-                val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
-                branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal()?: "master"
+                val repos = model.listSubjectsWithProperty(RDF.type, MMS.Repo)
+                if (repos.hasNext()) {
+                    branchId = repos.next().outgoing()[SYSMLV2.DEFAULT_BRANCH_ID]?.literal()?: "master"
+                } else {
+                    branchId = "master"
+                }
             }
         }
         // each change (DataVersionRequest)
@@ -244,7 +253,8 @@ fun Route.CommitApi() {
                                     // @id reference
                                     if(valueObj.containsKey("@id")) {
                                         if(valueObj.keys.size > 1) {
-                                            throw Error("Unexpected extra keys at .${key}")
+                                            // client-input problem: must map to a 400, not a 500
+                                            throw InvalidSysmlSerializationError("Unexpected extra keys at .change[$index].$key")
                                         }
                                         add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(valueObj["@id"]!!.jsonPrimitive.content).asNode()))
                                     }

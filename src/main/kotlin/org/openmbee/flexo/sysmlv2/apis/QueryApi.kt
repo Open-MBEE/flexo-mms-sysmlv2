@@ -160,9 +160,15 @@ suspend fun RoutingContext.runQuery(
         val projectResponse = flexoRequestGet {
             orgPath("/repos/$projectId")
         }
+        // nonexistent/unauthorized project: let the caller forward the failure
+        if (projectResponse.isFailure()) {
+            return projectResponse
+        }
         projectResponse.parseModel {
-            val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
-            branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal() ?: "master"
+            val repos = model.listSubjectsWithProperty(RDF.type, MMS.Repo)
+            if (repos.hasNext()) {
+                branchId = repos.next().outgoing()[SYSMLV2.DEFAULT_BRANCH_ID]?.literal() ?: "master"
+            }
         }
     }
     val cb = ConstructBuilder().addConstruct("?e", "?p", "?o")
@@ -303,7 +309,8 @@ fun Route.QueryApi() {
         // parse the response model, extract the elements to JSON, and reply to client
         call.respond(buildJsonArray {
             flexoResponse.parseModel {
-                for (subject in model.listSubjects()) {
+                for(subject in model.listSubjects()) {
+                    if (subject.isAnon) continue
                     add(extractModelElementToJson(subject.uri))
                 }
             }
@@ -323,7 +330,8 @@ fun Route.QueryApi() {
         // parse the response model, extract the elements to JSON, and reply to client
         call.respond(buildJsonArray {
             flexoResponse.parseModel {
-                for (subject in model.listSubjects()) {
+                for(subject in model.listSubjects()) {
+                    if (subject.isAnon) continue
                     add(extractModelElementToJson(subject.uri))
                 }
             }

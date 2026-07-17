@@ -11,6 +11,7 @@
 */
 package org.openmbee.flexo.sysmlv2.apis
 
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
@@ -194,10 +195,12 @@ fun Route.ElementApi() {
         }
 
         // parse the response model, extract the target element to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
-            // extract the target model element to JSON
-            extractModelElementToJson(elementIri)
-        })
+        val element = flexoResponse.parseModel {
+            // an empty result means no such element at this commit
+            if (!model.listStatements(model.getResource(elementIri), null, null as RDFNode?).hasNext()) null
+            else extractModelElementToJson(elementIri)
+        } ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(element)
     }
 
     // get multiple elements
@@ -217,6 +220,7 @@ fun Route.ElementApi() {
         val result = buildJsonArray {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
+                    if (subject.isAnon) continue
                     add(extractModelElementToJson(subject.uri))
                 }
             }
@@ -254,6 +258,7 @@ fun Route.ElementApi() {
         val result = buildJsonArray {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
+                    if (subject.isAnon) continue
                     add(extractModelElementToJson(subject.uri))
                 }
             }
@@ -297,6 +302,7 @@ fun Route.ElementApi() {
         val result = buildJsonArray {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
+                    if (subject.isAnon) continue
                     add(extractModelElementToJson(subject.uri))
                 }
             }
