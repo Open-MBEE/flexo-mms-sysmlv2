@@ -39,59 +39,72 @@ import org.openmbee.flexo.sysmlv2.models.QueryRequest
 
 fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
     val p: Node
-    var pvar: String = property
+    // property names are client input; only variable-safe characters may
+    // appear in the SPARQL variable derived from them
+    var pvar: String = property.replace(Regex("[^A-Za-z0-9_]"), "_")
     when(property) {
         "@id" -> { p = SYSMLV2.prop("elementId").asNode(); pvar = "id" }
         "@type" -> { p = RDF.type.asNode(); pvar = "Metatype" }
         else -> { p = SYSMLV2.prop(property).asNode() }
     }
-    if (value.isEmpty()) {
+    // schema: value is null, or an array of at least one scalar/Identified/null;
+    // a null value (either form) matches elements lacking the property
+    val values = value ?: listOf(JsonNull)
+    if (values.isEmpty()) {
         throw BadRequestException("PrimitiveConstraint value must not be empty")
     }
-    val firstVal = value[0]
-    val v: Node = when(firstVal) {
-        is JsonObject -> {
-            if (firstVal.containsKey("@id")) {
-                SYSMLV2.element(firstVal.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
-            } else {
-                throw BadRequestException("PrimitiveConstraint value object must contain @id")
+    // null stands for "property absent"; everything else becomes a comparable node
+    val nodes: List<Node?> = values.map { el ->
+        when(el) {
+            is JsonObject -> {
+                if (el.containsKey("@id")) {
+                    SYSMLV2.element(el["@id"]!!.jsonPrimitive.content).asNode()
+                } else {
+                    throw BadRequestException("PrimitiveConstraint value object must contain @id")
+                }
             }
-        }
-        is JsonPrimitive -> {
-            if (firstVal == JsonNull) {
-                RDF.nil.asNode()
-            } else {
-                if (property == "@type") SYSMLV2.type(firstVal.content).asNode() else firstVal.toRdfLiteralNode()
+            is JsonPrimitive -> {
+                if (el == JsonNull) {
+                    null
+                } else {
+                    if (property == "@type") SYSMLV2.type(el.content).asNode() else el.toRdfLiteralNode()
+                }
             }
+            else -> throw BadRequestException("Unexpected JSON element type in PrimitiveConstraint value")
         }
-        is JsonArray -> throw BadRequestException("PrimitiveConstraint value cannot be array")
-        else -> throw BadRequestException("Unexpected JSON element type in PrimitiveConstraint value")
     }
-    if (firstVal == JsonNull) {
-        cb.addOptional("?e", p, "?$pvar")
-    } else {
-        cb.addWhere("?e", p, "?$pvar")
-    }
+    // the pattern must be optional so that (a) null values can match elements
+    // lacking the property and (b) an or-composite over different properties
+    // does not require all of them to be present; bound() guards below keep
+    // required-presence semantics for the individual comparisons
+    cb.addOptional("?e", p, "?$pvar")
     val ef = cb.exprFactory
+    val matchesAbsent = nodes.any { it == null }
+    val comparable = nodes.filterNotNull()
     val expr = when(operator) {
-        PrimitiveConstraint.Operator.Equal -> {
-            if (value == JsonNull) {
-                ef.or(ef.not(ef.bound("?$pvar")), ef.eq("?$pvar", v))
-            } else {
-                ef.eq("?$pvar", v)
+        // per the OMG schema "=" takes an array; both it and "in" are set
+        // membership over the array's values
+        PrimitiveConstraint.Operator.Equal, PrimitiveConstraint.Operator.In -> {
+            val membership = comparable
+                .map { ef.eq("?$pvar", it) as Expr }
+                .reduceOrNull { acc, e -> ef.or(acc, e) }
+                ?.let { ef.and(ef.bound("?$pvar"), it) as Expr }
+            val absent = if (matchesAbsent) ef.not(ef.bound("?$pvar")) as Expr else null
+            listOfNotNull(absent, membership).reduce { acc, e -> ef.or(acc, e) }
+        }
+        else -> {
+            if (matchesAbsent || comparable.size != 1) {
+                throw BadRequestException("PrimitiveConstraint operator '${operator.value}' requires exactly one non-null value")
             }
-        }
-        PrimitiveConstraint.Operator.Less_Than -> {
-            ef.lt("?$pvar", v)
-        }
-        PrimitiveConstraint.Operator.Less_Than_Equal -> {
-            ef.le("?$pvar", v)
-        }
-        PrimitiveConstraint.Operator.Greater_Than -> {
-            ef.gt("?$pvar", v)
-        }
-        PrimitiveConstraint.Operator.Greater_Than_Equal -> {
-            ef.ge("?$pvar", v)
+            val v = comparable[0]
+            val cmp = when(operator) {
+                PrimitiveConstraint.Operator.Less_Than -> ef.lt("?$pvar", v)
+                PrimitiveConstraint.Operator.Less_Than_Equal -> ef.le("?$pvar", v)
+                PrimitiveConstraint.Operator.Greater_Than -> ef.gt("?$pvar", v)
+                PrimitiveConstraint.Operator.Greater_Than_Equal -> ef.ge("?$pvar", v)
+                else -> throw BadRequestException("Unsupported PrimitiveConstraint operator '${operator.value}'")
+            }
+            ef.and(ef.bound("?$pvar"), cmp)
         }
     }
     return if (inverse) ef.not(expr) else expr
@@ -121,8 +134,8 @@ suspend fun RoutingContext.createOrUpdateQuery(
     val query = Query(atId = queryId,
         atType = Query.AtType.Query,
         owningProject = Identified(projectId),
-        select = queryRequest.select!!,
-        where = queryRequest.where!!)
+        select = queryRequest.select ?: throw BadRequestException("Query must have a select"),
+        where = queryRequest.where ?: throw BadRequestException("Query must have a where"))
     val queryString = Json.encodeToString<Query>(query)
     val queryUri = SYSMLV2.query(queryId)
     val insertBuilder = UpdateBuilder().addInsert(queryUri, DCTerms.description, queryString)
