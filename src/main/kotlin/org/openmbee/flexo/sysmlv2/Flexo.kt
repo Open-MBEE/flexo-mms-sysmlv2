@@ -35,6 +35,7 @@ fun escapeRdfDoubleQuotedLiteralContents(contents: String): String {
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
         .replace("\n", "\\n")
+        .replace("\r", "\\r")
 }
 
 private val RDF_IRI_ESCAPE_REGEX = "([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()

@@ -180,8 +180,11 @@ fun Route.CommitApi() {
                 payloadId = generateId() // generate an id
             }
 
-            // subject node, target element
-            val elementNode: Node = SYSMLV2.element(identityId ?: payloadId!!).asNode()
+            // subject node, target element; the id is interpolated into
+            // SPARQL, so it must be validated
+            val elementId = identityId ?: payloadId!!
+            requireValidId(elementId, ".change[$index] element @id")
+            val elementNode: Node = SYSMLV2.element(elementId).asNode()
 
             // transform payload into property pairs
             mutableListOf<Pair<Property, Set<Node>>>().apply {
@@ -230,7 +233,10 @@ fun Route.CommitApi() {
                                         if(value[0] is JsonObject) {
                                             // create additional triples to link the elements
                                             add(SYSMLV2.prop(key) to value.jsonArray.map {
-                                                SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+                                                val refId = it.jsonObject["@id"]?.jsonPrimitive?.content
+                                                    ?: throw InvalidSysmlSerializationError("Missing @id at .change[$index].$key")
+                                                requireValidId(refId, ".change[$index].$key.@id")
+                                                SYSMLV2.element(refId).asNode()
                                             }.toSet())
                                         }
                                         // and first element is a primitive
@@ -256,7 +262,9 @@ fun Route.CommitApi() {
                                             // client-input problem: must map to a 400, not a 500
                                             throw InvalidSysmlSerializationError("Unexpected extra keys at .change[$index].$key")
                                         }
-                                        add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(valueObj["@id"]!!.jsonPrimitive.content).asNode()))
+                                        val refId = valueObj["@id"]!!.jsonPrimitive.content
+                                        requireValidId(refId, ".change[$index].$key.@id")
+                                        add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(refId).asNode()))
                                     }
                                     else {
                                         throw InvalidSysmlSerializationError("Unexpected JSON object at .change[$index].$key == ${Json.encodeToString(value)}")
