@@ -92,6 +92,13 @@ tasks.wrapper {
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
+sourceSets {
+    main {
+        // bundles the official OMG spec (resources/openapi.json) so the
+        // /meta/datatypes endpoints can serve its schema definitions
+        resources.srcDir("resources")
+    }
+}
 kotlin {
     jvmToolchain(21)
 }
