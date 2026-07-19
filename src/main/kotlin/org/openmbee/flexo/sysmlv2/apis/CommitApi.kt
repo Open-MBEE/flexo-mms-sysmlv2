@@ -29,6 +29,8 @@ import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
+import org.openmbee.flexo.sysmlv2.models.DataIdentity
+import org.openmbee.flexo.sysmlv2.models.DataVersion
 
 import org.openmbee.flexo.sysmlv2.infrastructure.generateId
 import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
@@ -86,13 +88,95 @@ fun JsonPrimitive.toRdfLiteralNode(): Node {
     return NodeFactory.createLiteralDT(content, datatype)
 }
 
+// index every element in the model by IRI as its API JSON shape
+fun FlexoModelHandler.elementsByIri(): Map<String, JsonObject> =
+    model.listSubjects().toList()
+        .filter { !it.isAnon && it.uri.startsWith(SYSMLV2.ELEMENT) }
+        .associate { it.uri to extractModelElementToJson(it.uri) }
+
+// change ids must be stable across requests: derive them from the commit
+// and element ids
+fun changeId(commitId: String, elementId: String): String =
+    java.util.UUID.nameUUIDFromBytes("$commitId:$elementId".toByteArray()).toString()
+
+/**
+ * Compute a commit's changes by diffing its model graph against its
+ * parent's (layer1 stores the raw SPARQL patch, which cannot be mapped
+ * back to per-element DataVersions).
+ *
+ * Returns (failureToForward, changes): a non-null failure must be
+ * forwarded to the client; null changes means the commit does not exist.
+ */
+suspend fun RoutingContext.computeCommitChanges(
+    projectId: String, commitId: String
+): Pair<FlexoResponse?, List<DataVersion>?> {
+    // resolve the commit and its parent from the commit collection
+    val commitsResponse = flexoRequestGet {
+        orgPath("/repos/$projectId/commits")
+    }
+    if (commitsResponse.isFailure()) return Pair(commitsResponse, null)
+    var found = false
+    var parentId: String? = null
+    commitsResponse.parseModel {
+        model.listSubjectsWithProperty(RDF.type, MMS.Commit).toList()
+            .firstOrNull { it.uri.uriSuffix == commitId }
+            ?.let { commit ->
+                found = true
+                parentId = commit.outgoing()[MMS.parent]?.resource()
+                    ?.takeIf { it != MMS.nil }?.uri?.uriSuffix
+            }
+    }
+    if (!found) return Pair(null, null)
+
+    val after = flexoRequestGet {
+        orgPath("/repos/$projectId/locks/Commit.$commitId/graph")
+    }
+    if (after.isFailure()) return Pair(after, null)
+    val afterElements = after.parseModel { elementsByIri() }
+
+    val beforeElements = parentId?.let { pid ->
+        val before = flexoRequestGet {
+            orgPath("/repos/$projectId/locks/Commit.$pid/graph")
+        }
+        // a parent graph that cannot be materialized (e.g. the empty root
+        // commit) diffs against an empty baseline
+        if (before.isFailure()) emptyMap() else before.parseModel { elementsByIri() }
+    } ?: emptyMap()
+
+    val changes = (afterElements.keys + beforeElements.keys).sorted().mapNotNull { iri ->
+        val payload = afterElements[iri]
+        // unchanged elements are not part of the commit's changes
+        if (payload == beforeElements[iri]) return@mapNotNull null
+        val elementId = iri.substringAfterLast(':')
+        DataVersion(
+            atId = changeId(commitId, elementId),
+            atType = DataVersion.AtType.DataVersion,
+            identity = DataIdentity(elementId, DataIdentity.AtType.DataIdentity),
+            payload = payload
+        )
+    }
+    return Pair(null, changes)
+}
+
 fun Route.CommitApi() {
-    get<Paths.getChangeByProjectCommitId> {
-        throw NotImplementedError()
+    get<Paths.getChangeByProjectCommitId> { params ->
+        requireValidId(params.projectId, "projectId")
+        requireValidId(params.commitId, "commitId")
+        requireValidId(params.changeId, "changeId")
+        val (failure, changes) = computeCommitChanges(params.projectId, params.commitId)
+        failure?.let { return@get forward(it) }
+        val change = changes?.firstOrNull { it.atId == params.changeId }
+            ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(change)
     }
 
-    get<Paths.getChangesByProjectCommit> {
-        throw NotImplementedError()
+    get<Paths.getChangesByProjectCommit> { params ->
+        requireValidId(params.projectId, "projectId")
+        requireValidId(params.commitId, "commitId")
+        val (failure, changes) = computeCommitChanges(params.projectId, params.commitId)
+        failure?.let { return@get forward(it) }
+        changes ?: return@get call.respond(HttpStatusCode.NotFound)
+        respondPage(changes, params.pageSize, params.pageAfter) { it.atId }
     }
 
     get<Paths.getCommitByProjectAndId> { getCommit ->
