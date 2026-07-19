@@ -13,6 +13,8 @@ package org.openmbee.flexo.sysmlv2.apis
 
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
+import io.ktor.server.request.*
 import io.ktor.server.resources.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -37,25 +39,24 @@ fun modelElementConstructQuery(elementTarget: String="?__element"): String {
     """.trimIndent()
 }
 
-fun listElementsConstructQuery(limit: Int?=null, offset: Int?=null): String {
-    if (limit == null && offset == null) return """
-        construct {
-            ?s ?p ?o .
-        } where {
-            ?s ?p ?o .
-        }
-    """.trimIndent()
+/**
+ * Cursor-paged element page: subjects are ordered by IRI (the element URN
+ * embeds the id, so this is id order), optionally resuming after a cursor.
+ */
+fun pagedElementsConstructQuery(afterElementIri: String?, limit: Int): String {
+    val afterFilter = afterElementIri?.let { """filter(str(?e) > "${escapeRdfDoubleQuotedLiteralContents(it)}")""" } ?: ""
     return """
-        prefix sysml: <https://www.omg.org/spec/SysML#>
         construct {
             ?e ?element_p ?element_o .
         }
         where {
             {
-                 select ?e
-                 where {
-                     ?e sysml:elementId ?id .
-                 } order by ?id limit $limit offset $offset
+                select distinct ?e
+                where {
+                    ?e ?any_p ?any_o .
+                    filter(isIRI(?e) && strstarts(str(?e), "${SYSMLV2.ELEMENT}"))
+                    $afterFilter
+                } order by ?e limit $limit
             }
             ?e ?element_p ?element_o .
         }
@@ -207,25 +208,66 @@ fun Route.ElementApi() {
     get<Paths.getElementsByProjectCommit> { getElements ->
         requireValidId(getElements.projectId, "projectId")
         requireValidId(getElements.commitId, "commitId")
-        // submit POST request to query model
-        val flexoResponse = flexoRequestGet {
-            orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
+        val pageSize = getElements.pageSize
+        getElements.pageAfter?.let { requireValidId(it, "page[after]") }
+
+        // unpaged: dump the whole model graph (historical behavior)
+        if (pageSize == null) {
+            val flexoResponse = flexoRequestGet {
+                orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
+            }
+
+            // forward failures to client
+            if(flexoResponse.isFailure()) {
+                return@get forward(flexoResponse)
+            }
+            // parse the response model, extract the elements to JSON, and reply to client
+            val result = buildJsonArray {
+                flexoResponse.parseModel {
+                    for(subject in model.listSubjects()) {
+                        if (subject.isAnon) continue
+                        add(extractModelElementToJson(subject.uri))
+                    }
+                }
+            }
+            return@get call.respond(result)
+        }
+
+        if (pageSize < 1) {
+            throw BadRequestException("page[size] must be a positive integer")
+        }
+
+        // paged: cursor over element IRIs at the SPARQL level, fetching one
+        // extra element to detect whether a next page exists
+        val afterIri = getElements.pageAfter?.let { SYSMLV2.element(it).uri }
+        val flexoResponse = flexoRequestPost {
+            orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/query")
+            sparqlQuery {
+                pagedElementsConstructQuery(afterIri, pageSize + 1)
+            }
         }
 
         // forward failures to client
         if(flexoResponse.isFailure()) {
             return@get forward(flexoResponse)
         }
-        // parse the response model, extract the elements to JSON, and reply to client
-        val result = buildJsonArray {
-            flexoResponse.parseModel {
-                for(subject in model.listSubjects()) {
-                    if (subject.isAnon) continue
-                    add(extractModelElementToJson(subject.uri))
-                }
+
+        val (page, hasNext) = flexoResponse.parseModel {
+            val ordered = model.listSubjects().toList()
+                .filter { !it.isAnon }
+                .map { it.uri }
+                .sorted()
+            val page = ordered.take(pageSize).map { iri ->
+                iri.urnSuffix to extractModelElementToJson(iri)
             }
+            page to (ordered.size > pageSize)
         }
-        call.respond(result)
+
+        if (hasNext) {
+            val nextUrl = "${call.request.path()}?page%5Bsize%5D=$pageSize&page%5Bafter%5D=${page.last().first}"
+            call.response.headers.append(HttpHeaders.Link, "<$nextUrl>; rel=\"next\"")
+        }
+        call.respond(buildJsonArray { page.forEach { add(it.second) } })
     }
     //TODO this is wrong
     get<Paths.getProjectUsageByProjectCommitElement> {
