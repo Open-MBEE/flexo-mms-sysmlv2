@@ -42,6 +42,21 @@ fun FlexoModelHandler.commitFromModel(
     properties: Map<Property, Set<RDFNode>?>,
     projectId: String
 ): Commit {
+    // expose previousCommit only when the parent is itself a user-visible
+    // commit: flexo auto-creates a root commit (its own mms:parent is
+    // rdf:nil) that this API hides from the commit list, so linking to it
+    // would produce a dangling reference. When the model lacks the parent's
+    // triples (e.g. a freshly created commit response), the linkage is
+    // unknowable here and stays null — clients can re-GET the commit.
+    val previousCommit = properties[MMS.parent]?.resource()
+        ?.takeIf { it != MMS.nil }
+        ?.let { model.getResource(it.uri) }
+        ?.takeIf { parent ->
+            parent.hasProperty(MMS.parent) &&
+                    parent.getProperty(MMS.parent).`object` != MMS.nil
+        }
+        ?.let { Identified(atId = it.uri.uriSuffix) }
+
     // generate commit object
     return Commit(
         atId = commitIri.uriSuffix,
@@ -51,10 +66,7 @@ fun FlexoModelHandler.commitFromModel(
         // dct:description for forward/backward compatibility.
         description = properties[MMS.message]?.literal()?: properties[DCTerms.description]?.literal()?: "",
         owningProject = Identified(atId = projectId),
-        //previousCommit = properties[MMS.parent]?.map {
-        //    Identified(atId = UUID.fromString(it.asResource().uri.uriSuffix))
-        //}?: emptyList()
-        previousCommit = null
+        previousCommit = previousCommit
     )
 }
 
@@ -86,9 +98,11 @@ fun Route.CommitApi() {
     get<Paths.getCommitByProjectAndId> { getCommit ->
         requireValidId(getCommit.projectId, "projectId")
         requireValidId(getCommit.commitId, "commitId")
-        // submit GET request to retrieve project metadata
+        // fetch the whole commit collection: layer1's single-commit response
+        // does not include the parent commit's triples, which are needed to
+        // resolve previousCommit (and to hide flexo's auto-created root)
         val flexoResponse = flexoRequestGet {
-            orgPath("/repos/${getCommit.projectId}/commits/${getCommit.commitId}")
+            orgPath("/repos/${getCommit.projectId}/commits")
         }
 
         // forward failures to client
@@ -97,9 +111,12 @@ fun Route.CommitApi() {
         }
         // parse the response model, convert it to JSON, and reply to client
         val commit = flexoResponse.parseModel {
-            model.listSubjectsWithProperty(RDF.type, MMS.Commit).mapWith {
-                commitFromModel(it.uri, it.outgoing(), getCommit.projectId)
-            }.toList().firstOrNull()
+            model.listSubjectsWithProperty(RDF.type, MMS.Commit)
+                .toList()
+                .firstOrNull { it.uri.uriSuffix == getCommit.commitId }
+                // the hidden root commit is not addressable through this API
+                ?.takeIf { it.outgoing()[MMS.parent]?.resource() != MMS.nil }
+                ?.let { commitFromModel(it.uri, it.outgoing(), getCommit.projectId) }
         } ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(commit)
     }
