@@ -35,6 +35,7 @@ fun escapeRdfDoubleQuotedLiteralContents(contents: String): String {
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
         .replace("\n", "\\n")
+        .replace("\r", "\\r")
 }
 
 private val RDF_IRI_ESCAPE_REGEX = "([\\x00-\\x20<>\"{}|^`\\\\]|%(?![0-9A-F][0-9A-F]))".toRegex()
@@ -335,10 +336,14 @@ class FlexoModelHandlerWithFocalNode(
 suspend fun RoutingContext.forward(flexoResponse: FlexoResponse) {
     val response = flexoResponse.response
 
-    call.respondText(response.bodyAsText(), response.contentType(), response.status) {
-        // forward the response headers
-        headersOf(*response.headers.names().map { name ->
-            name to headers.getAll(name).orEmpty()
-        }.toTypedArray())
+    // forward the upstream response headers (e.g. ETag, Location,
+    // WWW-Authenticate); content headers are managed by respondText and
+    // Date/Server belong to this server, not the upstream
+    response.headers.forEach { name, values ->
+        if (HttpHeaders.isUnsafe(name)
+            || name.equals(HttpHeaders.Date, ignoreCase = true)
+            || name.equals(HttpHeaders.Server, ignoreCase = true)) return@forEach
+        values.forEach { call.response.headers.append(name, it) }
     }
+    call.respondText(response.bodyAsText(), response.contentType(), response.status)
 }

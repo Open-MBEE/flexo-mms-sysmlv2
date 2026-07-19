@@ -142,9 +142,18 @@ fun Route.CommitApi() {
             val projectResponse = flexoRequestGet {
                 orgPath("/repos/$projectId")
             }
+            // nonexistent/unauthorized project: forward instead of crashing
+            // on an empty model below
+            if (projectResponse.isFailure()) {
+                return@post forward(projectResponse)
+            }
             projectResponse.parseModel {
-                val outgoing = model.listSubjectsWithProperty(RDF.type, MMS.Repo).next()!!.outgoing()
-                branchId = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal()?: "master"
+                val repos = model.listSubjectsWithProperty(RDF.type, MMS.Repo)
+                if (repos.hasNext()) {
+                    branchId = repos.next().outgoing()[SYSMLV2.DEFAULT_BRANCH_ID]?.literal()?: "master"
+                } else {
+                    branchId = "master"
+                }
             }
         }
         // each change (DataVersionRequest)
@@ -162,15 +171,20 @@ fun Route.CommitApi() {
             val identityId = identity?.atId
             var payloadId = payload?.getOrDefault("@id", null)?.jsonPrimitive?.content
             if (identityId != null && payloadId != null && identityId != payloadId) {
-                //bad, log error?
-                continue
+                // silently skipping the change would report a successful
+                // commit while discarding data
+                throw InvalidSysmlSerializationError(
+                    "identity @id '$identityId' does not match payload @id '$payloadId' at .change[$index]")
             }
             if (identityId == null && payloadId == null && payload != null) {
                 payloadId = generateId() // generate an id
             }
 
-            // subject node, target element
-            val elementNode: Node = SYSMLV2.element(identityId ?: payloadId!!).asNode()
+            // subject node, target element; the id is interpolated into
+            // SPARQL, so it must be validated
+            val elementId = identityId ?: payloadId!!
+            requireValidId(elementId, ".change[$index] element @id")
+            val elementNode: Node = SYSMLV2.element(elementId).asNode()
 
             // transform payload into property pairs
             mutableListOf<Pair<Property, Set<Node>>>().apply {
@@ -219,7 +233,10 @@ fun Route.CommitApi() {
                                         if(value[0] is JsonObject) {
                                             // create additional triples to link the elements
                                             add(SYSMLV2.prop(key) to value.jsonArray.map {
-                                                SYSMLV2.element(it.jsonObject["@id"]!!.jsonPrimitive.content).asNode()
+                                                val refId = it.jsonObject["@id"]?.jsonPrimitive?.content
+                                                    ?: throw InvalidSysmlSerializationError("Missing @id at .change[$index].$key")
+                                                requireValidId(refId, ".change[$index].$key.@id")
+                                                SYSMLV2.element(refId).asNode()
                                             }.toSet())
                                         }
                                         // and first element is a primitive
@@ -242,9 +259,12 @@ fun Route.CommitApi() {
                                     // @id reference
                                     if(valueObj.containsKey("@id")) {
                                         if(valueObj.keys.size > 1) {
-                                            throw Error("Unexpected extra keys at .${key}")
+                                            // client-input problem: must map to a 400, not a 500
+                                            throw InvalidSysmlSerializationError("Unexpected extra keys at .change[$index].$key")
                                         }
-                                        add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(valueObj["@id"]!!.jsonPrimitive.content).asNode()))
+                                        val refId = valueObj["@id"]!!.jsonPrimitive.content
+                                        requireValidId(refId, ".change[$index].$key.@id")
+                                        add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(refId).asNode()))
                                     }
                                     else {
                                         throw InvalidSysmlSerializationError("Unexpected JSON object at .change[$index].$key == ${Json.encodeToString(value)}")
@@ -264,6 +284,27 @@ fun Route.CommitApi() {
             }
         }
         if (replace == null || replace != "true") { //regular update
+            // deleted elements must not leave dangling references: remove
+            // incoming link triples, and the json: array annotations of the
+            // referencing property (they cannot be rewritten in SPARQL; the
+            // remaining link triples render as a best-effort array instead)
+            val deleteIncomingUpdate = if (deleteIncoming.isEmpty()) "" else """
+            delete {
+                ?ref_s ?ref_p ?deleted_n .
+                ?ref_s ?ref_ann ?ann_val .
+            } where {
+                values ?deleted_n {
+                    ${deleteIncoming.joinToString("\n").reindent(5)}
+                }
+                ?ref_s ?ref_p ?deleted_n .
+                optional {
+                    ?ref_s ?ref_ann ?ann_val .
+                    filter(strstarts(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}"))
+                    filter(strafter(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}") = strafter(str(?ref_p), "${SYSMLV2.VOCABULARY}"))
+                }
+            };
+            """
+
             // build SPARQL UPDATE string
             var sparqlUpdateString = """
             ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
@@ -277,14 +318,15 @@ fun Route.CommitApi() {
             } where {
                 values ?element_n {
                     ${values.joinToString("\n").reindent(5)}
-                } 
+                }
                 optional {
                     ?element_n ?element_p ?element_o .
                 }
             };
+            $deleteIncomingUpdate
             insert data {
                 ${inserts.joinToString("\n\n").reindent(4)}
-            }           
+            }
             """
 
             // trim indent for better inspectability
