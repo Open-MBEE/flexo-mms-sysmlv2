@@ -341,15 +341,14 @@ fun Route.ElementApi() {
         }
 
         // parse the response model, extract the elements to JSON, and reply to client
-        val result = buildJsonArray {
-            flexoResponse.parseModel {
-                for(subject in model.listSubjects()) {
-                    if (subject.isAnon) continue
-                    add(extractModelElementToJson(subject.uri))
-                }
-            }
+        val roots = flexoResponse.parseModel {
+            model.listSubjects().toList()
+                .filter { !it.isAnon }
+                .map { extractModelElementToJson(it.uri) }
         }
-        call.respond(result)
+        respondPage(roots, it.pageSize, it.pageAfter) { root ->
+            root["@id"]!!.jsonPrimitive.content
+        }
     }
 
 }

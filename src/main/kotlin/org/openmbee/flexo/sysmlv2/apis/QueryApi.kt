@@ -269,11 +269,12 @@ fun Route.QueryApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        val queries = flexoResponse.parseModel {
             model.listSubjects().mapWith { it2 ->
                 queryFromResponse(it2.outgoing())
             }.toList()
-        })
+        }
+        respondPage(queries, it.pageSize, it.pageAfter) { query -> query.atId }
     }
 
     get<Paths.getQueryByProjectAndId> {

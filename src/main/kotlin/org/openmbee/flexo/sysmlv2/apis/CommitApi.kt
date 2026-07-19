@@ -143,7 +143,7 @@ fun Route.CommitApi() {
             }
         }
         commits.sortByDescending {it.created}
-        call.respond(commits)
+        respondPage(commits, getCommits.pageSize, getCommits.pageAfter) { it.atId }
     }
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
