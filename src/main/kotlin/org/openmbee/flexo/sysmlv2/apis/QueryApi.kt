@@ -190,6 +190,12 @@ suspend fun RoutingContext.runQuery(
     }
 }
 
+// apply a query's select projection: keep only the requested properties
+fun JsonObject.projectTo(select: List<String>?): JsonObject {
+    if (select.isNullOrEmpty()) return this
+    return JsonObject(filterKeys { it in select })
+}
+
 suspend fun RoutingContext.getQuery(projectId: String, queryId: String): Pair<FlexoResponse, Query?> {
     val uri = SYSMLV2.query(queryId).uri
     val flexoResponse = flexoRequestPost {
@@ -311,7 +317,7 @@ fun Route.QueryApi() {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
                     if (subject.isAnon) continue
-                    add(extractModelElementToJson(subject.uri))
+                    add(extractModelElementToJson(subject.uri).projectTo(query.select))
                 }
             }
         })
@@ -332,7 +338,7 @@ fun Route.QueryApi() {
             flexoResponse.parseModel {
                 for(subject in model.listSubjects()) {
                     if (subject.isAnon) continue
-                    add(extractModelElementToJson(subject.uri))
+                    add(extractModelElementToJson(subject.uri).projectTo(it.select))
                 }
             }
         })
