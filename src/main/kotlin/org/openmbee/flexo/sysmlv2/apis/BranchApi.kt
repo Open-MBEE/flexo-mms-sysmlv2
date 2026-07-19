@@ -89,13 +89,14 @@ fun Route.BranchApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        val branches = flexoResponse.parseModel {
             model.listSubjectsWithProperty(RDF.type, MMS.Branch).filterDrop {
                 (it.hasProperty(SYSMLV2.DELETED) || it.uri.uriSuffix == "master")
             }.mapWith {
                 branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().filterNotNull()
-        })
+        }
+        respondPage(branches, path.pageSize, path.pageAfter) { it.atId }
     }
 
     get<Paths.getBranchByProjectAndId> { path ->

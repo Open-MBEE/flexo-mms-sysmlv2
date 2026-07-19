@@ -31,7 +31,8 @@ data class DataVersion(
     @SerialName("@type")
     val atType: DataVersion.AtType,
     val identity: DataIdentity,
-    val payload: JsonObject
+    // null payload denotes a deleted element
+    val payload: JsonObject?
 )
 {
     /**

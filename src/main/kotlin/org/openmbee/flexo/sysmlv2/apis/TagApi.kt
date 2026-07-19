@@ -110,7 +110,7 @@ fun Route.TagApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        val tags = flexoResponse.parseModel {
             // find all locks and transform each one into a tag by its outgoing triples
             model.listSubjectsWithProperty(RDF.type, MMS.Lock).filterDrop {
                 // ignore flexo created locks and deleted
@@ -118,7 +118,8 @@ fun Route.TagApi() {
             }.mapWith {
                 tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().filterNotNull()
-        })
+        }
+        respondPage(tags, path.pageSize, path.pageAfter) { it.atId }
     }
 
     post<TagRequest>("/projects/{projectId}/tags") { request ->
