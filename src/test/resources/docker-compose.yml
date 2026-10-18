@@ -5,6 +5,8 @@ version: '3.8'
 #   - quad-store-server: triplestore that layer1 reads/writes
 #   - layer1-service:    Flexo MMS Layer 1, the upstream HTTP service that
 #                        sysmlv2 forwards requests to
+#   - sysml-grpc:        OpenSysML conversion service for the textual-notation
+#                        tests (built from the pinned release, see sysml-grpc/)
 #
 # The sysmlv2 service itself is NOT containerised for tests — it runs
 # in-process via Ktor's testApplication.
@@ -42,6 +44,14 @@ services:
       - quad-store-server
     ports:
       - 8080:8080
+
+  sysml-grpc:
+    build: ./sysml-grpc
+    image: flexo-sysmlv2-test-sysml-grpc:v0.10.1
+    hostname: sysml-grpc
+    container_name: flexo-sysmlv2-test-sysml-grpc
+    ports:
+      - 50051:50051
 
 networks:
   default:

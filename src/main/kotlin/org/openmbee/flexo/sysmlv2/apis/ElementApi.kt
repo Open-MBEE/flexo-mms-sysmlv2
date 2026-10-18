@@ -212,6 +212,12 @@ fun Route.ElementApi() {
     get<Paths.getElementsByProjectCommit> { getElements ->
         requireValidId(getElements.projectId, "projectId")
         requireValidId(getElements.commitId, "commitId")
+        if (call.request.acceptedNotationType() != null && OpenSysmlNotationService == null) {
+            throw NotationUnavailableError(
+                HttpStatusCode.NotAcceptable,
+                "Textual notation output needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
+            )
+        }
         getElements.pageAfter?.let { requireValidId(it, "page[after]") }
         getElements.pageBefore?.let { requireValidId(it, "page[before]") }
 
@@ -234,7 +240,7 @@ fun Route.ElementApi() {
                     }
                 }
             }
-            return@get call.respond(result)
+            return@get respondElements(result)
         }
 
         val pageSize = resolvePageSize(getElements.pageSize)
@@ -288,7 +294,7 @@ fun Route.ElementApi() {
                 if (bounded) getElements.pageAfter else null,
                 if (bounded) getElements.pageBefore else null)
         }
-        call.respond(buildJsonArray { page.forEach { add(it.second) } })
+        respondElements(buildJsonArray { page.forEach { add(it.second) } })
     }
     //TODO this is wrong
     get<Paths.getProjectUsageByProjectCommitElement> {
@@ -372,4 +378,19 @@ fun Route.ElementApi() {
         }
     }
 
+}
+
+/**
+ * Elements as JSON, or — when the Accept header asks for `text/plain`, `application/vnd.sysml`
+ * or `application/vnd.kerml` — as textual notation written by OpenSysML from that element set.
+ */
+private suspend fun RoutingContext.respondElements(elements: JsonArray) {
+    val type = call.request.acceptedNotationType() ?: return call.respond(elements)
+    val notation = OpenSysmlNotationService ?: throw NotationUnavailableError(
+        HttpStatusCode.NotAcceptable,
+        "Textual notation output needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
+    )
+    val conversion = notation.toNotation(elements, notationFormat(type))
+    conversion.diagnostics().forEach { call.application.log.info("OpenSysML ${notationFormat(type)} conversion: ${it.describe()}") }
+    call.respondText(conversion.content(), type.withCharset(Charsets.UTF_8))
 }

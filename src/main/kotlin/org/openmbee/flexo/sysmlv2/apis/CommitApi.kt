@@ -13,6 +13,9 @@ package org.openmbee.flexo.sysmlv2.apis
 
 import io.ktor.server.application.*
 import io.ktor.server.resources.*
+import io.ktor.server.request.*
+import org.openmbee.flexo.sysmlv2.models.DataIdentityRequest
+import org.openmbee.flexo.sysmlv2.models.DataVersionRequest
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
@@ -235,9 +238,10 @@ fun Route.CommitApi() {
         respondPage(commits, getCommits.pageSize, getCommits.pageAfter, getCommits.pageBefore) { it.atId }
     }
 
-    post<CommitRequest>("/projects/{projectId}/commits") { commit ->
+    post("/projects/{projectId}/commits") {
         val projectId = call.parameters["projectId"]!!
         requireValidId(projectId, "projectId")
+        val commit = receiveCommitRequest()
         var branchId = call.parameters["branchId"]
         branchId?.let { requireValidId(it, "branchId") }
         val replace = call.parameters["replace"]
@@ -539,4 +543,31 @@ fun Route.CommitApi() {
             call.respond(commit)
         }
     }
+}
+
+/**
+ * The commit request: JSON as before, or textual notation (`text/plain`, `application/vnd.sysml`,
+ * `application/vnd.kerml`) converted by OpenSysML into the same change list a JSON client would send.
+ */
+private suspend fun RoutingContext.receiveCommitRequest(): CommitRequest {
+    val type = notationType(call.request.contentType()) ?: return call.receive<CommitRequest>()
+    val notation = OpenSysmlNotationService ?: throw NotationUnavailableError(
+        HttpStatusCode.UnsupportedMediaType,
+        "Textual notation input needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
+    )
+    val format = notationFormat(type)
+    val (elements, diagnostics) = notation.toApiJson(call.receiveText(), format)
+    diagnostics.forEach { call.application.log.info("OpenSysML $format conversion: ${it.describe()}") }
+    val changes = elements.map { element ->
+        val payload = element as? JsonObject
+            ?: throw InvalidSysmlSerializationError("OpenSysML returned a non-object element")
+        val id = payload["@id"]?.jsonPrimitive?.contentOrNull
+            ?: throw InvalidSysmlSerializationError("OpenSysML returned an element without @id")
+        DataVersionRequest(
+            payload = payload,
+            atType = DataVersionRequest.AtType.DataVersion,
+            identity = DataIdentityRequest(id, DataIdentityRequest.AtType.DataIdentity)
+        )
+    }
+    return CommitRequest(changes, CommitRequest.AtType.Commit, call.parameters["description"])
 }

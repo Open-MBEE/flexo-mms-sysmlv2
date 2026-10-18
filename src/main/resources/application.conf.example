@@ -25,6 +25,12 @@ flexo {
     defaultTimeout = ${?FLEXO_DEFAULT_TIMEOUT}
     auth = ""
     auth = ${?FLEXO_AUTH}
+    # host:port of a running OpenSysML sysml-grpc service; empty disables
+    # textual-notation input/output
+    opensysml {
+        url = ""
+        url = ${?FLEXO_OPENSYSML_URL}
+    }
     basePath = ""
     basePath = ${?BASEPATH}
     # space-separated origins allowed for CORS, e.g. "https://app.example.org http://localhost:3000";
