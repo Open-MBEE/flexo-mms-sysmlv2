@@ -14,6 +14,7 @@ import org.openmbee.opensysml.Conversion
 import org.openmbee.opensysml.ConversionException
 import org.openmbee.opensysml.ConversionOptions
 import org.openmbee.opensysml.Diagnostic
+import java.util.Optional
 
 /** Media types carrying SysML v2 / KerML textual notation. `text/plain` is read as SysML. */
 val SYSML_NOTATION_TYPE = ContentType("application", "vnd.sysml")
@@ -71,18 +72,37 @@ class NotationUnavailableError(val status: HttpStatusCode, message: String) : Ru
 /** OpenSysML reported errors for the notation or the element set; the message lists them. */
 class NotationConversionError(val diagnostics: List<Diagnostic>, message: String) : RuntimeException(message)
 
+/**
+ * How OpenSysML's verdict on the model a commit would leave at the branch head is applied
+ * (`flexo.opensysml.validate`, raised per request by `?validate=`): not at all, reported in
+ * [DIAGNOSTIC_HEADER] headers while the commit proceeds, or refusing the commit on any error.
+ */
+enum class ValidationLevel {
+    OFF, WARN, REJECT;
+
+    companion object {
+        val names: String get() = entries.joinToString(", ") { it.name.lowercase() }
+
+        fun parseOrNull(value: String): ValidationLevel? =
+            entries.firstOrNull { it.name.equals(value.trim(), ignoreCase = true) }
+    }
+}
+
+/** The model the commit would leave at the branch head has errors (validation level `reject`). */
+class ModelValidationError(val diagnostics: List<Diagnostic>, message: String) : RuntimeException(message)
+
 fun Diagnostic.describe(): String {
     val where = span().map { " at ${it.startLine()}:${it.startColumn()}" }.orElse("")
     return "${severity().name.lowercase()}$where: ${message()}"
 }
 
-/** Response header carrying each non-error OpenSysML diagnostic of a successful conversion. */
+/** Response header carrying each OpenSysML diagnostic reported to the client, one per line. */
 const val DIAGNOSTIC_HEADER = "X-SysML-Diagnostic"
 
-/** Logs the conversion's non-error diagnostics and adds one [DIAGNOSTIC_HEADER] line per diagnostic. */
-fun ApplicationCall.reportDiagnostics(format: String, diagnostics: List<Diagnostic>) {
+/** Logs the diagnostics of [source] (a conversion, a validation) and adds one [DIAGNOSTIC_HEADER] line per diagnostic. */
+fun ApplicationCall.reportDiagnostics(source: String, diagnostics: List<Diagnostic>) {
     diagnostics.forEach { diagnostic ->
-        application.log.info("OpenSysML $format conversion: ${diagnostic.describe()}")
+        application.log.info("OpenSysML $source: ${diagnostic.describe()}")
         response.headers.append(DIAGNOSTIC_HEADER, diagnostic.headerValue())
     }
 }
@@ -129,6 +149,27 @@ class OpenSysmlNotation(hostPort: String) : AutoCloseable {
     /** API JSON element array → notation in [toFormat] (`sysml` or `kerml`). */
     suspend fun toNotation(elements: JsonArray, toFormat: String): Conversion =
         convert(elements.toString(), toFormat, ConversionOptions.defaults().withFromFormat("api-json"))
+
+    /**
+     * OpenSysML's diagnostics for the model the API JSON [elements] form: the element set is
+     * written as SysML notation and that notation is parsed and checked (`GetDiagnostics`).
+     * An element set OpenSysML refuses to write is reported through its own diagnostics, or
+     * the refusal itself as an error when it carries none.
+     */
+    suspend fun diagnose(elements: JsonArray): List<Diagnostic> = withContext(Dispatchers.IO) {
+        val options = ConversionOptions.defaults().withFromFormat("api-json")
+        val conversion = try {
+            connection().convert(elements.toString(), "sysml", options)
+        } catch (e: ConversionException) {
+            return@withContext e.diagnostics().ifEmpty {
+                listOf(Diagnostic(Diagnostic.Severity.ERROR, e.message ?: "conversion failed", "", Optional.empty()))
+            }
+        }
+        if (conversion.diagnostics().any { it.severity() == Diagnostic.Severity.ERROR }) {
+            return@withContext conversion.diagnostics()
+        }
+        connection().parse(conversion.content()).diagnostics()
+    }
 
     private suspend fun convert(content: String, toFormat: String, options: ConversionOptions): Conversion {
         val conversion = try {

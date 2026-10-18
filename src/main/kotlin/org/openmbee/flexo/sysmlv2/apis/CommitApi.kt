@@ -13,6 +13,7 @@ package org.openmbee.flexo.sysmlv2.apis
 
 import io.ktor.server.application.*
 import io.ktor.server.resources.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.*
 import org.openmbee.flexo.sysmlv2.models.DataIdentityRequest
 import org.openmbee.flexo.sysmlv2.models.DataVersionRequest
@@ -30,6 +31,10 @@ import org.apache.jena.vocabulary.DCTerms
 import org.apache.jena.vocabulary.RDF
 import io.ktor.http.*
 import org.openmbee.flexo.sysmlv2.*
+import org.apache.jena.riot.Lang
+import org.apache.jena.riot.RDFParser
+import org.apache.jena.update.UpdateAction
+import org.openmbee.opensysml.Diagnostic
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
 import org.openmbee.flexo.sysmlv2.models.DataIdentity
@@ -96,6 +101,14 @@ fun FlexoModelHandler.elementsByIri(): Map<String, JsonObject> =
     model.listSubjects().toList()
         .filter { !it.isAnon && it.uri.startsWith(SYSMLV2.ELEMENT) }
         .associate { it.uri to extractModelElementToJson(it.uri) }
+
+/** Every element of the graph as API JSON, the complete element set of a commit. */
+fun FlexoModelHandler.elementsJson(): JsonArray = buildJsonArray {
+    for (subject in model.listSubjects()) {
+        if (subject.isAnon) continue
+        add(extractModelElementToJson(subject.uri))
+    }
+}
 
 // change ids must be stable across requests: derive them from the commit
 // and element ids
@@ -242,6 +255,7 @@ fun Route.CommitApi() {
         val projectId = call.parameters["projectId"]!!
         requireValidId(projectId, "projectId")
         val commit = receiveCommitRequest()
+        val validation = validationLevel()
         var branchId = call.parameters["branchId"]
         branchId?.let { requireValidId(it, "branchId") }
         val replace = call.parameters["replace"]
@@ -494,6 +508,21 @@ fun Route.CommitApi() {
             // trim indent for better inspectability
             sparqlUpdateString = sparqlUpdateString.trimIndent()
 
+            if (validation != ValidationLevel.OFF) {
+                // the would-be head: the same update applied to a copy of the current head graph
+                val head = flexoRequestGet {
+                    orgPath("/repos/$projectId/branches/$branchId/graph")
+                }
+                if (head.isFailure()) {
+                    return@post forward(head)
+                }
+                val wouldBeHead = head.parseModel {
+                    UpdateAction.parseExecute(sparqlUpdateString, model)
+                    elementsJson()
+                }
+                validateModel(validation, wouldBeHead)
+            }
+
             // submit POST request to commit model
             val flexoResponseUpdate = flexoRequestPost {
                 orgPath("/repos/$projectId/branches/$branchId/update")
@@ -523,6 +552,12 @@ fun Route.CommitApi() {
             
             ${inserts.joinToString("\n\n").reindent(4)}
             """
+            if (validation != ValidationLevel.OFF) {
+                val wouldBeHead = FlexoModelHandler(
+                    RDFParser.create().lang(Lang.TURTLE).fromString(turtleLoad).toModel(), DEFAULT_PREFIX_MAPPING
+                ).elementsJson()
+                validateModel(validation, wouldBeHead)
+            }
             val flexoResponseLoad = flexoRequestPut {
                 orgPath("/repos/$projectId/branches/$branchId/graph")
                 // forward the commit message so layer1 records it (mms:message)
@@ -545,6 +580,42 @@ fun Route.CommitApi() {
     }
 }
 
+/**
+ * The commit's validation level: the configured `flexo.opensysml.validate`, raised by the
+ * `validate` query parameter. A request can only be stricter than the configuration.
+ */
+private fun RoutingContext.validationLevel(): ValidationLevel {
+    val configured = GlobalFlexoConfig.opensysmlValidate
+    val parameter = call.parameters["validate"] ?: return configured
+    val requested = ValidationLevel.parseOrNull(parameter)
+        ?: throw BadRequestException("validate must be one of ${ValidationLevel.names}, got '$parameter'")
+    if (requested < configured) {
+        throw BadRequestException(
+            "validate=${requested.name.lowercase()} cannot loosen the configured level ${configured.name.lowercase()}")
+    }
+    return requested
+}
+
+/**
+ * OpenSysML's verdict on the model the commit would leave at the branch head: its diagnostics
+ * are answered as [DIAGNOSTIC_HEADER] headers, and at [ValidationLevel.REJECT] any error
+ * refuses the commit before anything is written.
+ */
+private suspend fun RoutingContext.validateModel(level: ValidationLevel, elements: JsonArray) {
+    val notation = OpenSysmlNotationService ?: throw BadRequestException(
+        "validate=${level.name.lowercase()} needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
+    )
+    val diagnostics = notation.diagnose(elements)
+    val errors = diagnostics.filter { it.severity() == Diagnostic.Severity.ERROR }
+    if (level == ValidationLevel.REJECT && errors.isNotEmpty()) {
+        throw ModelValidationError(
+            diagnostics,
+            errors.joinToString(separator = "\n", prefix = "The commit would leave the branch head with ${errors.size} error(s):\n") { "- ${it.describe()}" }
+        )
+    }
+    call.reportDiagnostics("validation", diagnostics)
+}
+
 /** The commit record is JSON even when a notation client sent `Accept: text/plain`. */
 private suspend fun RoutingContext.respondCommit(commit: Commit) {
     if (call.request.acceptedNotationType() != null) call.respondJson(commit) else call.respond(commit)
@@ -562,7 +633,7 @@ private suspend fun RoutingContext.receiveCommitRequest(): CommitRequest {
     )
     val format = notationFormat(type)
     val (elements, diagnostics) = notation.toApiJson(call.receiveText(), format)
-    call.reportDiagnostics(format, diagnostics)
+    call.reportDiagnostics("$format conversion", diagnostics)
     val changes = elements.map { element ->
         val payload = element as? JsonObject
             ?: throw InvalidSysmlSerializationError("OpenSysML returned a non-object element")
