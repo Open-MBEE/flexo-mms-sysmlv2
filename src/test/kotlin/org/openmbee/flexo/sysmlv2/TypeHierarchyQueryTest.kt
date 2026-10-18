@@ -40,11 +40,11 @@ class TypeHierarchyQueryTest : ProjectAny() {
             }
         """.trimIndent()
 
-        suspend fun ApplicationTestBuilder.idsOfType(vararg types: String): List<String> {
+        suspend fun ApplicationTestBuilder.idsOfType(vararg types: String, operator: String = "="): List<String> {
             val values = types.joinToString(", ") { "\"$it\"" }
             val response = httpPost("/projects/$demoProjectId/query-results") {
                 setJsonBody(
-                    """{ "@type": "Query", "where": {"@type": "PrimitiveConstraint", "operator": "=", "property": "@type", "value": [$values]} }"""
+                    """{ "@type": "Query", "where": {"@type": "PrimitiveConstraint", "operator": "$operator", "property": "@type", "value": [$values]} }"""
                 )
             }
             response shouldHaveStatus HttpStatusCode.OK
@@ -99,6 +99,15 @@ class TypeHierarchyQueryTest : ProjectAny() {
             testApplication {
                 commitChanges(demoProjectId, seedChanges).atId()
                 idsOfType("Usage", "Definition") shouldContainExactlyInAnyOrder listOf(partUsageId, partDefinitionId)
+            }
+        }
+
+        "POST query-results - @type in [...] expands each member to its specializations" {
+            testApplication {
+                commitChanges(demoProjectId, seedChanges).atId()
+                idsOfType("Feature", operator = "in") shouldContainExactlyInAnyOrder listOf(partUsageId)
+                idsOfType("Usage", "Definition", operator = "in") shouldContainExactlyInAnyOrder listOf(partUsageId, partDefinitionId)
+                idsOfType("Definition", operator = "in") shouldContainExactlyInAnyOrder listOf(partDefinitionId)
             }
         }
     }
