@@ -58,22 +58,28 @@ fun PrimitiveConstraint.toSparql(cb: ConstructBuilder, vars: ConstraintVars): Ex
     if (values.isEmpty()) {
         throw BadRequestException("PrimitiveConstraint value must not be empty")
     }
+    // an element carries one rdf:type, its concrete metaclass, so a set
+    // membership test on @type is widened to every specialization the
+    // metaclass hierarchy knows; without the vocabulary graph it stays exact
+    val widenTypes = property == "@type" &&
+        (operator == PrimitiveConstraint.Operator.Equal || operator == PrimitiveConstraint.Operator.In)
     // null stands for "property absent or explicitly null" (commits store
     // JSON null as rdf:nil); everything else becomes a comparable node
-    val nodes: List<Node?> = values.map { el ->
+    val nodes: List<Node?> = values.flatMap { el ->
         when(el) {
             is JsonObject -> {
                 if (el.containsKey("@id")) {
-                    SYSMLV2.element(el["@id"]!!.jsonPrimitive.content).asNode()
+                    listOf(SYSMLV2.element(el["@id"]!!.jsonPrimitive.content).asNode())
                 } else {
                     throw BadRequestException("PrimitiveConstraint value object must contain @id")
                 }
             }
             is JsonPrimitive -> {
-                if (el == JsonNull) {
-                    null
-                } else {
-                    if (property == "@type") SYSMLV2.type(el.content).asNode() else el.toRdfLiteralNode()
+                when {
+                    el == JsonNull -> listOf(null)
+                    widenTypes -> MetaclassHierarchy.specializationsOf(el.content).map { SYSMLV2.type(it).asNode() }
+                    property == "@type" -> listOf(SYSMLV2.type(el.content).asNode())
+                    else -> listOf(el.toRdfLiteralNode())
                 }
             }
             else -> throw BadRequestException("Unexpected JSON element type in PrimitiveConstraint value")
