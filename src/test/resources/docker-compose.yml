@@ -48,6 +48,7 @@ services:
   sysml-grpc:
     build: ./sysml-grpc
     image: flexo-sysmlv2-test-sysml-grpc:v0.10.1
+    pull_policy: build
     hostname: sysml-grpc
     container_name: flexo-sysmlv2-test-sysml-grpc
     ports:
