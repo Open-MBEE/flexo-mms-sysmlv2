@@ -38,6 +38,12 @@ Set `FLEXO_OPENSYSML_URL` (HOCON `flexo.opensysml.url`) to the `host:port` of a 
 for example `localhost:50051`. Leave it empty (the default) and the feature is off: the JSON routes
 behave as before, notation input is answered `415 Unsupported Media Type` and notation output
 `406 Not Acceptable`.
+When it is set but the service cannot be reached, notation requests are answered `502 Bad Gateway`.
+
+Notation output is always the complete element graph of the commit (`page[size]`/`page[after]` are
+ignored, no `Link` header), since a page of elements cannot be written as notation on its own. The
+`Accept` header is read by quality: a `q=0` notation entry keeps the JSON response. A notation `POST`
+answers with the JSON commit record even when the client only accepts `text/plain`.
 
 Input: `POST /projects/{projectId}/commits` with one of
 

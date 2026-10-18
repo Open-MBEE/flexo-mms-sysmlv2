@@ -94,6 +94,22 @@ class NotationTest : ProjectAny() {
                     Json.parseToJsonElement(response.bodyAsText()).jsonObject["@type"]!!.jsonPrimitive.content shouldBe "Error"
                 }
                 elementsJson(commitId).map { it["@type"]!!.jsonPrimitive.content } shouldBe listOf("Package")
+                // a q=0 notation entry is a refusal, not a request
+                val json = httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
+                    header(HttpHeaders.Accept, "text/plain;q=0, application/json")
+                }
+                json.status shouldBe HttpStatusCode.OK
+                Json.parseToJsonElement(json.bodyAsText()).jsonArray.size shouldBe 1
+            }
+        }
+
+        "notation POST is 502 Bad Gateway when the configured sysml-grpc is unreachable" {
+            testApplication(mapOf("flexo.opensysml.url" to "localhost:1")) {
+                val response = postNotation(model)
+                response.status shouldBe HttpStatusCode.BadGateway
+                val error = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                error["@type"]!!.jsonPrimitive.content shouldBe "Error"
+                error["description"]!!.jsonPrimitive.content shouldContain "localhost:1"
             }
         }
 
@@ -122,6 +138,29 @@ class NotationTest : ProjectAny() {
                     notation shouldContain "part a : A"
                     identities(reparse(notation)) shouldContainExactlyInAnyOrder identities(elements)
                 }
+
+                // notation is the complete graph: page parameters do not split it
+                val paged = httpGet("/projects/$demoProjectId/commits/$commitId/elements?page%5Bsize%5D=1") { accept(ContentType.Text.Plain) }
+                paged.status shouldBe HttpStatusCode.OK
+                paged.headers[HttpHeaders.Link] shouldBe null
+                identities(reparse(paged.bodyAsText())) shouldContainExactlyInAnyOrder identities(elements)
+
+                // a refused notation type (q=0) leaves JSON in place
+                val json = httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
+                    header(HttpHeaders.Accept, "text/plain;q=0, application/json")
+                }
+                json.status shouldBe HttpStatusCode.OK
+                Json.parseToJsonElement(json.bodyAsText()).jsonArray.size shouldBe elements.size
+
+                // a notation client that also accepts text/plain still gets the JSON commit record
+                val textClient = httpPost("/projects/$demoProjectId/commits") {
+                    contentType(ContentType.Text.Plain)
+                    accept(ContentType.Text.Plain)
+                    setBody(model)
+                }
+                textClient.status shouldBe HttpStatusCode.OK
+                textClient.contentType().shouldNotBeNull().withoutParameters() shouldBe ContentType.Application.Json
+                Json.parseToJsonElement(textClient.bodyAsText()).jsonObject["@type"]!!.jsonPrimitive.content shouldBe "Commit"
             }
         }
 

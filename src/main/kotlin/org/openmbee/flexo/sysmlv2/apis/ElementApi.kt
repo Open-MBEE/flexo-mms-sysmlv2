@@ -221,8 +221,10 @@ fun Route.ElementApi() {
         getElements.pageAfter?.let { requireValidId(it, "page[after]") }
         getElements.pageBefore?.let { requireValidId(it, "page[before]") }
 
-        // unpaged: dump the whole model graph (historical behavior)
-        if (getElements.pageSize == null && getElements.pageAfter == null && getElements.pageBefore == null) {
+        // unpaged: dump the whole model graph (historical behavior); notation
+        // output is always the complete graph, since a page cannot be written alone
+        val unpaged = getElements.pageSize == null && getElements.pageAfter == null && getElements.pageBefore == null
+        if (unpaged || call.request.acceptedNotationType() != null) {
             val flexoResponse = flexoRequestGet {
                 orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
             }

@@ -27,13 +27,16 @@ fun notationFormat(type: ContentType): String = if (type == KERML_NOTATION_TYPE)
 
 /**
  * Notation media type the Accept header asks for, or null when JSON (the default) is wanted.
- * The first acceptable entry decides: `text/plain` or `application/vnd.sysml` select notation,
- * `application/json` or a wildcard select JSON as before.
+ * Entries are taken in descending quality, `q=0` ones excluded: the first naming `text/plain`
+ * (or any `text` subtype), `application/vnd.sysml` or `application/vnd.kerml` selects notation;
+ * the first `application/json` or full wildcard keeps JSON as before.
  */
 fun ApplicationRequest.acceptedNotationType(): ContentType? {
     for (item in acceptItems()) {
+        if (item.quality <= 0.0) continue
         val type = try { ContentType.parse(item.value) } catch (e: BadContentTypeFormatException) { continue }
         notationType(type)?.let { return it }
+        if (type.contentType == "text" && type.contentSubtype == "*") return ContentType.Text.Plain
         if (type.match(ContentType.Application.Json) || type.contentSubtype == "*") return null
     }
     return null

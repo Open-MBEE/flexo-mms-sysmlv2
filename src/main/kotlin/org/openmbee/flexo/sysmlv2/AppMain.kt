@@ -17,9 +17,11 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.resources.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import io.ktor.server.application.ApplicationStopped
 import org.openmbee.flexo.sysmlv2.apis.*
+import org.openmbee.opensysml.OpenSysMLException
 import org.openmbee.flexo.sysmlv2.models.Error
 
 lateinit var GlobalFlexoConfig: FlexoConfig
@@ -53,12 +55,7 @@ fun Application.module() {
         reporter.start(10, TimeUnit.SECONDS)
     }*/
     install(ContentNegotiation) {
-        json(Json {
-            isLenient = true
-            prettyPrint = true
-            ignoreUnknownKeys = true
-            classDiscriminator = "@type"
-        })
+        json(ApiJson)
         /*gson {
             registerTypeAdapter(OffsetDateTime::class.java, OffsetDateTimeAdapter)
             registerTypeAdapter(LocalDateTime::class.java, LocalDateTimeAdapter)
@@ -117,6 +114,10 @@ fun Application.module() {
         exception<NotationConversionError> { call, cause ->
             call.respondJsonError(HttpStatusCode.BadRequest, cause.message ?: "Bad Request")
         }
+        exception<OpenSysMLException> { call, cause ->
+            call.application.log.error("OpenSysML service call failed", cause)
+            call.respondJsonError(HttpStatusCode.BadGateway, "OpenSysML service at ${OpenSysmlNotationService?.address}: ${cause.message}")
+        }
         exception<InvalidSysmlSerializationError> { call, cause ->
             call.respond(HttpStatusCode.BadRequest,
                 Error(Error.AtType.Error, cause.message ?: "Bad Request"))
@@ -163,13 +164,20 @@ fun Application.property(key: String): ApplicationConfigValue? {
 /**
  * Flexo config struct
  */
-private suspend fun ApplicationCall.respondJsonError(status: HttpStatusCode, description: String) {
-    respondText(
-        Json.encodeToString(Error.serializer(), Error(Error.AtType.Error, description)),
-        ContentType.Application.Json,
-        status
-    )
+/** The API's JSON configuration, shared by content negotiation and the explicit JSON responses. */
+val ApiJson = Json {
+    isLenient = true
+    prettyPrint = true
+    ignoreUnknownKeys = true
+    classDiscriminator = "@type"
 }
+
+/** Respond with JSON regardless of the request's Accept header (notation clients accept text/plain). */
+suspend inline fun <reified T> ApplicationCall.respondJson(value: T, status: HttpStatusCode = HttpStatusCode.OK) =
+    respondText(ApiJson.encodeToString(value), ContentType.Application.Json, status)
+
+private suspend fun ApplicationCall.respondJsonError(status: HttpStatusCode, description: String) =
+    respondJson(Error(Error.AtType.Error, description), status)
 
 data class FlexoConfig(
     val protocol: URLProtocol,

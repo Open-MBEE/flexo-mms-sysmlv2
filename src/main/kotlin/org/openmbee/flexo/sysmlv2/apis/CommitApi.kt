@@ -510,7 +510,7 @@ fun Route.CommitApi() {
                 return@post forward(flexoResponseUpdate)
             }
             // parse the response model, convert it to JSON, and reply to client
-            call.respond(flexoResponseUpdate.parseLdp {
+            respondCommit(flexoResponseUpdate.parseLdp {
                 commitFromModel(focalIri!!, focalOutgoing, projectId)
             })
         } else { //model load - replaces model
@@ -540,9 +540,14 @@ fun Route.CommitApi() {
                     commitFromModel(it.uri, it.outgoing(), projectId)
                 }.toList().firstOrNull()
             } ?: return@post call.respond(HttpStatusCode.NotFound)
-            call.respond(commit)
+            respondCommit(commit)
         }
     }
+}
+
+/** The commit record is JSON even when a notation client sent `Accept: text/plain`. */
+private suspend fun RoutingContext.respondCommit(commit: Commit) {
+    if (call.request.acceptedNotationType() != null) call.respondJson(commit) else call.respond(commit)
 }
 
 /**
