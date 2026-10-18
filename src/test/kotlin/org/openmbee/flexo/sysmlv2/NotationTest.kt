@@ -155,7 +155,7 @@ class NotationTest : ProjectAny() {
                 httpGet("/projects/$demoProjectId/commits/$commitId/elements?page%5Bafter%5D=not.valid").status shouldBe HttpStatusCode.BadRequest
 
                 // a refused notation type (q=0) leaves JSON in place; a tie goes to JSON
-                for (accept in listOf("text/plain;q=0, application/json", "application/json, text/plain", "*/*")) {
+                for (accept in listOf("text/plain;q=0, application/json", "application/json, text/plain", "*/*", "text/plain;q=0.8, */*;q=0.8")) {
                     val json = httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
                         header(HttpHeaders.Accept, accept)
                     }

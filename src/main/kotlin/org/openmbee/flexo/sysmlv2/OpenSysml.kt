@@ -29,8 +29,8 @@ fun notationFormat(type: ContentType): String = if (type == KERML_NOTATION_TYPE)
  * Notation media type the Accept header asks for, or null when JSON (the default) is wanted.
  * Each supported representation takes the quality of its most specific matching Accept range
  * (`text/plain;q=0` beside a `text` wildcard therefore refuses plain text). The notation type with
- * the highest quality wins only when it beats JSON's; ties (a full wildcard, or JSON and a notation
- * type side by side) and the absence of an Accept header keep JSON as before.
+ * the highest quality wins only when that quality is strictly above JSON's; equal quality (a full
+ * wildcard, or JSON beside a notation type) and the absence of an Accept header keep JSON as before.
  */
 fun ApplicationRequest.acceptedNotationType(): ContentType? {
     val ranges = acceptItems().mapNotNull { item ->
@@ -60,7 +60,7 @@ fun ApplicationRequest.acceptedNotationType(): ContentType? {
         .filter { it.second.first > 0.0 }
         .maxWithOrNull { a, b -> order.compare(a.second, b.second) }
         ?: return null
-    return if (order.compare(notation.second, json) > 0) notation.first else null
+    return if (notation.second.first > json.first) notation.first else null
 }
 
 /** Notation was requested while `flexo.opensysml.url` is not configured (415 on input, 406 on output). */
