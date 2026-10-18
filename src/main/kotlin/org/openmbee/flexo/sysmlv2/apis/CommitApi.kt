@@ -35,6 +35,9 @@ import org.apache.jena.riot.Lang
 import org.apache.jena.riot.RDFParser
 import org.apache.jena.update.UpdateAction
 import org.openmbee.opensysml.Diagnostic
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
 import org.openmbee.flexo.sysmlv2.models.DataIdentity
@@ -101,6 +104,16 @@ fun FlexoModelHandler.elementsByIri(): Map<String, JsonObject> =
     model.listSubjects().toList()
         .filter { !it.isAnon && it.uri.startsWith(SYSMLV2.ELEMENT) }
         .associate { it.uri to extractModelElementToJson(it.uri) }
+
+/**
+ * One lock per branch for validated commits: the head is read, judged and written under it, so two
+ * commits this instance validates against the same head cannot interleave (other writers, and other
+ * instances, are not covered). Unvalidated commits take no lock.
+ */
+private val branchLocks = ConcurrentHashMap<String, Mutex>()
+
+private suspend inline fun <T> withBranchLock(key: String?, action: () -> T): T =
+    if (key == null) action() else branchLocks.computeIfAbsent(key) { Mutex() }.withLock { action() }
 
 /** Every element of the graph as API JSON, the complete element set of a commit. */
 fun FlexoModelHandler.elementsJson(): JsonArray = buildJsonArray {
@@ -287,6 +300,7 @@ fun Route.CommitApi() {
                 throw InvalidSysmlSerializationError("Reference to element '$refId' deleted in the same commit at $where")
             }
         }
+        val lockKey = if (validation == ValidationLevel.OFF) null else "$projectId/$branchId"
         // each change (DataVersionRequest)
         for((index, change) in commit.change.withIndex()) {
             val (payload, atType, identity) = change
@@ -508,6 +522,7 @@ fun Route.CommitApi() {
             // trim indent for better inspectability
             sparqlUpdateString = sparqlUpdateString.trimIndent()
 
+            withBranchLock(lockKey) {
             if (validation != ValidationLevel.OFF) {
                 // the would-be head: the same update applied to a copy of the current head graph
                 val head = flexoRequestGet {
@@ -542,6 +557,7 @@ fun Route.CommitApi() {
             respondCommit(flexoResponseUpdate.parseLdp {
                 commitFromModel(focalIri!!, focalOutgoing, projectId)
             })
+            }
         } else { //model load - replaces model
             val turtleLoad = """
             ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
@@ -552,6 +568,7 @@ fun Route.CommitApi() {
             
             ${inserts.joinToString("\n\n").reindent(4)}
             """
+            withBranchLock(lockKey) {
             if (validation != ValidationLevel.OFF) {
                 val wouldBeHead = FlexoModelHandler(
                     RDFParser.create().lang(Lang.TURTLE).fromString(turtleLoad).toModel(), DEFAULT_PREFIX_MAPPING
@@ -576,6 +593,7 @@ fun Route.CommitApi() {
                 }.toList().firstOrNull()
             } ?: return@post call.respond(HttpStatusCode.NotFound)
             respondCommit(commit)
+            }
         }
     }
 }

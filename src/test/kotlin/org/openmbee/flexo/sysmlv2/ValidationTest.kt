@@ -12,6 +12,9 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.ApplicationTestBuilder
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.*
 import org.openmbee.flexo.sysmlv2.util.*
 import org.openmbee.opensysml.Connection
@@ -249,6 +252,28 @@ class ValidationTest : ProjectAny() {
                 val replaced = postNotation(clean, "?replace=true")
                 replaced.status shouldBe HttpStatusCode.OK
                 replaced.diagnostics().shouldBeEmpty()
+            }
+        }
+
+        "concurrent commits are judged one after the other, so a verdict holds for what is written".config(enabledOrReasonIf = requiresOpenSysml) {
+            testApplication(reject) {
+                repeat(3) {
+                    val stored = elements(postNotation(clean, "?replace=true").also { it.status shouldBe HttpStatusCode.OK }.atId())
+                    val definition = stored.first { it["declaredName"]?.jsonPrimitive?.contentOrNull == "A" }["@id"]!!.jsonPrimitive.content
+                    val membership = stored.first { it["memberElement"]?.jsonObject?.get("@id")?.jsonPrimitive?.content == definition }
+                    val typing = stored.first { it["@type"]!!.jsonPrimitive.content == "FeatureTyping" }
+                    // each is valid against the current head; together they leave `b` typed by nothing
+                    val removeDefinition = """{"@type":"Commit","change":[
+                        {"@type":"DataVersion","identity":{"@id":"$definition","@type":"DataIdentity"},"payload":null},
+                        {"@type":"DataVersion","identity":{"@id":"${membership["@id"]!!.jsonPrimitive.content}","@type":"DataIdentity"},"payload":null},
+                        {"@type":"DataVersion","identity":{"@id":"${typing["@id"]!!.jsonPrimitive.content}","@type":"DataIdentity"},"payload":null}]}"""
+                    val useDefinition = changeList(apiJson("package P { part def A; part b : A; }")
+                        .filter { it["declaredName"]?.jsonPrimitive?.contentOrNull != "A" })
+                    val statuses = coroutineScope {
+                        listOf(removeDefinition, useDefinition).map { change -> async { commitChanges(demoProjectId, change).status } }.awaitAll()
+                    }
+                    statuses.toSet() shouldBe setOf(HttpStatusCode.OK, HttpStatusCode.UnprocessableEntity)
+                }
             }
         }
 

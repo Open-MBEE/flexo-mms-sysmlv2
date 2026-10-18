@@ -154,7 +154,8 @@ class OpenSysmlNotation(hostPort: String) : AutoCloseable {
      * OpenSysML's diagnostics for the model the API JSON [elements] form: the element set is
      * written as SysML notation and that notation is parsed and checked (`GetDiagnostics`).
      * An element set OpenSysML refuses to write is reported through its own diagnostics, or
-     * the refusal itself as an error when it carries none.
+     * the refusal itself as an error when it carries none; the warnings of a successful
+     * conversion precede the model's diagnostics.
      */
     suspend fun diagnose(elements: JsonArray): List<Diagnostic> = withContext(Dispatchers.IO) {
         val options = ConversionOptions.defaults().withFromFormat("api-json")
@@ -168,7 +169,7 @@ class OpenSysmlNotation(hostPort: String) : AutoCloseable {
         if (conversion.diagnostics().any { it.severity() == Diagnostic.Severity.ERROR }) {
             return@withContext conversion.diagnostics()
         }
-        connection().parse(conversion.content()).diagnostics()
+        conversion.diagnostics() + connection().parse(conversion.content()).diagnostics()
     }
 
     private suspend fun convert(content: String, toFormat: String, options: ConversionOptions): Conversion {

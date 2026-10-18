@@ -96,6 +96,10 @@ commit applied is written as SysML notation and parsed by OpenSysML, and only it
 An element set OpenSysML cannot write as notation (for instance a reference to an element that does
 not exist) is an error too.
 
+Validated commits to one branch are processed one at a time by the service instance (head read, judged
+and written under one lock), so the verdict applies to what is written; writers that bypass the service,
+and other instances, are not covered.
+
 A request may raise the level with `?validate=warn` or `?validate=reject` on
 `POST /projects/{projectId}/commits`; asking for a level below the configured one is answered `400`.
 Validation fetches the whole head graph and parses the whole model, so its cost grows with the model.
