@@ -42,7 +42,9 @@ When it is set but the service cannot be reached, notation requests are answered
 
 Notation output is always the complete element graph of the commit (`page[size]`/`page[after]` are
 ignored, no `Link` header), since a page of elements cannot be written as notation on its own. The
-`Accept` header is read by quality: a `q=0` notation entry keeps the JSON response. A notation `POST`
+`Accept` header is negotiated by quality and specificity: `*/*`, or JSON listed beside a notation type,
+keeps JSON; `text/plain;q=0, text/*` refuses plain text and, as JSON is not acceptable either, is
+answered `406`. A notation `POST`
 answers with the JSON commit record even when the client only accepts `text/plain`.
 
 Input: `POST /projects/{projectId}/commits` with one of

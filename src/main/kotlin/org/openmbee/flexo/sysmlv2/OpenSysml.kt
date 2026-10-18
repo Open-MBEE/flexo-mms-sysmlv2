@@ -27,19 +27,40 @@ fun notationFormat(type: ContentType): String = if (type == KERML_NOTATION_TYPE)
 
 /**
  * Notation media type the Accept header asks for, or null when JSON (the default) is wanted.
- * Entries are taken in descending quality, `q=0` ones excluded: the first naming `text/plain`
- * (or any `text` subtype), `application/vnd.sysml` or `application/vnd.kerml` selects notation;
- * the first `application/json` or full wildcard keeps JSON as before.
+ * Each supported representation takes the quality of its most specific matching Accept range
+ * (`text/plain;q=0` beside a `text` wildcard therefore refuses plain text). The notation type with
+ * the highest quality wins only when it beats JSON's; ties (a full wildcard, or JSON and a notation
+ * type side by side) and the absence of an Accept header keep JSON as before.
  */
 fun ApplicationRequest.acceptedNotationType(): ContentType? {
-    for (item in acceptItems()) {
-        if (item.quality <= 0.0) continue
-        val type = try { ContentType.parse(item.value) } catch (e: BadContentTypeFormatException) { continue }
-        notationType(type)?.let { return it }
-        if (type.contentType == "text" && type.contentSubtype == "*") return ContentType.Text.Plain
-        if (type.match(ContentType.Application.Json) || type.contentSubtype == "*") return null
+    val ranges = acceptItems().mapNotNull { item ->
+        val type = try { ContentType.parse(item.value) } catch (e: BadContentTypeFormatException) { return@mapNotNull null }
+        type.withoutParameters() to item.quality
     }
-    return null
+    if (ranges.isEmpty()) return null
+
+    // (quality, specificity) of the most specific range matching the candidate; no match = unacceptable
+    fun rank(candidate: ContentType): Pair<Double, Int> {
+        var best: Pair<Double, Int>? = null
+        for ((range, quality) in ranges) {
+            val specificity = when {
+                range.contentType == "*" -> 0
+                range.contentSubtype == "*" -> if (range.contentType == candidate.contentType) 1 else continue
+                range == candidate -> 2
+                else -> continue
+            }
+            if (best == null || specificity > best.second) best = quality to specificity
+        }
+        return best ?: (0.0 to -1)
+    }
+
+    val order = compareBy<Pair<Double, Int>>({ it.first }, { it.second })
+    val json = rank(ContentType.Application.Json)
+    val notation = NOTATION_TYPES.map { it to rank(it) }
+        .filter { it.second.first > 0.0 }
+        .maxWithOrNull { a, b -> order.compare(a.second, b.second) }
+        ?: return null
+    return if (order.compare(notation.second, json) > 0) notation.first else null
 }
 
 /** Notation was requested while `flexo.opensysml.url` is not configured (415 on input, 406 on output). */

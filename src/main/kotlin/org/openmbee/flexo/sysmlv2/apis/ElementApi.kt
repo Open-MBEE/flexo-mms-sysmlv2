@@ -212,19 +212,22 @@ fun Route.ElementApi() {
     get<Paths.getElementsByProjectCommit> { getElements ->
         requireValidId(getElements.projectId, "projectId")
         requireValidId(getElements.commitId, "commitId")
-        if (call.request.acceptedNotationType() != null && OpenSysmlNotationService == null) {
+        val notation = call.request.acceptedNotationType()
+        if (notation != null && OpenSysmlNotationService == null) {
             throw NotationUnavailableError(
                 HttpStatusCode.NotAcceptable,
                 "Textual notation output needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
             )
         }
-        getElements.pageAfter?.let { requireValidId(it, "page[after]") }
-        getElements.pageBefore?.let { requireValidId(it, "page[before]") }
+        if (notation == null) {
+            getElements.pageAfter?.let { requireValidId(it, "page[after]") }
+            getElements.pageBefore?.let { requireValidId(it, "page[before]") }
+        }
 
         // unpaged: dump the whole model graph (historical behavior); notation
         // output is always the complete graph, since a page cannot be written alone
         val unpaged = getElements.pageSize == null && getElements.pageAfter == null && getElements.pageBefore == null
-        if (unpaged || call.request.acceptedNotationType() != null) {
+        if (unpaged || notation != null) {
             val flexoResponse = flexoRequestGet {
                 orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
             }

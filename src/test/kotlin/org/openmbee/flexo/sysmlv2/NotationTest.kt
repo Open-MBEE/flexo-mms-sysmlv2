@@ -95,11 +95,17 @@ class NotationTest : ProjectAny() {
                 }
                 elementsJson(commitId).map { it["@type"]!!.jsonPrimitive.content } shouldBe listOf("Package")
                 // a q=0 notation entry is a refusal, not a request
-                val json = httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
-                    header(HttpHeaders.Accept, "text/plain;q=0, application/json")
+                for (accept in listOf("text/plain;q=0, application/json", "*/*")) {
+                    val json = httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
+                        header(HttpHeaders.Accept, accept)
+                    }
+                    json.status shouldBe HttpStatusCode.OK
+                    Json.parseToJsonElement(json.bodyAsText()).jsonArray.size shouldBe 1
                 }
-                json.status shouldBe HttpStatusCode.OK
-                Json.parseToJsonElement(json.bodyAsText()).jsonArray.size shouldBe 1
+                // refusing text/plain beside a text wildcard leaves nothing we can serve
+                httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
+                    header(HttpHeaders.Accept, "text/plain;q=0, text/*;q=1")
+                }.status shouldBe HttpStatusCode.NotAcceptable
             }
         }
 
@@ -139,18 +145,27 @@ class NotationTest : ProjectAny() {
                     identities(reparse(notation)) shouldContainExactlyInAnyOrder identities(elements)
                 }
 
-                // notation is the complete graph: page parameters do not split it
-                val paged = httpGet("/projects/$demoProjectId/commits/$commitId/elements?page%5Bsize%5D=1") { accept(ContentType.Text.Plain) }
-                paged.status shouldBe HttpStatusCode.OK
-                paged.headers[HttpHeaders.Link] shouldBe null
-                identities(reparse(paged.bodyAsText())) shouldContainExactlyInAnyOrder identities(elements)
-
-                // a refused notation type (q=0) leaves JSON in place
-                val json = httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
-                    header(HttpHeaders.Accept, "text/plain;q=0, application/json")
+                // notation is the complete graph: page parameters neither split nor gate it
+                for (query in listOf("page%5Bsize%5D=1", "page%5Bafter%5D=not.valid")) {
+                    val paged = httpGet("/projects/$demoProjectId/commits/$commitId/elements?$query") { accept(ContentType.Text.Plain) }
+                    paged.status shouldBe HttpStatusCode.OK
+                    paged.headers[HttpHeaders.Link] shouldBe null
+                    identities(reparse(paged.bodyAsText())) shouldContainExactlyInAnyOrder identities(elements)
                 }
-                json.status shouldBe HttpStatusCode.OK
-                Json.parseToJsonElement(json.bodyAsText()).jsonArray.size shouldBe elements.size
+                httpGet("/projects/$demoProjectId/commits/$commitId/elements?page%5Bafter%5D=not.valid").status shouldBe HttpStatusCode.BadRequest
+
+                // a refused notation type (q=0) leaves JSON in place; a tie goes to JSON
+                for (accept in listOf("text/plain;q=0, application/json", "application/json, text/plain", "*/*")) {
+                    val json = httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
+                        header(HttpHeaders.Accept, accept)
+                    }
+                    json.status shouldBe HttpStatusCode.OK
+                    Json.parseToJsonElement(json.bodyAsText()).jsonArray.size shouldBe elements.size
+                }
+                // text/plain refused beside a text wildcard: neither notation nor JSON is acceptable
+                httpGet("/projects/$demoProjectId/commits/$commitId/elements") {
+                    header(HttpHeaders.Accept, "text/plain;q=0, text/*;q=1")
+                }.status shouldBe HttpStatusCode.NotAcceptable
 
                 // a notation client that also accepts text/plain still gets the JSON commit record
                 val textClient = httpPost("/projects/$demoProjectId/commits") {
