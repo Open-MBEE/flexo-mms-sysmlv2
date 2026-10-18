@@ -562,7 +562,7 @@ private suspend fun RoutingContext.receiveCommitRequest(): CommitRequest {
     )
     val format = notationFormat(type)
     val (elements, diagnostics) = notation.toApiJson(call.receiveText(), format)
-    diagnostics.forEach { call.application.log.info("OpenSysML $format conversion: ${it.describe()}") }
+    call.reportDiagnostics(format, diagnostics)
     val changes = elements.map { element ->
         val payload = element as? JsonObject
             ?: throw InvalidSysmlSerializationError("OpenSysML returned a non-object element")

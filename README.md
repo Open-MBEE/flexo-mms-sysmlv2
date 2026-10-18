@@ -59,7 +59,10 @@ the stored elements have the same ids, `@type`s and properties a JSON client wou
 are OpenSysML's name-based uuids (`sysml -id uuid`), so posting the same text again updates the same
 elements. The `branchId` and `replace` query parameters apply as for JSON; `description` sets the
 commit description. Conversion errors are answered `400` with an `Error` whose `description` lists
-the diagnostics; warnings are logged and the commit proceeds.
+the diagnostics. Non-error diagnostics do not block the commit: each is returned as one
+`X-SysML-Diagnostic` response header line of the form `<severity> at <line>:<col>: <message>` (and
+logged), on notation input and output alike. OpenSysML v0.10.1's `convert` reports only parser
+errors, so the header appears once the service emits warnings for a conversion.
 
 ```
 curl -X POST "http://localhost:8083/projects/$PROJECT/commits" \

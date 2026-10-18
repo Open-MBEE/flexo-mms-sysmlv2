@@ -396,6 +396,6 @@ private suspend fun RoutingContext.respondElements(elements: JsonArray) {
         "Textual notation output needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
     )
     val conversion = notation.toNotation(elements, notationFormat(type))
-    conversion.diagnostics().forEach { call.application.log.info("OpenSysML ${notationFormat(type)} conversion: ${it.describe()}") }
+    call.reportDiagnostics(notationFormat(type), conversion.diagnostics())
     call.respondText(conversion.content(), type.withCharset(Charsets.UTF_8))
 }

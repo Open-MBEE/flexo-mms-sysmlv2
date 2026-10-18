@@ -8,12 +8,17 @@ import io.kotest.matchers.string.shouldContain
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import io.ktor.server.testing.ApplicationTestBuilder
+import java.util.Optional
 import kotlinx.serialization.json.*
 import org.openmbee.flexo.sysmlv2.util.*
 import org.openmbee.opensysml.Connection
 import org.openmbee.opensysml.ConnectionOptions
 import org.openmbee.opensysml.ConversionOptions
+import org.openmbee.opensysml.Diagnostic
 
 private val openSysmlUrl: String? = System.getenv("FLEXO_OPENSYSML_URL")?.takeIf { it.isNotBlank() }
 
@@ -123,6 +128,7 @@ class NotationTest : ProjectAny() {
             testApplication {
                 val post = postNotation(model)
                 post.status shouldBe HttpStatusCode.OK
+                post.headers.getAll(DIAGNOSTIC_HEADER) shouldBe null
                 val commitId = post.commitId()
 
                 val elements = elementsJson(commitId)
@@ -137,6 +143,7 @@ class NotationTest : ProjectAny() {
                 for (type in listOf(ContentType.Text.Plain, SYSML_NOTATION_TYPE)) {
                     val text = httpGet("/projects/$demoProjectId/commits/$commitId/elements") { accept(type) }
                     text.status shouldBe HttpStatusCode.OK
+                    text.headers.getAll(DIAGNOSTIC_HEADER) shouldBe null
                     text.contentType().shouldNotBeNull().withoutParameters() shouldBe type
                     val notation = text.bodyAsText()
                     notation shouldContain "package P"
@@ -192,6 +199,33 @@ class NotationTest : ProjectAny() {
                 // the branch keeps the earlier SysML commit; the KerML elements are added to it
                 named.keys shouldContainExactlyInAnyOrder listOf("P", "A", "a", "K", "C", "f")
                 named["K"] shouldBe "Package"
+            }
+        }
+
+        "non-error diagnostics are returned one per X-SysML-Diagnostic header and do not block the response" {
+            val located = Diagnostic(
+                Diagnostic.Severity.WARNING, "end feature multiplicity\nshould be 1", "end-feature-multiplicity",
+                Optional.of(Diagnostic.Span("<content>", 2, 7, 2, 12))
+            )
+            val unlocated = Diagnostic(Diagnostic.Severity.INFO, "experimental mapping", "", Optional.empty())
+            located.headerValue() shouldBe "warning at 2:7: end feature multiplicity should be 1"
+            unlocated.headerValue() shouldBe "info: experimental mapping"
+
+            testApplication {
+                application {
+                    routing {
+                        get("/diagnostics") {
+                            call.reportDiagnostics("sysml", listOf(located, unlocated))
+                            call.respondText("ok")
+                        }
+                    }
+                }
+                val response = httpGet("/diagnostics")
+                response.status shouldBe HttpStatusCode.OK
+                response.headers.getAll(DIAGNOSTIC_HEADER) shouldBe listOf(
+                    "warning at 2:7: end feature multiplicity should be 1",
+                    "info: experimental mapping"
+                )
             }
         }
 

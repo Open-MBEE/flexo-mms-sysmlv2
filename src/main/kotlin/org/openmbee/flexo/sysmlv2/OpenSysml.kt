@@ -1,7 +1,9 @@
 package org.openmbee.flexo.sysmlv2
 
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.request.*
+import io.ktor.server.response.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -73,6 +75,20 @@ fun Diagnostic.describe(): String {
     val where = span().map { " at ${it.startLine()}:${it.startColumn()}" }.orElse("")
     return "${severity().name.lowercase()}$where: ${message()}"
 }
+
+/** Response header carrying each non-error OpenSysML diagnostic of a successful conversion. */
+const val DIAGNOSTIC_HEADER = "X-SysML-Diagnostic"
+
+/** Logs the conversion's non-error diagnostics and adds one [DIAGNOSTIC_HEADER] line per diagnostic. */
+fun ApplicationCall.reportDiagnostics(format: String, diagnostics: List<Diagnostic>) {
+    diagnostics.forEach { diagnostic ->
+        application.log.info("OpenSysML $format conversion: ${diagnostic.describe()}")
+        response.headers.append(DIAGNOSTIC_HEADER, diagnostic.headerValue())
+    }
+}
+
+/** The header form of [describe]: one line, with the control characters a header cannot carry replaced. */
+fun Diagnostic.headerValue(): String = describe().replace(Regex("[\\r\\n\\t]+"), " ").trim()
 
 /**
  * Textual notation in/out through a running OpenSysML `sysml-grpc` service at `host:port`.
