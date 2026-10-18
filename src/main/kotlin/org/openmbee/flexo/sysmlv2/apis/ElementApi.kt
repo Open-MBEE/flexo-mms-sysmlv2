@@ -267,23 +267,21 @@ fun Route.ElementApi() {
 
         // the subquery only tells whether the scan direction continues; the
         // other side is settled by looking for one element beyond the page
-        suspend fun anyElement(after: String?, before: String?): Boolean {
-            val probe = flexoRequestPost {
-                orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/query")
-                sparqlQuery { pagedElementsConstructQuery(after, before, 1) }
-            }
-            return !probe.isFailure() && probe.parseModel { model.listSubjects().asSequence().any { !it.isAnon } }
+        suspend fun probeBeyond(after: String?, before: String?) = flexoRequestPost {
+            orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/query")
+            sparqlQuery { pagedElementsConstructQuery(after, before, 1) }
         }
+        suspend fun FlexoResponse.hasElement() = parseModel { model.listSubjects().asSequence().any { !it.isAnon } }
         if (page.isNotEmpty()) {
             val bounded = afterIri != null && beforeIri != null
-            val hasNext = if (backwards) anyElement(SYSMLV2.element(page.last().first).uri, null) else hasMore
-            val hasPrev = when {
-                backwards -> hasMore
-                // a bounded window starts at page[after], which this page heads
-                bounded -> false
-                afterIri != null -> anyElement(null, SYSMLV2.element(page.first().first).uri)
-                else -> false
-            }
+            val nextProbe = if (backwards) probeBeyond(SYSMLV2.element(page.last().first).uri, null) else null
+            // a bounded window starts at page[after], which this page heads
+            val prevProbe = if (!backwards && !bounded && afterIri != null)
+                probeBeyond(null, SYSMLV2.element(page.first().first).uri) else null
+            // a failed probe must not pass for a final page
+            listOfNotNull(nextProbe, prevProbe).firstOrNull { it.isFailure() }?.let { return@get forward(it) }
+            val hasNext = nextProbe?.hasElement() ?: hasMore
+            val hasPrev = if (backwards) hasMore else prevProbe?.hasElement() ?: false
             appendPageLinks(pageSize,
                 page.last().first.takeIf { hasNext },
                 page.first().first.takeIf { hasPrev },
