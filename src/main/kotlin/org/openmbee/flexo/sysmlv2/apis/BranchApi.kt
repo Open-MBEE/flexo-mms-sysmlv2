@@ -96,7 +96,7 @@ fun Route.BranchApi() {
                 branchFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().filterNotNull()
         }
-        respondPage(branches, path.pageSize, path.pageAfter) { it.atId }
+        respondPage(branches, path.pageSize, path.pageAfter, path.pageBefore) { it.atId }
     }
 
     get<Paths.getBranchByProjectAndId> { path ->

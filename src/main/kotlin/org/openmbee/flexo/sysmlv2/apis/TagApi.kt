@@ -119,7 +119,7 @@ fun Route.TagApi() {
                 tagFromResponse(it.outgoing(), path.projectId, it.uri.uriSuffix)
             }.toList().filterNotNull()
         }
-        respondPage(tags, path.pageSize, path.pageAfter) { it.atId }
+        respondPage(tags, path.pageSize, path.pageAfter, path.pageBefore) { it.atId }
     }
 
     post<TagRequest>("/projects/{projectId}/tags") { request ->

@@ -122,8 +122,13 @@ suspend fun RoutingContext.computeCommitChanges(
             .firstOrNull { it.uri.uriSuffix == commitId }
             ?.let { commit ->
                 found = true
+                // flexo's auto-created root commit holds an empty graph, so
+                // a commit whose parent is the root diffs against nothing
                 parentId = commit.outgoing()[MMS.parent]?.resource()
-                    ?.takeIf { it != MMS.nil }?.uri?.uriSuffix
+                    ?.takeIf { it != MMS.nil }
+                    ?.let { model.getResource(it.uri) }
+                    ?.takeIf { it.getProperty(MMS.parent)?.`object` != MMS.nil }
+                    ?.uri?.uriSuffix
             }
     }
     if (!found) return Pair(null, null)
@@ -138,9 +143,9 @@ suspend fun RoutingContext.computeCommitChanges(
         val before = flexoRequestGet {
             orgPath("/repos/$projectId/locks/Commit.$pid/graph")
         }
-        // a parent graph that cannot be materialized (e.g. the empty root
-        // commit) diffs against an empty baseline
-        if (before.isFailure()) emptyMap() else before.parseModel { elementsByIri() }
+        // without the parent snapshot every element would look new
+        if (before.isFailure()) return Pair(before, null)
+        before.parseModel { elementsByIri() }
     } ?: emptyMap()
 
     val changes = (afterElements.keys + beforeElements.keys).sorted().mapNotNull { iri ->
@@ -176,7 +181,7 @@ fun Route.CommitApi() {
         val (failure, changes) = computeCommitChanges(params.projectId, params.commitId)
         failure?.let { return@get forward(it) }
         changes ?: return@get call.respond(HttpStatusCode.NotFound)
-        respondPage(changes, params.pageSize, params.pageAfter) { it.atId }
+        respondPage(changes, params.pageSize, params.pageAfter, params.pageBefore) { it.atId }
     }
 
     get<Paths.getCommitByProjectAndId> { getCommit ->
@@ -227,7 +232,7 @@ fun Route.CommitApi() {
             }
         }
         commits.sortByDescending {it.created}
-        respondPage(commits, getCommits.pageSize, getCommits.pageAfter) { it.atId }
+        respondPage(commits, getCommits.pageSize, getCommits.pageAfter, getCommits.pageBefore) { it.atId }
     }
 
     post<CommitRequest>("/projects/{projectId}/commits") { commit ->
@@ -255,6 +260,13 @@ fun Route.CommitApi() {
                 } else {
                     branchId = "master"
                 }
+            }
+        }
+        // elements deleted by this commit; no other change may reference them
+        val deletedIds = commit.change.filter { it.payload == null }.mapNotNull { it.identity?.atId }.toSet()
+        fun requireNotDeleted(refId: String, where: String) {
+            if (refId in deletedIds) {
+                throw InvalidSysmlSerializationError("Reference to element '$refId' deleted in the same commit at $where")
             }
         }
         // each change (DataVersionRequest)
@@ -337,6 +349,7 @@ fun Route.CommitApi() {
                                                 val refId = it.jsonObject["@id"]?.jsonPrimitive?.content
                                                     ?: throw InvalidSysmlSerializationError("Missing @id at .change[$index].$key")
                                                 requireValidId(refId, ".change[$index].$key.@id")
+                                                requireNotDeleted(refId, ".change[$index].$key")
                                                 SYSMLV2.element(refId).asNode()
                                             }.toSet())
                                         }
@@ -365,6 +378,7 @@ fun Route.CommitApi() {
                                         }
                                         val refId = valueObj["@id"]!!.jsonPrimitive.content
                                         requireValidId(refId, ".change[$index].$key.@id")
+                                        requireNotDeleted(refId, ".change[$index].$key")
                                         add(SYSMLV2.prop(key) to setOf(SYSMLV2.element(refId).asNode()))
                                     }
                                     else {
@@ -386,9 +400,53 @@ fun Route.CommitApi() {
         }
         if (replace == null || replace != "true") { //regular update
             // deleted elements must not leave dangling references: remove
-            // incoming link triples, and the json: array annotations of the
-            // referencing property (they cannot be rewritten in SPARQL; the
-            // remaining link triples render as a best-effort array instead)
+            // incoming link triples and the json: array annotations of the
+            // referencing property; the annotations are re-inserted below
+            // with the deleted ids removed (elements rewritten by this
+            // commit already carry their new annotations)
+            val annotationFilters = """
+                    filter(strstarts(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}"))
+                    filter(strafter(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}") = strafter(str(?ref_p), "${SYSMLV2.VOCABULARY}"))
+            """
+            if (deleteIncoming.isNotEmpty()) {
+                val referrers = flexoRequestPost {
+                    orgPath("/repos/$projectId/branches/$branchId/query")
+                    sparqlQuery {
+                        """
+                        ${DEFAULT_PREFIX_MAPPING.nsPrefixMap.filter { (id, iri) ->
+                            iri.startsWith(SYSMLV2.VOCABULARY) || iri.startsWith(SYSMLV2.BASE) || id == "rdf"
+                        }.toList().joinToString("\n") { (id, iri) ->
+                            "prefix $id: <$iri>"
+                        }.reindent(6)}
+
+                        construct {
+                            ?ref_s ?ref_ann ?ann_val .
+                        } where {
+                            values ?deleted_n {
+                                ${deleteIncoming.joinToString("\n").reindent(8)}
+                            }
+                            ?ref_s ?ref_p ?deleted_n .
+                            ?ref_s ?ref_ann ?ann_val .
+                            ${annotationFilters.reindent(7)}
+                        }
+                        """.trimIndent()
+                    }
+                }
+                if (referrers.isFailure()) {
+                    return@post forward(referrers)
+                }
+                val rewrittenSubjects = values.toSet()
+                referrers.parseModel {
+                    model.listStatements().forEach { stmt ->
+                        if (stmt.subject.asNode().stringify() in rewrittenSubjects) return@forEach
+                        val remaining = Json.parseToJsonElement(stmt.`object`.asLiteral().string).jsonArray.filter {
+                            (it as? JsonObject)?.get("@id")?.jsonPrimitive?.content !in deletedIds
+                        }
+                        val annotation = NodeFactory.createLiteralString(Json.encodeToString(JsonArray(remaining)))
+                        inserts.add("${stmt.subject.asNode().stringify()} ${stmt.predicate.asNode().stringify()} ${annotation.stringify()} .")
+                    }
+                }
+            }
             val deleteIncomingUpdate = if (deleteIncoming.isEmpty()) "" else """
             delete {
                 ?ref_s ?ref_p ?deleted_n .
@@ -400,8 +458,7 @@ fun Route.CommitApi() {
                 ?ref_s ?ref_p ?deleted_n .
                 optional {
                     ?ref_s ?ref_ann ?ann_val .
-                    filter(strstarts(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}"))
-                    filter(strafter(str(?ref_ann), "${SYSMLV2.ANNOTATION_JSON}") = strafter(str(?ref_p), "${SYSMLV2.VOCABULARY}"))
+                    ${annotationFilters.reindent(5)}
                 }
             };
             """

@@ -2,7 +2,9 @@ package org.openmbee.flexo.sysmlv2
 
 import io.kotest.assertions.ktor.client.shouldHaveStatus
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonNull
@@ -10,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.apache.jena.sparql.exec.http.UpdateExecutionHTTP
 import org.openmbee.flexo.sysmlv2.util.*
 
 /**
@@ -86,6 +89,28 @@ class ChangesTest : ProjectAny() {
                     "/projects/$demoProjectId/commits/$commitId/changes/$changeId")
                 response shouldHaveStatus HttpStatusCode.OK
                 response.bodyAsJsonObject()["@id"]!!.jsonPrimitive.content shouldBe changeId
+            }
+        }
+
+        "a parent whose graph cannot be fetched fails instead of reporting every element as new" {
+            testApplication {
+                val firstCommitId = commitChanges(demoProjectId, firstChange).atId()
+                val secondCommitId = commitChanges(demoProjectId, secondChange).atId()
+
+                // the parent commit, its snapshot and its graph vanish from the store
+                UpdateExecutionHTTP.service(testEnv().property("flexoMmsTest.updateUrl").getString()).update("""
+                    delete { graph ?g { ?s ?p ?o } }
+                    where {
+                        graph ?g { ?s ?p ?o }
+                        filter(contains(str(?s), "$firstCommitId") || contains(str(?g), "$firstCommitId"))
+                    }
+                """.trimIndent()).execute()
+
+                val response = httpGet("/projects/$demoProjectId/commits/$secondCommitId/changes")
+                withClue(response.bodyAsText()) {
+                    response.status.isSuccess() shouldBe false
+                }
+                response.bodyAsText() shouldNotContain keepId
             }
         }
 

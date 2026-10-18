@@ -60,11 +60,11 @@ fun Application.module() {
         }*/
         //register(ContentType.Application.Json, GsonConverter())
     }
-    install(CORS) {
-        // credentials (the Authorization header) may only be shared with
-        // configured origins — anyHost()+allowCredentials would let any
-        // website replay a logged-in user's session
-        allowCredentials = GlobalFlexoConfig.corsAllowedOrigins.isNotEmpty()
+    // cross-origin access is opt-in: without configured origins no CORS
+    // headers are sent, so a page on another site cannot read responses to
+    // requests it attaches an Authorization header to
+    if (GlobalFlexoConfig.corsAllowedOrigins.isNotEmpty()) install(CORS) {
+        allowCredentials = true
 
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
@@ -90,15 +90,11 @@ fun Application.module() {
         exposeHeader(HttpHeaders.Link)
         exposeHeader("Flexo-Mms-Layer-1")
 
-        if (GlobalFlexoConfig.corsAllowedOrigins.isEmpty()) {
-            anyHost()
-        } else {
-            GlobalFlexoConfig.corsAllowedOrigins.forEach { origin ->
-                val scheme = origin.substringBefore("://", "")
-                val host = origin.substringAfter("://")
-                if (scheme.isEmpty()) allowHost(host, listOf("http", "https"))
-                else allowHost(host, listOf(scheme))
-            }
+        GlobalFlexoConfig.corsAllowedOrigins.forEach { origin ->
+            val scheme = origin.substringBefore("://", "")
+            val host = origin.substringAfter("://")
+            if (scheme.isEmpty()) allowHost(host, listOf("http", "https"))
+            else allowHost(host, listOf(scheme))
         }
     }
     install(AutoHeadResponse) // see https://ktor.io/docs/autoheadresponse.html
@@ -163,7 +159,7 @@ data class FlexoConfig(
     val auth: String,
     val basePath: String,
     // origins allowed for CORS ("scheme://host[:port]", space-separated);
-    // empty means any host, which browsers only honor without credentials
+    // empty disables cross-origin access altogether
     val corsAllowedOrigins: List<String> = emptyList()
 )
 

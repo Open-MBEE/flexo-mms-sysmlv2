@@ -53,6 +53,9 @@ suspend fun RoutingContext.createOrUpdateProject(
     // submit POST request to create new repo or update repo
     val flexoResponse = flexoRequestPut {
         orgPath("/repos/${projectId}")
+        // creation must not replace a project that appeared since the
+        // request was accepted; layer1 rejects the write atomically
+        if (post) addHeaders(HttpHeaders.IfNoneMatch to "*")
         // construct body payload
         turtle {
             thisSubject(
@@ -157,7 +160,7 @@ fun Route.ProjectApi() {
                 projectFromResponse(it.outgoing())
             }.toList().filterNotNull()
         }
-        respondPage(projects, params.pageSize, params.pageAfter) { it.atId }
+        respondPage(projects, params.pageSize, params.pageAfter, params.pageBefore) { it.atId }
     }
 
     // create new project via POST
@@ -167,17 +170,16 @@ fun Route.ProjectApi() {
         projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         // use provided project ID or generate one if not provided
         val projectId = projectRequest.atId ?: generateId()
-        // POST must not silently overwrite an existing project
-        if (projectRequest.atId != null) {
+        val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
+        if (flexoResponse.isFailure()) {
+            // the conditional write failed; a project now at that id means
+            // POST must not overwrite it
             val existing = flexoRequestGet {
                 orgPath("/repos/${projectId}")
             }
-            if (!existing.isFailure()) {
+            if (existing.isSuccess()) {
                 return@post call.respond(HttpStatusCode.Conflict)
             }
-        }
-        val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
-        if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }
         val project = flexoResponse.findFirstByType(MMS.Repo) {

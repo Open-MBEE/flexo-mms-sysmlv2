@@ -5,6 +5,8 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.Json
@@ -53,9 +55,45 @@ class CollectionPaginationTest : ProjectAny() {
                 val secondIds = Json.parseToJsonElement(second.bodyAsText()).jsonArray
                     .map { it.jsonObject["@id"]!!.jsonPrimitive.content }
                 secondIds.size shouldBe 2
-                second.headers[HttpHeaders.Link].shouldBeNull()
+                // the last page links back but not forward
+                second.headers[HttpHeaders.Link]!! shouldNotContain "rel=\"next\""
+                second.headers[HttpHeaders.Link]!! shouldContain "rel=\"prev\""
 
                 (firstIds + secondIds) shouldContainExactly created
+            }
+        }
+
+        "page[before] pages backwards through the branch list" {
+            testApplication {
+                val commitId = commitChanges(demoProjectId, elementChange).atId()
+                val defaultBranchId = getProject(demoProjectId).bodyAsJsonObject()
+                    .nestedAtId("defaultBranch")
+                val all = ((1..4).map { n ->
+                    createBranch(demoProjectId, commitId, "branch-$n").atId()
+                } + defaultBranchId).sorted()
+
+                suspend fun ids(query: String) = httpGet("/projects/$demoProjectId/branches?$query").let {
+                    it shouldHaveStatus HttpStatusCode.OK
+                    Json.parseToJsonElement(it.bodyAsText()).jsonArray
+                        .map { el -> el.jsonObject["@id"]!!.jsonPrimitive.content } to it.headers[HttpHeaders.Link]
+                }
+
+                // before alone yields the two items just before the cursor, in order
+                val (back, backLink) = ids("page%5Bsize%5D=2&page%5Bbefore%5D=${all[3]}")
+                back shouldContainExactly listOf(all[1], all[2])
+                backLink!! shouldContain "rel=\"prev\""
+                backLink shouldContain "page%5Bbefore%5D=${all[1]}"
+                backLink shouldContain "rel=\"next\""
+                backLink shouldContain "page%5Bafter%5D=${all[2]}"
+
+                // before without size applies the default page size
+                val (fromStart, startLink) = ids("page%5Bbefore%5D=${all[2]}")
+                fromStart shouldContainExactly listOf(all[0], all[1])
+                startLink!! shouldNotContain "rel=\"prev\""
+
+                // after and before together bound the window
+                val (window, _) = ids("page%5Bafter%5D=${all[0]}&page%5Bbefore%5D=${all[3]}")
+                window shouldContainExactly listOf(all[1], all[2])
             }
         }
 
