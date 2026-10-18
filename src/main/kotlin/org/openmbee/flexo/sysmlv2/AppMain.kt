@@ -91,6 +91,7 @@ fun Application.module() {
         exposeHeader(HttpHeaders.Location)
         exposeHeader(HttpHeaders.Link)
         exposeHeader("Flexo-Mms-Layer-1")
+        exposeHeader(DIAGNOSTIC_HEADER)
 
         GlobalFlexoConfig.corsAllowedOrigins.forEach { origin ->
             val scheme = origin.substringBefore("://", "")

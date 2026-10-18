@@ -61,7 +61,7 @@ elements. The `branchId` and `replace` query parameters apply as for JSON; `desc
 commit description. Conversion errors are answered `400` with an `Error` whose `description` lists
 the diagnostics. Non-error diagnostics do not block the commit: each is returned as one
 `X-SysML-Diagnostic` response header line of the form `<severity> at <line>:<col>: <message>` (and
-logged), on notation input and output alike. OpenSysML v0.10.1's `convert` reports only parser
+logged), on notation input and output alike; the header is CORS-exposed for browser clients. OpenSysML v0.10.1's `convert` reports only parser
 errors, so the header appears once the service emits warnings for a conversion.
 
 ```

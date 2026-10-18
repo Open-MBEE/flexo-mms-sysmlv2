@@ -211,7 +211,8 @@ class NotationTest : ProjectAny() {
             located.headerValue() shouldBe "warning at 2:7: end feature multiplicity should be 1"
             unlocated.headerValue() shouldBe "info: experimental mapping"
 
-            testApplication {
+            // cross-origin access is opt-in, so allow the editor's origin
+            testApplication(mapOf("flexo.corsAllowedOrigins" to "https://editor.example")) {
                 application {
                     routing {
                         get("/diagnostics") {
@@ -220,12 +221,14 @@ class NotationTest : ProjectAny() {
                         }
                     }
                 }
-                val response = httpGet("/diagnostics")
+                val response = httpGet("/diagnostics") { header(HttpHeaders.Origin, "https://editor.example") }
                 response.status shouldBe HttpStatusCode.OK
                 response.headers.getAll(DIAGNOSTIC_HEADER) shouldBe listOf(
                     "warning at 2:7: end feature multiplicity should be 1",
                     "info: experimental mapping"
                 )
+                // a browser client on another origin may read the header
+                response.headers[HttpHeaders.AccessControlExposeHeaders].shouldNotBeNull() shouldContain DIAGNOSTIC_HEADER
             }
         }
 
