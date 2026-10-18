@@ -24,12 +24,23 @@ fun resolvePageSize(pageSize: Int?): Int {
 
 /**
  * Add the Link header for a page: rel="next" resumes after [lastId] and
- * rel="prev" pages back from [firstId]; both carry the effective page[size].
+ * rel="prev" pages back from [firstId]; both carry the effective page[size]
+ * and, when the request bounded a window, the window's opposite cursor.
  */
-fun RoutingContext.appendPageLinks(size: Int, lastId: String?, firstId: String?) {
+fun RoutingContext.appendPageLinks(
+    size: Int, lastId: String?, firstId: String?,
+    windowAfter: String? = null, windowBefore: String? = null
+) {
+    val path = call.request.path()
     val links = listOfNotNull(
-        lastId?.let { "<${call.request.path()}?page%5Bsize%5D=$size&page%5Bafter%5D=$it>; rel=\"next\"" },
-        firstId?.let { "<${call.request.path()}?page%5Bsize%5D=$size&page%5Bbefore%5D=$it>; rel=\"prev\"" }
+        lastId?.let {
+            val bound = windowBefore?.let { b -> "&page%5Bbefore%5D=$b" } ?: ""
+            "<$path?page%5Bsize%5D=$size&page%5Bafter%5D=$it$bound>; rel=\"next\""
+        },
+        firstId?.let {
+            val bound = windowAfter?.let { a -> "&page%5Bafter%5D=$a" } ?: ""
+            "<$path?page%5Bsize%5D=$size&page%5Bbefore%5D=$it$bound>; rel=\"prev\""
+        }
     )
     if (links.isNotEmpty()) call.response.headers.append(HttpHeaders.Link, links.joinToString(", "))
 }
@@ -58,9 +69,14 @@ suspend inline fun <reified T : Any> RoutingContext.respondPage(
     if (page.isNotEmpty()) {
         val first = idOf(page.first())
         val last = idOf(page.last())
+        // with both cursors the neighbouring pages stay inside the window
+        val bounded = pageAfter != null && pageBefore != null
+        val candidates = if (bounded) window else sorted
         appendPageLinks(size,
-            last.takeIf { sorted.any { idOf(it) > last } },
-            first.takeIf { sorted.any { idOf(it) < first } })
+            last.takeIf { candidates.any { idOf(it) > last } },
+            first.takeIf { candidates.any { idOf(it) < first } },
+            if (bounded) pageAfter else null,
+            if (bounded) pageBefore else null)
     }
     call.respond(page)
 }

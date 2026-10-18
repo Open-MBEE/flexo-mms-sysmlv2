@@ -94,6 +94,16 @@ class CollectionPaginationTest : ProjectAny() {
                 // after and before together bound the window
                 val (window, _) = ids("page%5Bafter%5D=${all[0]}&page%5Bbefore%5D=${all[3]}")
                 window shouldContainExactly listOf(all[1], all[2])
+
+                // the links of a bounded window carry both cursors and stay inside it
+                val (head, headLink) = ids("page%5Bsize%5D=1&page%5Bafter%5D=${all[0]}&page%5Bbefore%5D=${all[3]}")
+                head shouldContainExactly listOf(all[1])
+                headLink!! shouldContain "page%5Bafter%5D=${all[1]}&page%5Bbefore%5D=${all[3]}>; rel=\"next\""
+                headLink shouldNotContain "rel=\"prev\""
+                val (tail, tailLink) = ids("page%5Bsize%5D=1&page%5Bafter%5D=${all[1]}&page%5Bbefore%5D=${all[3]}")
+                tail shouldContainExactly listOf(all[2])
+                // the window is exhausted on both sides
+                tailLink shouldBe null
             }
         }
 

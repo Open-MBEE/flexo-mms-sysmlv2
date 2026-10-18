@@ -46,6 +46,8 @@ fun projectFromResponse(
     )
 }
 
+class ProjectExistsError(projectId: String): Error("Project '$projectId' already exists")
+
 suspend fun RoutingContext.createOrUpdateProject(
     projectId: String, projectRequest: ProjectRequest, post: Boolean): FlexoResponse {
     // generate an ID for the default branch if not provided
@@ -68,6 +70,11 @@ suspend fun RoutingContext.createOrUpdateProject(
 
     // forward failures to client
     if(flexoResponse.isFailure()) {
+        // only the conditional write can lose to an existing project; a
+        // failure of the later initialization steps is forwarded as is
+        if (post && flexoRequestGet { orgPath("/repos/${projectId}") }.isSuccess()) {
+            throw ProjectExistsError(projectId)
+        }
         return flexoResponse
     }
     if (post) { //creating new project
@@ -170,16 +177,12 @@ fun Route.ProjectApi() {
         projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         // use provided project ID or generate one if not provided
         val projectId = projectRequest.atId ?: generateId()
-        val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
+        val flexoResponse = try {
+            createOrUpdateProject(projectId, projectRequest, true)
+        } catch (e: ProjectExistsError) {
+            return@post call.respond(HttpStatusCode.Conflict)
+        }
         if (flexoResponse.isFailure()) {
-            // the conditional write failed; a project now at that id means
-            // POST must not overwrite it
-            val existing = flexoRequestGet {
-                orgPath("/repos/${projectId}")
-            }
-            if (existing.isSuccess()) {
-                return@post call.respond(HttpStatusCode.Conflict)
-            }
             return@post forward(flexoResponse)
         }
         val project = flexoResponse.findFirstByType(MMS.Repo) {

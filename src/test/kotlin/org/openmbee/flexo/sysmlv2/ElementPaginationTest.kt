@@ -117,6 +117,18 @@ class ElementPaginationTest : ProjectAny() {
                     "/projects/$demoProjectId/commits/$commitId/elements?page%5Bbefore%5D=${elementIds[2]}")
                 Json.parseToJsonElement(first.bodyAsText()).jsonArray.size shouldBe 2
                 first.headers[HttpHeaders.Link]!! shouldNotContain "rel=\"prev\""
+
+                // cursors beyond either end of the model do not advertise empty pages
+                val pastEnd = httpGet(
+                    "/projects/$demoProjectId/commits/$commitId/elements?page%5Bsize%5D=2&page%5Bbefore%5D=zzzzzzzz")
+                Json.parseToJsonElement(pastEnd.bodyAsText()).jsonArray
+                    .map { it.jsonObject["@id"]!!.jsonPrimitive.content } shouldContainExactly elementIds.takeLast(2)
+                pastEnd.headers[HttpHeaders.Link]!! shouldNotContain "rel=\"next\""
+                val beforeStart = httpGet(
+                    "/projects/$demoProjectId/commits/$commitId/elements?page%5Bsize%5D=2&page%5Bafter%5D=0")
+                Json.parseToJsonElement(beforeStart.bodyAsText()).jsonArray
+                    .map { it.jsonObject["@id"]!!.jsonPrimitive.content } shouldContainExactly elementIds.take(2)
+                beforeStart.headers[HttpHeaders.Link]!! shouldNotContain "rel=\"prev\""
             }
         }
 

@@ -265,11 +265,30 @@ fun Route.ElementApi() {
             ids.map { iri -> iri.urnSuffix to extractModelElementToJson(iri) } to (ordered.size > pageSize)
         }
 
-        // a cursor came from a neighbouring page, so that side continues
+        // the subquery only tells whether the scan direction continues; the
+        // other side is settled by looking for one element beyond the page
+        suspend fun anyElement(after: String?, before: String?): Boolean {
+            val probe = flexoRequestPost {
+                orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/query")
+                sparqlQuery { pagedElementsConstructQuery(after, before, 1) }
+            }
+            return !probe.isFailure() && probe.parseModel { model.listSubjects().asSequence().any { !it.isAnon } }
+        }
         if (page.isNotEmpty()) {
+            val bounded = afterIri != null && beforeIri != null
+            val hasNext = if (backwards) anyElement(SYSMLV2.element(page.last().first).uri, null) else hasMore
+            val hasPrev = when {
+                backwards -> hasMore
+                // a bounded window starts at page[after], which this page heads
+                bounded -> false
+                afterIri != null -> anyElement(null, SYSMLV2.element(page.first().first).uri)
+                else -> false
+            }
             appendPageLinks(pageSize,
-                page.last().first.takeIf { if (backwards) true else hasMore || beforeIri != null },
-                page.first().first.takeIf { if (backwards) hasMore else afterIri != null })
+                page.last().first.takeIf { hasNext },
+                page.first().first.takeIf { hasPrev },
+                if (bounded) getElements.pageAfter else null,
+                if (bounded) getElements.pageBefore else null)
         }
         call.respond(buildJsonArray { page.forEach { add(it.second) } })
     }
