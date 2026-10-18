@@ -37,7 +37,6 @@ import org.apache.jena.update.UpdateAction
 import org.openmbee.opensysml.Diagnostic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.ConcurrentHashMap
 import org.openmbee.flexo.sysmlv2.models.Commit
 import org.openmbee.flexo.sysmlv2.models.CommitRequest
 import org.openmbee.flexo.sysmlv2.models.DataIdentity
@@ -108,12 +107,25 @@ fun FlexoModelHandler.elementsByIri(): Map<String, JsonObject> =
 /**
  * One lock per branch for validated commits: the head is read, judged and written under it, so two
  * commits this instance validates against the same head cannot interleave (other writers, and other
- * instances, are not covered). Unvalidated commits take no lock.
+ * instances, are not covered). Unvalidated commits take no lock. An entry lives only while a
+ * commit holds or awaits it, so the registry does not grow with the branches ever seen.
  */
-private val branchLocks = ConcurrentHashMap<String, Mutex>()
+private class BranchLock {
+    val mutex = Mutex()
+    var users = 0
+}
 
-private suspend inline fun <T> withBranchLock(key: String?, action: () -> T): T =
-    if (key == null) action() else branchLocks.computeIfAbsent(key) { Mutex() }.withLock { action() }
+private val branchLocks = HashMap<String, BranchLock>()
+
+private suspend inline fun <T> withBranchLock(key: String?, action: () -> T): T {
+    if (key == null) return action()
+    val lock = synchronized(branchLocks) { branchLocks.getOrPut(key) { BranchLock() }.also { it.users++ } }
+    try {
+        return lock.mutex.withLock { action() }
+    } finally {
+        synchronized(branchLocks) { if (--lock.users == 0) branchLocks.remove(key) }
+    }
+}
 
 /** Every element of the graph as API JSON, the complete element set of a commit. */
 fun FlexoModelHandler.elementsJson(): JsonArray = buildJsonArray {
