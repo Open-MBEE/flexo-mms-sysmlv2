@@ -26,3 +26,16 @@ fun testApplication(block: suspend ApplicationTestBuilder.() -> Unit) {
         block()
     }
 }
+
+/**
+ * Same as [testApplication], with individual config values overridden
+ * (e.g. "flexo.opensysml.url" to "" to run with notation support off).
+ */
+fun testApplication(overrides: Map<String, String>, block: suspend ApplicationTestBuilder.() -> Unit) {
+    io.ktor.server.testing.testApplication {
+        environment {
+            config = cachedConfig.mergeWith(MapApplicationConfig(*overrides.toList().toTypedArray()))
+        }
+        block()
+    }
+}
