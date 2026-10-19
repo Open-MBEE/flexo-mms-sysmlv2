@@ -8,7 +8,10 @@ jobs:
       image: default
     working_directory: /home/circleci/flexo-mms-sysmlv2
     steps:
-      - checkout
+      # The default checkout is a blobless partial clone; this .git is persisted to the scan job,
+      # whose SonarCloud (jgit) blame needs every historical blob and cannot lazy-fetch them.
+      - checkout:
+          method: full
       - run:
           name: Build stack and run tests
           shell: /bin/bash
@@ -37,10 +40,28 @@ jobs:
           at: ~/
       # checkout re-adds the deploy key and known_hosts in this container; without it the
       # fetch below hangs on GitHub's host-key prompt until the 10-minute no-output timeout.
-      - checkout
+      - checkout:
+          method: full
       - run:
           name: Fetch all branches for SonarCloud blame and new-code detection
           command: git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+      - run:
+          name: Verify the repository has every git object (SonarCloud blame needs them)
+          command: |
+            git --version
+            if git config --get remote.origin.promisor >/dev/null; then
+              echo "origin is a promisor remote (partial clone); blame would hit missing blobs"
+              exit 1
+            fi
+            missing=$(git rev-list --objects --all --missing=print | grep -c '^?' || true)
+            echo "missing objects: $missing"
+            if [ "$missing" -ne 0 ]; then
+              git rev-list --objects --all --missing=print | grep '^?' | head
+              exit 1
+            fi
+            # historical blob of src/main/kotlin/org/openmbee/flexo/sysmlv2/Namespaces.kt that a
+            # blobless clone lacks and jgit blame on develop asks for first
+            git cat-file -e 45ef7557357a40ddbf291a133c95d78cf10c01c1
       - sonarcloud/scan
   deploy_snapshot:
     executor:
