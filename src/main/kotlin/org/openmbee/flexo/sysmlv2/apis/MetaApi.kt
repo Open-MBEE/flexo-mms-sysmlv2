@@ -21,6 +21,31 @@ import org.openmbee.flexo.sysmlv2.Paths
 
 private const val JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 
+private const val OPENAPI_SCHEMA_REF = "#/components/schemas/"
+private const val DEFS_REF = "#/\$defs/"
+
+// the OpenAPI document's $refs point into its components; the standalone
+// schemas served here keep their referents under $defs instead
+private fun JsonElement.withDefsRefs(): JsonElement = when (this) {
+    is JsonObject -> JsonObject(mapValues { (key, value) ->
+        if (key == "\$ref" && value is JsonPrimitive && value.content.startsWith(OPENAPI_SCHEMA_REF))
+            JsonPrimitive(DEFS_REF + value.content.removePrefix(OPENAPI_SCHEMA_REF))
+        else value.withDefsRefs()
+    })
+    is JsonArray -> JsonArray(map { it.withDefsRefs() })
+    else -> this
+}
+
+private fun JsonElement.referencedDefs(): Set<String> = when (this) {
+    is JsonObject -> flatMap { (key, value) ->
+        if (key == "\$ref" && value is JsonPrimitive && value.content.startsWith(DEFS_REF))
+            setOf(value.content.removePrefix(DEFS_REF))
+        else value.referencedDefs()
+    }.toSet()
+    is JsonArray -> flatMap { it.referencedDefs() }.toSet()
+    else -> emptySet()
+}
+
 // the API's datatype schemas, served from the bundled official OMG spec
 // (resources/openapi.json); parsed once on first use
 private val datatypeSchemas: Map<String, JsonObject> by lazy {
@@ -28,8 +53,22 @@ private val datatypeSchemas: Map<String, JsonObject> by lazy {
         ?: return@lazy emptyMap()
     val doc = stream.reader().use { Json.parseToJsonElement(it.readText()) }.jsonObject
     doc["components"]?.jsonObject?.get("schemas")?.jsonObject
-        ?.mapValues { (_, schema) -> schema.jsonObject }
+        ?.mapValues { (_, schema) -> schema.withDefsRefs().jsonObject }
         ?: emptyMap()
+}
+
+// every schema a datatype's $refs reach, transitively
+private fun transitiveDefs(schema: JsonObject): Map<String, JsonObject> {
+    val defs = linkedMapOf<String, JsonObject>()
+    val pending = ArrayDeque(schema.referencedDefs())
+    while (pending.isNotEmpty()) {
+        val name = pending.removeFirst()
+        if (name in defs) continue
+        val def = datatypeSchemas[name] ?: continue
+        defs[name] = def
+        pending.addAll(def.referencedDefs())
+    }
+    return defs
 }
 
 fun Route.MetaApi() {
@@ -40,6 +79,8 @@ fun Route.MetaApi() {
         call.respond(buildJsonObject {
             put("\$schema", JSON_SCHEMA_DIALECT)
             schema.forEach { (key, value) -> put(key, value) }
+            val defs = transitiveDefs(schema)
+            if (defs.isNotEmpty()) put("\$defs", JsonObject(defs))
         })
     }
 

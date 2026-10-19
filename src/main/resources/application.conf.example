@@ -28,7 +28,9 @@ flexo {
     basePath = ""
     basePath = ${?BASEPATH}
     # space-separated origins allowed for CORS, e.g. "https://app.example.org http://localhost:3000";
-    # empty allows any origin but disables credentialed (Authorization) cross-origin requests
+    # only these origins may make credentialed (Authorization) cross-origin requests.
+    # empty (the default) sends no CORS headers at all, so browsers refuse every
+    # cross-origin request; same-origin and non-browser clients are unaffected
     corsAllowedOrigins = ""
     corsAllowedOrigins = ${?FLEXO_CORS_ALLOWED_ORIGINS}
 }

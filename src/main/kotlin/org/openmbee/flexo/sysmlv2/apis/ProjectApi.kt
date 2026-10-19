@@ -46,6 +46,8 @@ fun projectFromResponse(
     )
 }
 
+class ProjectExistsError(projectId: String): Error("Project '$projectId' already exists")
+
 suspend fun RoutingContext.createOrUpdateProject(
     projectId: String, projectRequest: ProjectRequest, post: Boolean): FlexoResponse {
     // generate an ID for the default branch if not provided
@@ -53,6 +55,9 @@ suspend fun RoutingContext.createOrUpdateProject(
     // submit POST request to create new repo or update repo
     val flexoResponse = flexoRequestPut {
         orgPath("/repos/${projectId}")
+        // creation must not replace a project that appeared since the
+        // request was accepted; layer1 rejects the write atomically
+        if (post) addHeaders(HttpHeaders.IfNoneMatch to "*")
         // construct body payload
         turtle {
             thisSubject(
@@ -65,6 +70,11 @@ suspend fun RoutingContext.createOrUpdateProject(
 
     // forward failures to client
     if(flexoResponse.isFailure()) {
+        // only the conditional write can lose to an existing project; a
+        // failure of the later initialization steps is forwarded as is
+        if (post && flexoRequestGet { orgPath("/repos/${projectId}") }.isSuccess()) {
+            throw ProjectExistsError(projectId)
+        }
         return flexoResponse
     }
     if (post) { //creating new project
@@ -157,7 +167,7 @@ fun Route.ProjectApi() {
                 projectFromResponse(it.outgoing())
             }.toList().filterNotNull()
         }
-        respondPage(projects, params.pageSize, params.pageAfter) { it.atId }
+        respondPage(projects, params.pageSize, params.pageAfter, params.pageBefore) { it.atId }
     }
 
     // create new project via POST
@@ -167,16 +177,11 @@ fun Route.ProjectApi() {
         projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         // use provided project ID or generate one if not provided
         val projectId = projectRequest.atId ?: generateId()
-        // POST must not silently overwrite an existing project
-        if (projectRequest.atId != null) {
-            val existing = flexoRequestGet {
-                orgPath("/repos/${projectId}")
-            }
-            if (!existing.isFailure()) {
-                return@post call.respond(HttpStatusCode.Conflict)
-            }
+        val flexoResponse = try {
+            createOrUpdateProject(projectId, projectRequest, true)
+        } catch (e: ProjectExistsError) {
+            return@post call.respond(HttpStatusCode.Conflict)
         }
-        val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)
         }

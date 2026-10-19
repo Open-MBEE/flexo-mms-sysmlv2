@@ -23,6 +23,8 @@ class QueryResultsTest : ProjectAny() {
         val betaId = "5f7e1c1a-0000-4000-8000-000000000002"
         val gammaId = "5f7e1c1a-0000-4000-8000-000000000003"
         val docId = "5f7e1c1a-0000-4000-8000-000000000004"
+        val nullNameId = "5f7e1c1a-0000-4000-8000-000000000005"
+        val dashedId = "5f7e1c1a-0000-4000-8000-000000000006"
 
         // two named PartDefinitions, one named PartUsage, and one
         // Documentation element with no name at all
@@ -99,6 +101,44 @@ class QueryResultsTest : ProjectAny() {
                     """{"@type": "PrimitiveConstraint", "operator": "=", "property": "@type", "value": ["PartUsage"]}"""
                 )
                 ids shouldContainExactlyInAnyOrder listOf(gammaId)
+            }
+        }
+
+        "POST query-results - '=' null also matches an explicit null value" {
+            testApplication {
+                commitChanges(demoProjectId, seedChanges).atId()
+                commitChanges(demoProjectId, """
+                    {"change": [{"@type": "DataVersion", "identity": {"@id": "$nullNameId"}, "payload": {"@type": "PartDefinition", "name": null}}]}
+                """.trimIndent()).atId()
+                val ids = queryResultIds(
+                    """{"@type": "PrimitiveConstraint", "operator": "=", "property": "name", "value": null}"""
+                )
+                ids shouldContainExactlyInAnyOrder listOf(docId, nullNameId)
+                // an explicit null is not a value either
+                queryResultIds(
+                    """{"@type": "PrimitiveConstraint", "operator": "=", "property": "name", "value": ["Alpha"]}"""
+                ) shouldContainExactlyInAnyOrder listOf(alphaId)
+            }
+        }
+
+        "POST query-results - properties differing only in punctuation are distinct" {
+            testApplication {
+                commitChanges(demoProjectId, """
+                    {"change": [{"@type": "DataVersion", "identity": {"@id": "$dashedId"}, "payload": {"@type": "PartDefinition", "part-name": "dashed", "part_name": "underscored"}}]}
+                """.trimIndent()).atId()
+                queryResultIds("""
+                    {
+                        "@type": "CompositeConstraint",
+                        "operator": "and",
+                        "constraint": [
+                            {"@type": "PrimitiveConstraint", "operator": "=", "property": "part-name", "value": ["dashed"]},
+                            {"@type": "PrimitiveConstraint", "operator": "=", "property": "part_name", "value": ["underscored"]}
+                        ]
+                    }
+                """) shouldContainExactlyInAnyOrder listOf(dashedId)
+                queryResultIds(
+                    """{"@type": "PrimitiveConstraint", "operator": "=", "property": "part-name", "value": ["underscored"]}"""
+                ) shouldContainExactlyInAnyOrder emptyList()
             }
         }
 
