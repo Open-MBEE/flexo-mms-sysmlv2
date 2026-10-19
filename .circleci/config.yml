@@ -35,11 +35,12 @@ jobs:
     steps:
       - attach_workspace:
           at: ~/
+      # checkout re-adds the deploy key and known_hosts in this container; without it the
+      # fetch below hangs on GitHub's host-key prompt until the 10-minute no-output timeout.
+      - checkout
       - run:
-          name: Fetch full git history for SonarCloud blame
-          command: |
-            git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
-            git fetch
+          name: Fetch all branches for SonarCloud blame and new-code detection
+          command: git fetch origin '+refs/heads/*:refs/remotes/origin/*'
       - sonarcloud/scan
   deploy_snapshot:
     executor:
