@@ -8,9 +8,8 @@ jobs:
       image: default
     working_directory: /home/circleci/flexo-mms-sysmlv2
     steps:
-      # The default checkout is a blobless partial clone (--filter=blob:none). This .git is
-      # persisted to the scan job, where SonarCloud's jgit blame needs every historical blob
-      # and cannot lazy-fetch them, so clone the full object set here.
+      # The default checkout is a blobless partial clone; this .git is persisted to the scan job,
+      # whose SonarCloud (jgit) blame needs every historical blob and cannot lazy-fetch them.
       - checkout:
           method: full
       - run:
