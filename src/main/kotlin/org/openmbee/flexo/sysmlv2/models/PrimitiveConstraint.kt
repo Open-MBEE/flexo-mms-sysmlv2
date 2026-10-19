@@ -29,12 +29,13 @@ data class PrimitiveConstraint @OptIn(ExperimentalSerializationApi::class) const
     val inverse: kotlin.Boolean = false,
     val operator: PrimitiveConstraint.Operator,
     val property: kotlin.String,
-    val value: kotlin.collections.List<JsonElement>, //can be Identified, boolean, string, number
+    // schema: array of Identified/boolean/string/number/null, or null
+    val value: kotlin.collections.List<JsonElement>?,
 ) : Constraint()
 {
     /**
     *
-    * Values: Equal,Greater_Than,Less_Than
+    * Values: Equal,Greater_Than,Less_Than,In
     */
     enum class Operator(val value: kotlin.String){
         @SerialName("=")
@@ -46,7 +47,9 @@ data class PrimitiveConstraint @OptIn(ExperimentalSerializationApi::class) const
         @SerialName("<=")
         Less_Than_Equal("<="),
         @SerialName(">=")
-        Greater_Than_Equal(">=");
+        Greater_Than_Equal(">="),
+        @SerialName("in")
+        In("in");
 
     }
 }

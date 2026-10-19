@@ -60,7 +60,10 @@ fun Application.module() {
         //register(ContentType.Application.Json, GsonConverter())
     }
     install(CORS) {
-        allowCredentials = true
+        // credentials (the Authorization header) may only be shared with
+        // configured origins — anyHost()+allowCredentials would let any
+        // website replay a logged-in user's session
+        allowCredentials = GlobalFlexoConfig.corsAllowedOrigins.isNotEmpty()
 
         allowHeader(HttpHeaders.Authorization)
         allowHeader(HttpHeaders.ContentType)
@@ -86,7 +89,16 @@ fun Application.module() {
         exposeHeader(HttpHeaders.Link)
         exposeHeader("Flexo-Mms-Layer-1")
 
-        anyHost() // @TODO: make configuration
+        if (GlobalFlexoConfig.corsAllowedOrigins.isEmpty()) {
+            anyHost()
+        } else {
+            GlobalFlexoConfig.corsAllowedOrigins.forEach { origin ->
+                val scheme = origin.substringBefore("://", "")
+                val host = origin.substringAfter("://")
+                if (scheme.isEmpty()) allowHost(host, listOf("http", "https"))
+                else allowHost(host, listOf(scheme))
+            }
+        }
     }
     install(AutoHeadResponse) // see https://ktor.io/docs/autoheadresponse.html
     install(Compression, ApplicationCompressionConfiguration()) // see https://ktor.io/docs/compression.html
@@ -139,7 +151,10 @@ data class FlexoConfig(
     val org: String,
     val defaultTimeout: Long,
     val auth: String,
-    val basePath: String
+    val basePath: String,
+    // origins allowed for CORS ("scheme://host[:port]", space-separated);
+    // empty means any host, which browsers only honor without credentials
+    val corsAllowedOrigins: List<String> = emptyList()
 )
 
 /**
@@ -154,5 +169,7 @@ val Application.flexoConfig: FlexoConfig
         val defaultTimeout = property("flexo.defaultTimeout")?.getString()?.toLong() ?: 60L
         val auth = property("flexo.auth")?.getString() ?: ""
         val basePath = property("flexo.basePath")?.getString() ?: ""
-        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath)
+        val corsAllowedOrigins = property("flexo.corsAllowedOrigins")?.getString()
+            ?.split(" ")?.filter { it.isNotBlank() } ?: emptyList()
+        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath, corsAllowedOrigins)
     }
