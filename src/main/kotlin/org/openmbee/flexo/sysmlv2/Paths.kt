@@ -35,7 +35,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/branches") class getBranchesByProject(val projectId: kotlin.String, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/branches") class getBranchesByProject(val projectId: kotlin.String, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Get branch by project and ID
@@ -71,7 +71,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/changes") class getChangesByProjectCommit(val projectId: kotlin.String, val commitId: kotlin.String, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/changes") class getChangesByProjectCommit(val projectId: kotlin.String, val commitId: kotlin.String, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Get commit by project and ID
@@ -89,7 +89,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/commits") class getCommitsByProject(val projectId: kotlin.String, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/commits") class getCommitsByProject(val projectId: kotlin.String, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Create commit by project
@@ -110,7 +110,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/commits/{compareCommitId}/diff") class diff(val projectId: kotlin.String, val baseCommitId: kotlin.String, val compareCommitId: kotlin.String, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/commits/{compareCommitId}/diff") class diff(val projectId: kotlin.String, val baseCommitId: kotlin.String, val compareCommitId: kotlin.String, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Merge source commit(s) into a target branch
@@ -124,7 +124,7 @@ object Paths {
      * @param pageSize Page size (optional)
      * @param &#x60;data&#x60;  (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/branches/{targetBranchId}/merge") class merge(val projectId: kotlin.String, val sourceCommitId: kotlin.collections.List<kotlin.String>, val targetBranchId: kotlin.String, val description: kotlin.String? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null, val `data`: kotlin.collections.List<JsonObject>? = null)
+    @Serializable @Resource("/projects/{projectId}/branches/{targetBranchId}/merge") class merge(val projectId: kotlin.String, val sourceCommitId: kotlin.collections.List<kotlin.String>, val targetBranchId: kotlin.String, val description: kotlin.String? = null, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null, val `data`: kotlin.collections.List<JsonObject>? = null)
 
     /**
      * Get element by project, commit and ID
@@ -146,7 +146,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/elements") class getElementsByProjectCommit(val projectId: kotlin.String, val commitId: kotlin.String, val excludeUsed: kotlin.Boolean? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/elements") class getElementsByProjectCommit(val projectId: kotlin.String, val commitId: kotlin.String, val excludeUsed: kotlin.Boolean? = null, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Get ProjectUsage that originates the provided element
@@ -167,7 +167,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/roots") class getRootsByProjectCommit(val projectId: kotlin.String, val commitId: kotlin.String, val excludeUsed: kotlin.Boolean? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/roots") class getRootsByProjectCommit(val projectId: kotlin.String, val commitId: kotlin.String, val excludeUsed: kotlin.Boolean? = null, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Get datatype by ID
@@ -183,7 +183,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/meta/datatypes") class getDatatypes(val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/meta/datatypes") class getDatatypes(@SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Delete project by ID
@@ -206,7 +206,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects") class getProjects(val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects") class getProjects(@SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Create project
@@ -239,7 +239,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/queries") class getQueriesByProject(val projectId: kotlin.String, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/queries") class getQueriesByProject(val projectId: kotlin.String, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Get query by project and ID
@@ -259,7 +259,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/query-results") class getQueryResultsByProjectIdQuery(val projectId: kotlin.String, val queryRequest: QueryRequest, val commitId: kotlin.String? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/query-results") class getQueryResultsByProjectIdQuery(val projectId: kotlin.String, val queryRequest: QueryRequest, val commitId: kotlin.String? = null, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Get query results by project and query
@@ -271,7 +271,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/queries/{queryId}/results") class getQueryResultsByProjectIdQueryId(val projectId: kotlin.String, val queryId: kotlin.String, val commitId: kotlin.String? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/queries/{queryId}/results") class getQueryResultsByProjectIdQueryId(val projectId: kotlin.String, val queryId: kotlin.String, val commitId: kotlin.String? = null, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Get query results by project and query definition via POST
@@ -283,7 +283,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/query-results") class getQueryResultsByProjectIdQueryPost(val projectId: kotlin.String, val queryRequest: QueryRequest, val commitId: kotlin.String? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/query-results") class getQueryResultsByProjectIdQueryPost(val projectId: kotlin.String, val queryRequest: QueryRequest, val commitId: kotlin.String? = null, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Create query by project
@@ -314,7 +314,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/elements/{relatedElementId}/relationships") class getRelationshipsByProjectCommitRelatedElement(val projectId: kotlin.String, val commitId: kotlin.String, val relatedElementId: kotlin.String, val direction: kotlin.String? = null, val excludeUsed: kotlin.Boolean? = null, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/commits/{commitId}/elements/{relatedElementId}/relationships") class getRelationshipsByProjectCommitRelatedElement(val projectId: kotlin.String, val commitId: kotlin.String, val relatedElementId: kotlin.String, val direction: kotlin.String? = null, val excludeUsed: kotlin.Boolean? = null, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Delete tag by project and ID
@@ -340,7 +340,7 @@ object Paths {
      * @param pageBefore Page before (optional)
      * @param pageSize Page size (optional)
      */
-    @Serializable @Resource("/projects/{projectId}/tags") class getTagsByProject(val projectId: kotlin.String, val pageAfter: kotlin.String? = null, val pageBefore: kotlin.String? = null, val pageSize: kotlin.Int? = null)
+    @Serializable @Resource("/projects/{projectId}/tags") class getTagsByProject(val projectId: kotlin.String, @SerialName("page[after]") val pageAfter: kotlin.String? = null, @SerialName("page[before]") val pageBefore: kotlin.String? = null, @SerialName("page[size]") val pageSize: kotlin.Int? = null)
 
     /**
      * Create tag by project

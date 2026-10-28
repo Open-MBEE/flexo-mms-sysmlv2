@@ -13,47 +13,41 @@ package org.openmbee.flexo.sysmlv2.apis
 
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
-import io.ktor.server.response.*
-import org.openmbee.flexo.sysmlv2.Paths
-import io.ktor.server.resources.options
 import io.ktor.server.resources.get
-import io.ktor.server.resources.post
-import io.ktor.server.resources.put
-import io.ktor.server.resources.delete
-import io.ktor.server.resources.head
-import io.ktor.server.resources.patch
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.*
+import org.openmbee.flexo.sysmlv2.Paths
+
+private const val JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
+
+// the API's datatype schemas, served from the bundled official OMG spec
+// (resources/openapi.json); parsed once on first use
+private val datatypeSchemas: Map<String, JsonObject> by lazy {
+    val stream = object {}.javaClass.classLoader.getResourceAsStream("openapi.json")
+        ?: return@lazy emptyMap()
+    val doc = stream.reader().use { Json.parseToJsonElement(it.readText()) }.jsonObject
+    doc["components"]?.jsonObject?.get("schemas")?.jsonObject
+        ?.mapValues { (_, schema) -> schema.jsonObject }
+        ?: emptyMap()
+}
 
 fun Route.MetaApi() {
 
-    get<Paths.getDatatypeById> {
-        val exampleContentString = """{
-          "${'$'}schema" : "${'$'}schema",
-          "${'$'}defs" : {
-            "key" : ""
-          },
-          "additionalProperties" : true,
-          "title" : "title",
-          "type" : "type",
-          "properties" : {
-            "key" : ""
-          },
-          "required" : [ "required", "required" ],
-          "${'$'}id" : "https://openapi-generator.tech"
-        }"""
-
-        call.respondText(exampleContentString, ContentType.Application.Json)
+    get<Paths.getDatatypeById> { params ->
+        val schema = datatypeSchemas[params.datatypeId.toString()]
+            ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.respond(buildJsonObject {
+            put("\$schema", JSON_SCHEMA_DIALECT)
+            schema.forEach { (key, value) -> put(key, value) }
+        })
     }
 
     get<Paths.getDatatypes> {
-        val exampleContentString = """{
-          "${'$'}schema" : "${'$'}schema",
-          "${'$'}defs" : {
-            "key" : ""
-          }
-        }"""
-        call.respondText(exampleContentString, ContentType.Application.Json)
+        call.respond(buildJsonObject {
+            put("\$schema", JSON_SCHEMA_DIALECT)
+            put("\$defs", JsonObject(datatypeSchemas))
+        })
     }
 
 }

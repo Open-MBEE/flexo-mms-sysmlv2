@@ -140,7 +140,7 @@ fun Route.ProjectApi() {
     }
 
     // get all projects
-    get<Paths.getProjects> {
+    get<Paths.getProjects> { params ->
         val flexoResponse = flexoRequestGet {
             orgPath("/repos")
         }
@@ -148,7 +148,7 @@ fun Route.ProjectApi() {
             return@get forward(flexoResponse)
         }
         // parse the response model, convert it to JSON, and reply to client
-        call.respond(flexoResponse.parseModel {
+        val projects = flexoResponse.parseModel {
             // find all repos and transform each one into a project by its outgoing triples
             // filter out deleted = true
             model.listSubjectsWithProperty(RDF.type, MMS.Repo).filterDrop {
@@ -156,7 +156,8 @@ fun Route.ProjectApi() {
             }.mapWith {
                 projectFromResponse(it.outgoing())
             }.toList().filterNotNull()
-        })
+        }
+        respondPage(projects, params.pageSize, params.pageAfter) { it.atId }
     }
 
     // create new project via POST

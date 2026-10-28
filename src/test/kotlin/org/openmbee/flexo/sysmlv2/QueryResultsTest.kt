@@ -2,6 +2,7 @@ package org.openmbee.flexo.sysmlv2
 
 import io.kotest.assertions.ktor.client.shouldHaveStatus
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.shouldBe
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -159,6 +160,44 @@ class QueryResultsTest : ProjectAny() {
                 val ids = Json.parseToJsonElement(response.bodyAsText()).jsonArray
                     .map { it.jsonObject["@id"]!!.jsonPrimitive.content }
                 ids shouldContainExactlyInAnyOrder listOf(gammaId)
+            }
+        }
+
+        "POST query-results - select projects the result properties" {
+            testApplication {
+                commitChanges(demoProjectId, seedChanges).atId()
+                val response = httpPost("/projects/$demoProjectId/query-results") {
+                    setJsonBody(
+                        """
+                        {
+                            "@type": "Query",
+                            "select": ["@id", "name"],
+                            "where": {"@type": "PrimitiveConstraint", "operator": "=", "property": "name", "value": ["Alpha"]}
+                        }
+                        """.trimIndent()
+                    )
+                }
+                response shouldHaveStatus HttpStatusCode.OK
+                val results = Json.parseToJsonElement(response.bodyAsText()).jsonArray
+                results.size shouldBe 1
+                val element = results[0].jsonObject
+                element.keys shouldBe setOf("@id", "name")
+                element["name"]!!.jsonPrimitive.content shouldBe "Alpha"
+            }
+        }
+
+        "GET queries/{queryId}/results - applies the saved select projection" {
+            testApplication {
+                commitChanges(demoProjectId, seedChanges).atId()
+                // createQuery stores select = ["@id"]
+                val queryId = createQuery(demoProjectId, "name", "Beta").atId()
+
+                val response = httpGet("/projects/$demoProjectId/queries/$queryId/results")
+                response shouldHaveStatus HttpStatusCode.OK
+                val results = Json.parseToJsonElement(response.bodyAsText()).jsonArray
+                results.size shouldBe 1
+                results[0].jsonObject.keys shouldBe setOf("@id")
+                results[0].jsonObject["@id"]!!.jsonPrimitive.content shouldBe betaId
             }
         }
 

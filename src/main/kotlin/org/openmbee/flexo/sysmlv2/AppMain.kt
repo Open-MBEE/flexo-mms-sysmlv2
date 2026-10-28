@@ -20,6 +20,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import io.ktor.server.application.ApplicationStopped
 import org.openmbee.flexo.sysmlv2.apis.*
+import org.openmbee.flexo.sysmlv2.models.Error
 
 lateinit var GlobalFlexoConfig: FlexoConfig
 lateinit var FlexoHttpClient: HttpClient
@@ -105,17 +106,26 @@ fun Application.module() {
     //install(HSTS, ApplicationHstsConfiguration()) // see https://ktor.io/docs/hsts.html
     install(Resources)
     install(StatusPages) {
+        // failures respond with the spec's Error shape so clients can
+        // parse them uniformly
         exception<InvalidSysmlSerializationError> { call, cause ->
-            call.respondText(cause.message ?: "Bad Request", status = HttpStatusCode.BadRequest)
+            call.respond(HttpStatusCode.BadRequest,
+                Error(Error.AtType.Error, cause.message ?: "Bad Request"))
         }
         exception<BadRequestException> { call, cause ->
-            call.respondText(cause.message ?: "Bad Request", status = HttpStatusCode.BadRequest)
+            call.respond(HttpStatusCode.BadRequest,
+                Error(Error.AtType.Error, cause.message ?: "Bad Request"))
         }
         exception<NotImplementedError> { call, cause ->
-            call.respondText(cause.message ?: "Not Implemented", status = HttpStatusCode.NotImplemented)
+            call.respond(HttpStatusCode.NotImplemented,
+                Error(Error.AtType.Error, cause.message ?: "Not Implemented"))
         }
         exception<Throwable> { call, cause ->
-            call.respondText(cause.message ?: "Internal Server Error", status = HttpStatusCode.InternalServerError)
+            // do not leak internal details (exception messages may contain
+            // IRIs, paths, or upstream internals)
+            call.application.log.error("unhandled exception", cause)
+            call.respond(HttpStatusCode.InternalServerError,
+                Error(Error.AtType.Error, "Internal Server Error"))
         }
     }
     routing {
