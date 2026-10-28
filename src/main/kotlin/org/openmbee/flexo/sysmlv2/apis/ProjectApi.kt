@@ -33,16 +33,16 @@ fun projectFromResponse(
     outgoing: Map<Property, Set<RDFNode>>,
     projectId: String = outgoing[MMS.id]?.literal() ?: error("project missing mms:id"),
     branchId: String = outgoing[SYSMLV2.DEFAULT_BRANCH_ID]?.literal() ?: error("project missing default branch id")
-): Project {
+): Project? {
+    // never fabricate created/name for malformed upstream data — invented
+    // values mask triplestore bugs (see issue #20)
     return Project(
         atId = projectId,
         atType = Project.AtType.Project,
-        created = OffsetDateTime.parse(
-            outgoing[MMS.created]?.literal()
-                ?: OffsetDateTime.now().toString()),
+        created = OffsetDateTime.parse(outgoing[MMS.created]?.literal() ?: return null),
         defaultBranch = Identified(branchId),
         description = outgoing[DCTerms.description]?.literal()?: "",
-        name = outgoing[DCTerms.title]?.literal()?: ""
+        name = outgoing[DCTerms.title]?.literal() ?: return null
     )
 }
 
@@ -133,7 +133,8 @@ fun Route.ProjectApi() {
             return@get forward(flexoResponse)
         }
         val project = flexoResponse.findFirstByType(MMS.Repo) {
-            projectFromResponse(it)
+            // soft-deleted projects are invisible
+            if (it[SYSMLV2.DELETED] != null) null else projectFromResponse(it)
         } ?: return@get call.respond(HttpStatusCode.NotFound)
         call.respond(project)
     }
@@ -154,7 +155,7 @@ fun Route.ProjectApi() {
                 it.hasProperty(SYSMLV2.DELETED)
             }.mapWith {
                 projectFromResponse(it.outgoing())
-            }.toList()
+            }.toList().filterNotNull()
         })
     }
 
@@ -165,6 +166,15 @@ fun Route.ProjectApi() {
         projectRequest.defaultBranch?.atId?.let { requireValidId(it, "defaultBranch.@id") }
         // use provided project ID or generate one if not provided
         val projectId = projectRequest.atId ?: generateId()
+        // POST must not silently overwrite an existing project
+        if (projectRequest.atId != null) {
+            val existing = flexoRequestGet {
+                orgPath("/repos/${projectId}")
+            }
+            if (!existing.isFailure()) {
+                return@post call.respond(HttpStatusCode.Conflict)
+            }
+        }
         val flexoResponse = createOrUpdateProject(projectId, projectRequest, true)
         if (flexoResponse.isFailure()) {
             return@post forward(flexoResponse)

@@ -8,7 +8,7 @@ JDK 21 for development or running without docker
 ## Run
 
 ```
-cp src/main/resources/application.conf.example to src/main/resources/application.conf
+cp src/main/resources/application.conf.example src/main/resources/application.conf
 
 ./gradlew run
 ```

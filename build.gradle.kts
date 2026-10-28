@@ -11,7 +11,7 @@ repositories {
 }
 
 jacoco {
-    toolVersion = "0.8.12"
+    toolVersion = "0.8.15"
 }
 
 plugins {
@@ -34,7 +34,7 @@ sonar {
 dependencies {
     implementation(kotlin("stdlib"))
 
-    val ktorVersion = "3.4.3"
+    val ktorVersion = "3.5.1"
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
@@ -58,7 +58,7 @@ dependencies {
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-resources:$ktorVersion")
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
-    val kotestVersion = "6.1.11"
+    val kotestVersion = "6.2.2"
     testImplementation("io.kotest:kotest-runner-junit5:$kotestVersion")
     testImplementation("io.kotest:kotest-assertions-core:$kotestVersion")
     testImplementation("io.kotest:kotest-assertions-json-jvm:$kotestVersion")
@@ -67,17 +67,17 @@ dependencies {
 
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
 
-    implementation("ch.qos.logback:logback-classic:1.5.18")
+    implementation("ch.qos.logback:logback-classic:1.5.38")
 
     val junitVersion = "5.13.1"
     testImplementation("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 
     // sign JWTs locally in tests with the same shared secret as the
     // layer1-service container (see src/test/resources/test.env)
-    testImplementation("com.auth0:java-jwt:4.5.0")
+    testImplementation("com.auth0:java-jwt:4.6.0")
 
-    val jenaVersion = "6.0.0"
+    val jenaVersion = "6.1.0"
     implementation("org.apache.jena:jena-arq:${jenaVersion}")
     implementation("org.apache.jena:jena-querybuilder:${jenaVersion}")
     // CommonSpec.beforeEach uses RDFConnection to reload cluster.trig via GSP
