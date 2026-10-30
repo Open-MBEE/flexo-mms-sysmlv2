@@ -17,24 +17,31 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.resources.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import io.ktor.server.application.ApplicationStopped
 import org.openmbee.flexo.sysmlv2.apis.*
+import org.openmbee.opensysml.OpenSysMLException
 import org.openmbee.flexo.sysmlv2.models.Error
 
 lateinit var GlobalFlexoConfig: FlexoConfig
+/** Textual-notation converter; null when flexo.opensysml.url is empty (feature off). */
+var OpenSysmlNotationService: OpenSysmlNotation? = null
 lateinit var FlexoHttpClient: HttpClient
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 @Suppress("unused")
 fun Application.module() {
     GlobalFlexoConfig = flexoConfig
+    OpenSysmlNotationService = GlobalFlexoConfig.opensysmlUrl.takeIf { it.isNotBlank() }?.let { OpenSysmlNotation(it) }
     FlexoHttpClient = HttpClient() {
         install(HttpTimeout) {
             requestTimeoutMillis = GlobalFlexoConfig.defaultTimeout * 1000
         }
     }
     environment.monitor.subscribe(ApplicationStopped) {
+        OpenSysmlNotationService?.close()
+        OpenSysmlNotationService = null
         FlexoHttpClient.close()
     }
     install(DefaultHeaders)
@@ -48,12 +55,7 @@ fun Application.module() {
         reporter.start(10, TimeUnit.SECONDS)
     }*/
     install(ContentNegotiation) {
-        json(Json {
-            isLenient = true
-            prettyPrint = true
-            ignoreUnknownKeys = true
-            classDiscriminator = "@type"
-        })
+        json(ApiJson)
         /*gson {
             registerTypeAdapter(OffsetDateTime::class.java, OffsetDateTimeAdapter)
             registerTypeAdapter(LocalDateTime::class.java, LocalDateTimeAdapter)
@@ -89,6 +91,7 @@ fun Application.module() {
         exposeHeader(HttpHeaders.Location)
         exposeHeader(HttpHeaders.Link)
         exposeHeader("Flexo-Mms-Layer-1")
+        exposeHeader(DIAGNOSTIC_HEADER)
 
         GlobalFlexoConfig.corsAllowedOrigins.forEach { origin ->
             val scheme = origin.substringBefore("://", "")
@@ -104,6 +107,18 @@ fun Application.module() {
     install(StatusPages) {
         // failures respond with the spec's Error shape so clients can
         // parse them uniformly
+        // notation requests carry a non-JSON Accept/Content-Type; answer in the
+        // spec Error shape regardless of what the client said it accepts
+        exception<NotationUnavailableError> { call, cause ->
+            call.respondJsonError(cause.status, cause.message ?: cause.status.description)
+        }
+        exception<NotationConversionError> { call, cause ->
+            call.respondJsonError(HttpStatusCode.BadRequest, cause.message ?: "Bad Request")
+        }
+        exception<OpenSysMLException> { call, cause ->
+            call.application.log.error("OpenSysML service call failed", cause)
+            call.respondJsonError(HttpStatusCode.BadGateway, "OpenSysML service at ${OpenSysmlNotationService?.address}: ${cause.message}")
+        }
         exception<InvalidSysmlSerializationError> { call, cause ->
             call.respond(HttpStatusCode.BadRequest,
                 Error(Error.AtType.Error, cause.message ?: "Bad Request"))
@@ -150,6 +165,21 @@ fun Application.property(key: String): ApplicationConfigValue? {
 /**
  * Flexo config struct
  */
+/** The API's JSON configuration, shared by content negotiation and the explicit JSON responses. */
+val ApiJson = Json {
+    isLenient = true
+    prettyPrint = true
+    ignoreUnknownKeys = true
+    classDiscriminator = "@type"
+}
+
+/** Respond with JSON regardless of the request's Accept header (notation clients accept text/plain). */
+suspend inline fun <reified T> ApplicationCall.respondJson(value: T, status: HttpStatusCode = HttpStatusCode.OK) =
+    respondText(ApiJson.encodeToString(value), ContentType.Application.Json, status)
+
+private suspend fun ApplicationCall.respondJsonError(status: HttpStatusCode, description: String) =
+    respondJson(Error(Error.AtType.Error, description), status)
+
 data class FlexoConfig(
     val protocol: URLProtocol,
     val host: String,
@@ -160,7 +190,8 @@ data class FlexoConfig(
     val basePath: String,
     // origins allowed for CORS ("scheme://host[:port]", space-separated);
     // empty disables cross-origin access altogether
-    val corsAllowedOrigins: List<String> = emptyList()
+    val corsAllowedOrigins: List<String> = emptyList(),
+    val opensysmlUrl: String = ""
 )
 
 /**
@@ -177,5 +208,6 @@ val Application.flexoConfig: FlexoConfig
         val basePath = property("flexo.basePath")?.getString() ?: ""
         val corsAllowedOrigins = property("flexo.corsAllowedOrigins")?.getString()
             ?.split(" ")?.filter { it.isNotBlank() } ?: emptyList()
-        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath, corsAllowedOrigins)
+        val opensysmlUrl = property("flexo.opensysml.url")?.getString() ?: ""
+        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath, corsAllowedOrigins, opensysmlUrl)
     }

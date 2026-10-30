@@ -212,11 +212,22 @@ fun Route.ElementApi() {
     get<Paths.getElementsByProjectCommit> { getElements ->
         requireValidId(getElements.projectId, "projectId")
         requireValidId(getElements.commitId, "commitId")
-        getElements.pageAfter?.let { requireValidId(it, "page[after]") }
-        getElements.pageBefore?.let { requireValidId(it, "page[before]") }
+        val notation = call.request.acceptedNotationType()
+        if (notation != null && OpenSysmlNotationService == null) {
+            throw NotationUnavailableError(
+                HttpStatusCode.NotAcceptable,
+                "Textual notation output needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
+            )
+        }
+        if (notation == null) {
+            getElements.pageAfter?.let { requireValidId(it, "page[after]") }
+            getElements.pageBefore?.let { requireValidId(it, "page[before]") }
+        }
 
-        // unpaged: dump the whole model graph (historical behavior)
-        if (getElements.pageSize == null && getElements.pageAfter == null && getElements.pageBefore == null) {
+        // unpaged: dump the whole model graph (historical behavior); notation
+        // output is always the complete graph, since a page cannot be written alone
+        val unpaged = getElements.pageSize == null && getElements.pageAfter == null && getElements.pageBefore == null
+        if (unpaged || notation != null) {
             val flexoResponse = flexoRequestGet {
                 orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
             }
@@ -234,7 +245,7 @@ fun Route.ElementApi() {
                     }
                 }
             }
-            return@get call.respond(result)
+            return@get respondElements(result)
         }
 
         val pageSize = resolvePageSize(getElements.pageSize)
@@ -288,7 +299,7 @@ fun Route.ElementApi() {
                 if (bounded) getElements.pageAfter else null,
                 if (bounded) getElements.pageBefore else null)
         }
-        call.respond(buildJsonArray { page.forEach { add(it.second) } })
+        respondElements(buildJsonArray { page.forEach { add(it.second) } })
     }
     //TODO this is wrong
     get<Paths.getProjectUsageByProjectCommitElement> {
@@ -372,4 +383,19 @@ fun Route.ElementApi() {
         }
     }
 
+}
+
+/**
+ * Elements as JSON, or — when the Accept header asks for `text/plain`, `application/vnd.sysml`
+ * or `application/vnd.kerml` — as textual notation written by OpenSysML from that element set.
+ */
+private suspend fun RoutingContext.respondElements(elements: JsonArray) {
+    val type = call.request.acceptedNotationType() ?: return call.respond(elements)
+    val notation = OpenSysmlNotationService ?: throw NotationUnavailableError(
+        HttpStatusCode.NotAcceptable,
+        "Textual notation output needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
+    )
+    val conversion = notation.toNotation(elements, notationFormat(type))
+    call.reportDiagnostics(notationFormat(type), conversion.diagnostics())
+    call.respondText(conversion.content(), type.withCharset(Charsets.UTF_8))
 }

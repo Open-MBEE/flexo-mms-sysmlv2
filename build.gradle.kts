@@ -58,6 +58,8 @@ dependencies {
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-resources:$ktorVersion")
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
+    // OpenSysML Java client: textual notation <-> API JSON via a running sysml-grpc service
+    implementation("org.openmbee:opensysml:0.10.1")
     val kotestVersion = "6.2.2"
     testImplementation("io.kotest:kotest-runner-junit5:$kotestVersion")
     testImplementation("io.kotest:kotest-assertions-core:$kotestVersion")
@@ -125,6 +127,8 @@ tasks {
         environment("JWT_AUDIENCE", System.getenv("JWT_AUDIENCE") ?: "flexo-mms-audience")
         environment("JWT_REALM", System.getenv("JWT_REALM") ?: "flexo-mms")
         environment("JWT_SECRET", System.getenv("JWT_SECRET") ?: "thisissomethingreallylong1234567801234567890")
+        // host:port of a running sysml-grpc; notation tests skip when unset
+        System.getenv("FLEXO_OPENSYSML_URL")?.let { environment("FLEXO_OPENSYSML_URL", it) }
     }
 }
 tasks.test {
