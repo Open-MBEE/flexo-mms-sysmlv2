@@ -116,8 +116,10 @@ fun Application.module() {
             call.respondJsonError(HttpStatusCode.BadRequest, cause.message ?: "Bad Request")
         }
         exception<OpenSysMLException> { call, cause ->
-            call.application.log.error("OpenSysML service call failed", cause)
-            call.respondJsonError(HttpStatusCode.BadGateway, "OpenSysML service at ${OpenSysmlNotationService?.address}: ${cause.message}")
+            // the address and the client's message stay in the log; the response
+            // only says the upstream service failed
+            call.application.log.error("OpenSysML service at ${OpenSysmlNotationService?.address} failed", cause)
+            call.respondJsonError(HttpStatusCode.BadGateway, "OpenSysML service unavailable")
         }
         exception<InvalidSysmlSerializationError> { call, cause ->
             call.respond(HttpStatusCode.BadRequest,
