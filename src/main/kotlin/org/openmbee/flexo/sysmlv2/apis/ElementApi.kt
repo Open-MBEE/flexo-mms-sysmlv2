@@ -43,8 +43,11 @@ fun modelElementConstructQuery(elementTarget: String="?__element"): String {
  * Cursor-paged element page: subjects are ordered by IRI (the element URN
  * embeds the id, so this is id order), optionally resuming after a cursor.
  */
-fun pagedElementsConstructQuery(afterElementIri: String?, limit: Int): String {
+// paging backwards (page[before] alone) takes the elements nearest the cursor
+fun pagedElementsConstructQuery(afterElementIri: String?, beforeElementIri: String?, limit: Int): String {
     val afterFilter = afterElementIri?.let { """filter(str(?e) > "${escapeRdfDoubleQuotedLiteralContents(it)}")""" } ?: ""
+    val beforeFilter = beforeElementIri?.let { """filter(str(?e) < "${escapeRdfDoubleQuotedLiteralContents(it)}")""" } ?: ""
+    val order = if (afterElementIri == null && beforeElementIri != null) "desc(?e)" else "?e"
     return """
         construct {
             ?e ?element_p ?element_o .
@@ -56,7 +59,8 @@ fun pagedElementsConstructQuery(afterElementIri: String?, limit: Int): String {
                     ?e ?any_p ?any_o .
                     filter(isIRI(?e) && strstarts(str(?e), "${SYSMLV2.ELEMENT}"))
                     $afterFilter
-                } order by ?e limit $limit
+                    $beforeFilter
+                } order by $order limit $limit
             }
             ?e ?element_p ?element_o .
         }
@@ -208,11 +212,11 @@ fun Route.ElementApi() {
     get<Paths.getElementsByProjectCommit> { getElements ->
         requireValidId(getElements.projectId, "projectId")
         requireValidId(getElements.commitId, "commitId")
-        val pageSize = getElements.pageSize
         getElements.pageAfter?.let { requireValidId(it, "page[after]") }
+        getElements.pageBefore?.let { requireValidId(it, "page[before]") }
 
         // unpaged: dump the whole model graph (historical behavior)
-        if (pageSize == null) {
+        if (getElements.pageSize == null && getElements.pageAfter == null && getElements.pageBefore == null) {
             val flexoResponse = flexoRequestGet {
                 orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/graph")
             }
@@ -233,17 +237,17 @@ fun Route.ElementApi() {
             return@get call.respond(result)
         }
 
-        if (pageSize < 1) {
-            throw BadRequestException("page[size] must be a positive integer")
-        }
+        val pageSize = resolvePageSize(getElements.pageSize)
 
         // paged: cursor over element IRIs at the SPARQL level, fetching one
-        // extra element to detect whether a next page exists
+        // extra element to detect whether the page continues
         val afterIri = getElements.pageAfter?.let { SYSMLV2.element(it).uri }
+        val beforeIri = getElements.pageBefore?.let { SYSMLV2.element(it).uri }
+        val backwards = afterIri == null && beforeIri != null
         val flexoResponse = flexoRequestPost {
             orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/query")
             sparqlQuery {
-                pagedElementsConstructQuery(afterIri, pageSize + 1)
+                pagedElementsConstructQuery(afterIri, beforeIri, pageSize + 1)
             }
         }
 
@@ -252,20 +256,37 @@ fun Route.ElementApi() {
             return@get forward(flexoResponse)
         }
 
-        val (page, hasNext) = flexoResponse.parseModel {
+        val (page, hasMore) = flexoResponse.parseModel {
             val ordered = model.listSubjects().toList()
                 .filter { !it.isAnon }
                 .map { it.uri }
                 .sorted()
-            val page = ordered.take(pageSize).map { iri ->
-                iri.urnSuffix to extractModelElementToJson(iri)
-            }
-            page to (ordered.size > pageSize)
+            val ids = if (backwards) ordered.takeLast(pageSize) else ordered.take(pageSize)
+            ids.map { iri -> iri.urnSuffix to extractModelElementToJson(iri) } to (ordered.size > pageSize)
         }
 
-        if (hasNext) {
-            val nextUrl = "${call.request.path()}?page%5Bsize%5D=$pageSize&page%5Bafter%5D=${page.last().first}"
-            call.response.headers.append(HttpHeaders.Link, "<$nextUrl>; rel=\"next\"")
+        // the subquery only tells whether the scan direction continues; the
+        // other side is settled by looking for one element beyond the page
+        suspend fun probeBeyond(after: String?, before: String?) = flexoRequestPost {
+            orgPath("/repos/${getElements.projectId}/locks/Commit.${getElements.commitId}/query")
+            sparqlQuery { pagedElementsConstructQuery(after, before, 1) }
+        }
+        suspend fun FlexoResponse.hasElement() = parseModel { model.listSubjects().asSequence().any { !it.isAnon } }
+        if (page.isNotEmpty()) {
+            val bounded = afterIri != null && beforeIri != null
+            val nextProbe = if (backwards) probeBeyond(SYSMLV2.element(page.last().first).uri, null) else null
+            // a bounded window starts at page[after], which this page heads
+            val prevProbe = if (!backwards && !bounded && afterIri != null)
+                probeBeyond(null, SYSMLV2.element(page.first().first).uri) else null
+            // a failed probe must not pass for a final page
+            listOfNotNull(nextProbe, prevProbe).firstOrNull { it.isFailure() }?.let { return@get forward(it) }
+            val hasNext = nextProbe?.hasElement() ?: hasMore
+            val hasPrev = if (backwards) hasMore else prevProbe?.hasElement() ?: false
+            appendPageLinks(pageSize,
+                page.last().first.takeIf { hasNext },
+                page.first().first.takeIf { hasPrev },
+                if (bounded) getElements.pageAfter else null,
+                if (bounded) getElements.pageBefore else null)
         }
         call.respond(buildJsonArray { page.forEach { add(it.second) } })
     }
@@ -346,7 +367,7 @@ fun Route.ElementApi() {
                 .filter { !it.isAnon }
                 .map { extractModelElementToJson(it.uri) }
         }
-        respondPage(roots, it.pageSize, it.pageAfter) { root ->
+        respondPage(roots, it.pageSize, it.pageAfter, it.pageBefore) { root ->
             root["@id"]!!.jsonPrimitive.content
         }
     }

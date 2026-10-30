@@ -37,15 +37,20 @@ import org.openmbee.flexo.sysmlv2.infrastructure.generateId
 import org.openmbee.flexo.sysmlv2.infrastructure.requireValidId
 import org.openmbee.flexo.sysmlv2.models.QueryRequest
 
-fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
+// every constraint binds its own variable: a shared name would conflate
+// distinct properties (e.g. part-name and part_name) or repeated ones
+class ConstraintVars {
+    private var count = 0
+    fun next(hint: String): String = "${hint.replace(Regex("[^A-Za-z0-9_]"), "_")}_${count++}"
+}
+
+fun PrimitiveConstraint.toSparql(cb: ConstructBuilder, vars: ConstraintVars): Expr {
     val p: Node
-    // property names are client input; only variable-safe characters may
-    // appear in the SPARQL variable derived from them
-    var pvar: String = property.replace(Regex("[^A-Za-z0-9_]"), "_")
+    val pvar: String
     when(property) {
-        "@id" -> { p = SYSMLV2.prop("elementId").asNode(); pvar = "id" }
-        "@type" -> { p = RDF.type.asNode(); pvar = "Metatype" }
-        else -> { p = SYSMLV2.prop(property).asNode() }
+        "@id" -> { p = SYSMLV2.prop("elementId").asNode(); pvar = vars.next("id") }
+        "@type" -> { p = RDF.type.asNode(); pvar = vars.next("Metatype") }
+        else -> { p = SYSMLV2.prop(property).asNode(); pvar = vars.next(property) }
     }
     // schema: value is null, or an array of at least one scalar/Identified/null;
     // a null value (either form) matches elements lacking the property
@@ -53,7 +58,8 @@ fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
     if (values.isEmpty()) {
         throw BadRequestException("PrimitiveConstraint value must not be empty")
     }
-    // null stands for "property absent"; everything else becomes a comparable node
+    // null stands for "property absent or explicitly null" (commits store
+    // JSON null as rdf:nil); everything else becomes a comparable node
     val nodes: List<Node?> = values.map { el ->
         when(el) {
             is JsonObject -> {
@@ -89,7 +95,9 @@ fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
                 .map { ef.eq("?$pvar", it) as Expr }
                 .reduceOrNull { acc, e -> ef.or(acc, e) }
                 ?.let { ef.and(ef.bound("?$pvar"), it) as Expr }
-            val absent = if (matchesAbsent) ef.not(ef.bound("?$pvar")) as Expr else null
+            val absent = if (matchesAbsent) {
+                ef.or(ef.not(ef.bound("?$pvar")), ef.eq("?$pvar", RDF.nil.asNode())) as Expr
+            } else null
             listOfNotNull(absent, membership).reduce { acc, e -> ef.or(acc, e) }
         }
         else -> {
@@ -109,15 +117,15 @@ fun PrimitiveConstraint.toSparql(cb: ConstructBuilder): Expr {
     }
     return if (inverse) ef.not(expr) else expr
 }
-fun CompositeConstraint.toSparql(cb: ConstructBuilder): Expr {
+fun CompositeConstraint.toSparql(cb: ConstructBuilder, vars: ConstraintVars): Expr {
     if (constraint.size < 2) throw BadRequestException("CompositeConstraint must have at least 2 constraints")
     val c = mutableListOf<Expr>()
     constraint.forEach {
         if (it is PrimitiveConstraint) {
-            c.add(it.toSparql(cb))
+            c.add(it.toSparql(cb, vars))
         }
         if (it is CompositeConstraint) {
-            c.add(it.toSparql(cb))
+            c.add(it.toSparql(cb, vars))
         }
     }
     val ef = cb.exprFactory
@@ -175,8 +183,8 @@ suspend fun RoutingContext.runQuery(
         .addWhere("?e", "?p", "?o")
         .addPrefixes(SYSMLV2_PREFIX_MAPPING)
     val filter = when(query.where) {
-        is CompositeConstraint -> query.where.toSparql(cb)
-        is PrimitiveConstraint -> query.where.toSparql(cb)
+        is CompositeConstraint -> query.where.toSparql(cb, ConstraintVars())
+        is PrimitiveConstraint -> query.where.toSparql(cb, ConstraintVars())
         null -> null
     }
     cb.addFilter(filter)
@@ -274,7 +282,7 @@ fun Route.QueryApi() {
                 queryFromResponse(it2.outgoing())
             }.toList()
         }
-        respondPage(queries, it.pageSize, it.pageAfter) { query -> query.atId }
+        respondPage(queries, it.pageSize, it.pageAfter, it.pageBefore) { query -> query.atId }
     }
 
     get<Paths.getQueryByProjectAndId> {

@@ -5,7 +5,11 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.shouldBe
+import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -112,6 +116,50 @@ class ProjectTest : CommonSpec() {
                 val ids = Json.parseToJsonElement(list.bodyAsText()).jsonArray
                     .map { it.jsonObject["@id"]!!.jsonPrimitive.content }
                 ids shouldNotContain id
+            }
+        }
+
+        "POST /projects - an existing @id is a 409, also under concurrent creation" {
+            testApplication {
+                val projectId = generateId()
+                createProject(projectId, "First")
+                httpPost("/projects") {
+                    setJsonBody("""{"@type": "Project", "@id": "$projectId", "name": "Second"}""")
+                } shouldHaveStatus HttpStatusCode.Conflict
+                getProject(projectId).bodyAsJsonObject()["name"]!!.jsonPrimitive.content shouldBe "First"
+
+                // simultaneous creation: exactly one request wins
+                val racedId = generateId()
+                val statuses = coroutineScope {
+                    (1..4).map { n ->
+                        async {
+                            httpPost("/projects") {
+                                setJsonBody("""{"@type": "Project", "@id": "$racedId", "name": "racer-$n"}""")
+                            }.status
+                        }
+                    }.awaitAll()
+                }
+                statuses.count { it == HttpStatusCode.OK } shouldBe 1
+                statuses.count { it == HttpStatusCode.Conflict } shouldBe 3
+            }
+        }
+
+        "cross-origin requests receive no CORS headers unless origins are configured" {
+            testApplication {
+                val response = httpGet("/projects") {
+                    header(HttpHeaders.Origin, "https://evil.example")
+                }
+                response shouldHaveStatus HttpStatusCode.OK
+                response.headers[HttpHeaders.AccessControlAllowOrigin] shouldBe null
+                response.headers[HttpHeaders.AccessControlAllowCredentials] shouldBe null
+
+                val preflight = httpRequest(HttpMethod.Options, "/projects") {
+                    header(HttpHeaders.Origin, "https://evil.example")
+                    header(HttpHeaders.AccessControlRequestMethod, "GET")
+                    header(HttpHeaders.AccessControlRequestHeaders, "authorization")
+                }
+                preflight.headers[HttpHeaders.AccessControlAllowOrigin] shouldBe null
+                preflight.headers[HttpHeaders.AccessControlAllowHeaders] shouldBe null
             }
         }
 
