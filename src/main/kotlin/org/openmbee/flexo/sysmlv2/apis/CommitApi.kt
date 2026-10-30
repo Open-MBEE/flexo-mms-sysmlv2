@@ -443,6 +443,9 @@ fun Route.CommitApi() {
             }
         }
         if (replace == null || replace != "true") { //regular update
+            // a validated commit holds the branch from the first read of the head (the
+            // referrers of deleted elements) through the write, see withBranchLock
+            withBranchLock(lockKey) {
             // deleted elements must not leave dangling references: remove
             // incoming link triples and the json: array annotations of the
             // referencing property; the annotations are re-inserted below
@@ -534,7 +537,6 @@ fun Route.CommitApi() {
             // trim indent for better inspectability
             sparqlUpdateString = sparqlUpdateString.trimIndent()
 
-            withBranchLock(lockKey) {
             if (validation != ValidationLevel.OFF) {
                 // the would-be head: the same update applied to a copy of the current head graph
                 val head = flexoRequestGet {
