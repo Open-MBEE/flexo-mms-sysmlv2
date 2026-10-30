@@ -78,6 +78,41 @@ curl "http://localhost:8083/projects/$PROJECT/commits/$COMMIT/elements" \
   -H "Authorization: Bearer $TOKEN" -H "Accept: text/plain"
 ```
 
+### Validating commits
+
+With the same service, the model a commit would leave at the branch head can be checked before it
+is written. `FLEXO_OPENSYSML_VALIDATE` (HOCON `flexo.opensysml.validate`) sets the level:
+
+- `off` (default): commits are stored as before, nothing is validated.
+- `warn`: the commit proceeds; OpenSysML's diagnostics for the resulting model are answered on the
+  `200` as one `X-SysML-Diagnostic: <severity> at <line>:<col>: <message>` header each.
+- `reject`: a commit whose resulting model has any error-severity diagnostic is refused with
+  `422 Unprocessable Entity`, an `Error` whose `description` lists the errors, and the same
+  `X-SysML-Diagnostic` headers; nothing is written. A clean model is committed as under `warn`.
+
+`warn` and `reject` need `FLEXO_OPENSYSML_URL`; without it the service refuses to start. The check
+applies to JSON and notation commits alike (`replace=true` included): the current head graph with the
+commit applied is written as SysML notation and parsed by OpenSysML, and only its diagnostics decide.
+An element set OpenSysML cannot write as notation (for instance a reference to an element that does
+not exist) is an error too.
+
+Validated commits to one branch are processed one at a time by the service instance (head read, judged
+and written under one lock), so the verdict applies to what is written; writers that bypass the service,
+and other instances, are not covered.
+
+A request may raise the level with `?validate=warn` or `?validate=reject` on
+`POST /projects/{projectId}/commits`; asking for a level below the configured one is answered `400`.
+Validation fetches the whole head graph and parses the whole model, so its cost grows with the model.
+
+```
+curl -i -X POST "http://localhost:8083/projects/$PROJECT/commits?validate=reject" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: text/plain" \
+  --data 'package P { part def A :> B; part def B :> A; }'
+# HTTP/1.1 422 Unprocessable Entity
+# X-SysML-Diagnostic: error at 1:27: A participates in a specialization cycle
+# X-SysML-Diagnostic: error at 1:44: B participates in a specialization cycle
+```
+
 For the test stack, `src/test/resources/docker-compose.yml` builds `sysml-grpc` from the pinned
 OpenSysML release (`src/test/resources/sysml-grpc/Dockerfile`); run the tests with
 `FLEXO_OPENSYSML_URL=localhost:50051 ./gradlew test`. Without it the notation tests are skipped.

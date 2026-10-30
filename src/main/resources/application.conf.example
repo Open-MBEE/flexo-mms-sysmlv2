@@ -30,6 +30,13 @@ flexo {
     opensysml {
         url = ""
         url = ${?FLEXO_OPENSYSML_URL}
+        # validation of the model a commit would leave at the branch head, through the
+        # same service: "off" (default), "warn" (commit proceeds, diagnostics answered in
+        # X-SysML-Diagnostic headers) or "reject" (a model with errors is refused with 422);
+        # "warn" and "reject" need url to be set. A request may raise the level with
+        # ?validate=warn|reject, never lower it.
+        validate = "off"
+        validate = ${?FLEXO_OPENSYSML_VALIDATE}
     }
     basePath = ""
     basePath = ${?BASEPATH}
