@@ -34,6 +34,10 @@ fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 fun Application.module() {
     GlobalFlexoConfig = flexoConfig
     OpenSysmlNotationService = GlobalFlexoConfig.opensysmlUrl.takeIf { it.isNotBlank() }?.let { OpenSysmlNotation(it) }
+    check(GlobalFlexoConfig.opensysmlValidate == ValidationLevel.OFF || OpenSysmlNotationService != null) {
+        "flexo.opensysml.validate=${GlobalFlexoConfig.opensysmlValidate.name.lowercase()} (FLEXO_OPENSYSML_VALIDATE) " +
+            "needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
+    }
     FlexoHttpClient = HttpClient() {
         install(HttpTimeout) {
             requestTimeoutMillis = GlobalFlexoConfig.defaultTimeout * 1000
@@ -115,6 +119,10 @@ fun Application.module() {
         exception<NotationConversionError> { call, cause ->
             call.respondJsonError(HttpStatusCode.BadRequest, cause.message ?: "Bad Request")
         }
+        exception<ModelValidationError> { call, cause ->
+            call.reportDiagnostics("validation", cause.diagnostics)
+            call.respondJsonError(HttpStatusCode.UnprocessableEntity, cause.message ?: "Unprocessable Entity")
+        }
         exception<OpenSysMLException> { call, cause ->
             call.application.log.error("OpenSysML service call failed", cause)
             call.respondJsonError(HttpStatusCode.BadGateway, "OpenSysML service at ${OpenSysmlNotationService?.address}: ${cause.message}")
@@ -191,7 +199,8 @@ data class FlexoConfig(
     // origins allowed for CORS ("scheme://host[:port]", space-separated);
     // empty disables cross-origin access altogether
     val corsAllowedOrigins: List<String> = emptyList(),
-    val opensysmlUrl: String = ""
+    val opensysmlUrl: String = "",
+    val opensysmlValidate: ValidationLevel = ValidationLevel.OFF
 )
 
 /**
@@ -209,5 +218,9 @@ val Application.flexoConfig: FlexoConfig
         val corsAllowedOrigins = property("flexo.corsAllowedOrigins")?.getString()
             ?.split(" ")?.filter { it.isNotBlank() } ?: emptyList()
         val opensysmlUrl = property("flexo.opensysml.url")?.getString() ?: ""
-        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath, corsAllowedOrigins, opensysmlUrl)
+        val opensysmlValidate = property("flexo.opensysml.validate")?.getString()?.takeIf { it.isNotBlank() }?.let {
+            ValidationLevel.parseOrNull(it) ?: throw IllegalArgumentException(
+                "flexo.opensysml.validate (FLEXO_OPENSYSML_VALIDATE) must be one of ${ValidationLevel.names}, got '$it'")
+        } ?: ValidationLevel.OFF
+        return FlexoConfig(protocol, host, port, org, defaultTimeout, auth, basePath, corsAllowedOrigins, opensysmlUrl, opensysmlValidate)
     }

@@ -237,15 +237,7 @@ fun Route.ElementApi() {
                 return@get forward(flexoResponse)
             }
             // parse the response model, extract the elements to JSON, and reply to client
-            val result = buildJsonArray {
-                flexoResponse.parseModel {
-                    for(subject in model.listSubjects()) {
-                        if (subject.isAnon) continue
-                        add(extractModelElementToJson(subject.uri))
-                    }
-                }
-            }
-            return@get respondElements(result)
+            return@get respondElements(flexoResponse.parseModel { elementsJson() })
         }
 
         val pageSize = resolvePageSize(getElements.pageSize)
@@ -396,6 +388,6 @@ private suspend fun RoutingContext.respondElements(elements: JsonArray) {
         "Textual notation output needs flexo.opensysml.url (FLEXO_OPENSYSML_URL) to point at a sysml-grpc service"
     )
     val conversion = notation.toNotation(elements, notationFormat(type))
-    call.reportDiagnostics(notationFormat(type), conversion.diagnostics())
+    call.reportDiagnostics("${notationFormat(type)} conversion", conversion.diagnostics())
     call.respondText(conversion.content(), type.withCharset(Charsets.UTF_8))
 }
