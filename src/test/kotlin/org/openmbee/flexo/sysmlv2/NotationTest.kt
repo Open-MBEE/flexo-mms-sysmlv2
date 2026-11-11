@@ -120,7 +120,7 @@ class NotationTest : ProjectAny() {
                 response.status shouldBe HttpStatusCode.BadGateway
                 val error = Json.parseToJsonElement(response.bodyAsText()).jsonObject
                 error["@type"]!!.jsonPrimitive.content shouldBe "Error"
-                error["description"]!!.jsonPrimitive.content shouldContain "localhost:1"
+                error["description"]!!.jsonPrimitive.content shouldBe "OpenSysML service unavailable"
             }
         }
 
